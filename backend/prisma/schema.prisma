@@ -1,0 +1,642 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Roles (todos los sprints)
+enum Role {
+  ADMIN
+  ORGANIZADOR
+  CLIENTE
+  JEFE_NEGOCIO
+  AYUDANTE
+  ENCARGADO_ACCESO
+  RECARGADOR
+  DEVOLUCIONES
+}
+
+enum SolicitudEstado {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  EVENTO_CREADO
+}
+
+enum InvitacionEstado {
+  PENDIENTE
+  ACEPTADA
+  CANCELADA
+}
+
+enum EventoEstado {
+  BORRADOR
+  PUBLICADO
+  FINALIZADO
+  CANCELADO
+}
+
+enum TipoAcceso {
+  QR_DIGITAL
+  MANILLA
+  AMBOS
+}
+
+enum MapChangeTipo {
+  CREACION
+  ACTUALIZACION
+}
+
+enum CompraEstado {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
+}
+
+enum EntradaEstado {
+  GENERADA
+  ASIGNADA
+  USADA
+  REEMBOLSADA
+  ANULADA
+}
+
+enum AccesoTipo {
+  INGRESO
+  SALIDA
+  REINGRESO
+}
+
+enum TipoTransaccionSaldo {
+  RECARGA
+  COMPRA_PRODUCTO
+  DEVOLUCION
+  AJUSTE
+}
+
+enum EstadoTransaccion {
+  COMPLETADA
+  PENDIENTE
+  ANULADA
+  ERROR
+}
+
+enum LiquidacionEstado {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  ENTREGADA
+}
+
+enum ReembolsoEstado {
+  SOLICITADO
+  APROBADO
+  RECHAZADO
+  PAGADO
+}
+
+// Usuarios y seguridad
+model Usuario {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  nombre       String
+  apellido     String?
+  /// Forma canónica (ver normalizePhone); único para evitar cuentas duplicadas.
+  telefono     String?   @unique
+  /// Forma canónica (ver normalizeDocument); único para evitar cuentas duplicadas.
+  documento    String?   @unique
+  fechaNac     DateTime?
+  fotoUrl      String?
+  fotoPublicId String?
+  preferencias Json?
+  activo       Boolean   @default(true)
+  /// Baja realizada por un administrador; la fila se conserva por el historial de eventos y compras.
+  eliminadoAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  roles                UsuarioRol[]
+  solicitudes          SolicitudEvento[]     @relation("OrganizadorSolicitudes")
+  eventosOrganizados   Evento[]              @relation("OrganizadorEventos")
+  resetTokens          PasswordResetToken[]
+  negocios             Negocio[]
+  ayudantesCreados     AyudanteNegocio[]     @relation("JefeAyudantes")
+  ayudanteDe           AyudanteNegocio?
+  saldosEvento         SaldoEvento[]
+  compras              CompraEntrada[]
+  entradas             Entrada[]             @relation("TitularEntrada")
+  transaccionesSaldo   TransaccionSaldo[]    @relation("UsuarioTransacciones")
+  transaccionesOperadas TransaccionSaldo[]   @relation("OperadorTransacciones")
+  accesosRegistrados   AccesoEvento[]        @relation("EncargadoAccesos")
+  ventasRealizadas     Venta[]               @relation("AyudanteVentas")
+  liquidacionesAprobadas LiquidacionEvento[] @relation("AdminLiquidaciones")
+  liquidacionesEntregadas LiquidacionEvento[] @relation("EntregaLiquidaciones")
+  reembolsos           ReembolsoEntrada[]
+  archivos             Archivo[]
+  staffAsignaciones    StaffEvento[]
+  invitacionesCreadas  InvitacionUsuario[]   @relation("InvitacionesCreadas")
+}
+
+/// Cuenta pendiente creada por un admin; el Usuario solo existe cuando el invitado acepta.
+model InvitacionUsuario {
+  id          String           @id @default(cuid())
+  email       String
+  nombre      String
+  apellido    String?
+  telefono    String?
+  role        Role
+  tokenHash   String           @unique
+  expiresAt   DateTime
+  estado      InvitacionEstado @default(PENDIENTE)
+  creadoPorId String
+  aceptadaAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  creadoPor Usuario @relation("InvitacionesCreadas", fields: [creadoPorId], references: [id])
+
+  @@index([email, estado])
+}
+
+model UsuarioRol {
+  id        String @id @default(cuid())
+  usuarioId String
+  role      Role
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, role])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  usuarioId String
+  tokenHash String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+}
+
+model StaffEvento {
+  id        String   @id @default(cuid())
+  usuarioId String
+  eventoId  String
+  role      Role
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  evento  Evento  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, eventoId, role])
+}
+
+// Eventos (Sprint 1)
+model SolicitudEvento {
+  id            String          @id @default(cuid())
+  organizadorId String
+  nombreEvento  String
+  descripcion   String          @db.Text
+  ubicacion     String
+  ubicacionUrl  String?         @db.VarChar(500)
+  capacidad     Int?
+  empresa       String?
+  /// Día de inicio; fechaFin solo existe si el evento dura varios días.
+  fechaInicio   DateTime        @db.Date
+  fechaFin      DateTime?       @db.Date
+  /// Mismo horario para todos los días del evento (HH:mm).
+  horaInicio    String          @db.VarChar(5)
+  horaFin       String          @db.VarChar(5)
+  mapaUrl       String?
+  mapaNombre    String?
+  estado        SolicitudEstado @default(PENDIENTE)
+  observaciones String?         @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  organizador Usuario         @relation("OrganizadorSolicitudes", fields: [organizadorId], references: [id])
+  evento      Evento?
+  mapHistory  MapaHistorial[]
+}
+
+model Evento {
+  id            String       @id @default(cuid())
+  solicitudId   String?      @unique
+  organizadorId String
+  titulo        String
+  descripcion   String       @db.Text
+  fotoUrl       String?
+  fotoPublicId  String?
+  ubicacion     String
+  ubicacionUrl  String?      @db.VarChar(500)
+  /// Lista de nombres de servicios: ["Estacionamiento", "Baños", ...]
+  servicios     Json?
+  /// { apertura: "HH:mm", cierre: "HH:mm", actividades: [{ hora: "HH:mm", actividad: string }] }
+  /// apertura y cierre son siempre la horaInicio y horaFin de sus FechaEvento.
+  cronograma    Json?
+  tipoAcceso    TipoAcceso   @default(QR_DIGITAL)
+  estado        EventoEstado @default(BORRADOR)
+  mapaUrl       String?
+  capacidad     Int?
+  puntoRetiroManilla String?
+  horarioRetiroManilla String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  solicitud      SolicitudEvento?  @relation(fields: [solicitudId], references: [id])
+  organizador    Usuario           @relation("OrganizadorEventos", fields: [organizadorId], references: [id])
+  fechas         FechaEvento[]
+  categorias     CategoriaEntrada[]
+  negocios       Negocio[]
+  mapHistory     MapaHistorial[]
+  saldos         SaldoEvento[]
+  compras        CompraEntrada[]
+  entradas       Entrada[]
+  manillas       Manilla[]
+  accesos        AccesoEvento[]
+  transacciones  TransaccionSaldo[]
+  ventas         Venta[]
+  liquidacion    LiquidacionEvento?
+  staff          StaffEvento[]
+  puntosRetiro   PuntoRetiroManilla[]
+}
+
+model FechaEvento {
+  id         String   @id @default(cuid())
+  eventoId   String
+  fecha      DateTime @db.Date
+  horaInicio String   @db.VarChar(5)
+  horaFin    String   @db.VarChar(5)
+  evento     Evento   @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  categorias CategoriaFecha[]
+  entradas   Entrada[]
+  accesos    AccesoEvento[]
+
+  @@unique([eventoId, fecha])
+}
+
+model CategoriaEntrada {
+  id         String  @id @default(cuid())
+  eventoId   String
+  nombre     String
+  precio     Decimal @db.Decimal(10, 2)
+  /// Lista de beneficios: ["Acceso preferencial", ...]
+  beneficios Json?
+  /// Entradas disponibles; el pool de códigos QR se mantiene con este mismo tamaño.
+  cupo       Int
+  evento     Evento  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  fechasDisponibles CategoriaFecha[]
+  ticketsPool       TicketPool[]
+  itemsCompra       CompraEntradaItem[]
+  entradas          Entrada[]
+}
+
+model CategoriaFecha {
+  id          String  @id @default(cuid())
+  categoriaId String
+  fechaId     String
+  disponible  Boolean @default(true)
+
+  categoria CategoriaEntrada @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  fecha     FechaEvento      @relation(fields: [fechaId], references: [id], onDelete: Cascade)
+
+  @@unique([categoriaId, fechaId])
+}
+
+model MapaHistorial {
+  id          String        @id @default(cuid())
+  solicitudId String?
+  eventoId    String?
+  mapaUrl     String
+  mapaNombre  String?
+  tipo        MapChangeTipo
+  nota        String?
+  createdAt   DateTime      @default(now())
+
+  solicitud SolicitudEvento? @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  evento    Evento?          @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+}
+
+/// Pool de códigos QR pregenerados (Sprint 1 HU-041); asignación a una Entrada en Sprint 2.
+/// codigoQr es el contenido que lleva el QR; la imagen se genera en la API al listar.
+model TicketPool {
+  id          String   @id @default(cuid())
+  categoriaId String
+  codigoQr    String   @unique
+  codigo      String   @unique
+  estado      String   @default("GENERADO")
+  createdAt   DateTime @default(now())
+
+  categoria CategoriaEntrada @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  entrada   Entrada?
+}
+
+// Compra de entradas (Sprint 2)
+model CompraEntrada {
+  id              String       @id @default(cuid())
+  usuarioId       String
+  eventoId        String
+  estado          CompraEstado @default(PENDIENTE)
+  montoTotal      Decimal      @db.Decimal(12, 2)
+  comprobanteUrl  String?
+  observaciones   String?      @db.Text
+  revisadoPorId   String?
+  revisadoAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  usuario Usuario             @relation(fields: [usuarioId], references: [id])
+  evento  Evento              @relation(fields: [eventoId], references: [id])
+  items   CompraEntradaItem[]
+  entradas Entrada[]
+  pago    PagoQR?
+}
+
+model CompraEntradaItem {
+  id          String  @id @default(cuid())
+  compraId    String
+  categoriaId String
+  fechaId     String?
+  cantidad    Int     @default(1)
+  precioUnit  Decimal @db.Decimal(10, 2)
+  paraNombre  String?
+  paraEmail   String?
+
+  compra    CompraEntrada    @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  categoria CategoriaEntrada @relation(fields: [categoriaId], references: [id])
+}
+
+model PagoQR {
+  id             String   @id @default(cuid())
+  compraId       String   @unique
+  referencia     String?
+  comprobanteUrl String?
+  monto          Decimal  @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
+
+  compra CompraEntrada @relation(fields: [compraId], references: [id], onDelete: Cascade)
+}
+
+model Entrada {
+  id           String        @id @default(cuid())
+  compraId     String?
+  eventoId     String
+  categoriaId  String
+  fechaId      String?
+  titularId    String?
+  ticketPoolId String?       @unique
+  codigoQr     String        @unique
+  codigo       String        @unique
+  estado       EntradaEstado @default(GENERADA)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  compra      CompraEntrada?    @relation(fields: [compraId], references: [id])
+  evento      Evento            @relation(fields: [eventoId], references: [id])
+  categoria   CategoriaEntrada  @relation(fields: [categoriaId], references: [id])
+  fecha       FechaEvento?      @relation(fields: [fechaId], references: [id])
+  titular     Usuario?          @relation("TitularEntrada", fields: [titularId], references: [id])
+  ticketPool  TicketPool?       @relation(fields: [ticketPoolId], references: [id])
+  manilla     Manilla?
+  accesos     AccesoEvento[]
+  reembolso   ReembolsoEntrada?
+  credencial  Credencial?
+}
+
+model ReembolsoEntrada {
+  id          String          @id @default(cuid())
+  entradaId   String          @unique
+  usuarioId   String
+  motivo      String?         @db.Text
+  estado      ReembolsoEstado @default(SOLICITADO)
+  monto       Decimal?        @db.Decimal(12, 2)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  entrada Entrada @relation(fields: [entradaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+}
+
+// Acceso / manillas (Sprint 2)
+model Credencial {
+  id        String   @id @default(cuid())
+  entradaId String   @unique
+  codigoQr  String   @unique
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  entrada Entrada  @relation(fields: [entradaId], references: [id], onDelete: Cascade)
+  manilla Manilla?
+}
+
+model Manilla {
+  id            String   @id @default(cuid())
+  eventoId      String
+  entradaId     String?  @unique
+  credencialId  String?  @unique
+  codigoFisico  String
+  vinculada     Boolean  @default(false)
+  vinculadaAt   DateTime?
+  puntoRetiroId String?
+  createdAt     DateTime @default(now())
+
+  evento      Evento             @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  entrada     Entrada?           @relation(fields: [entradaId], references: [id])
+  credencial  Credencial?        @relation(fields: [credencialId], references: [id])
+  puntoRetiro PuntoRetiroManilla? @relation(fields: [puntoRetiroId], references: [id])
+
+  @@unique([eventoId, codigoFisico])
+}
+
+model PuntoRetiroManilla {
+  id        String  @id @default(cuid())
+  eventoId  String
+  nombre    String
+  ubicacion String?
+  horario   String?
+  activo    Boolean @default(true)
+
+  evento   Evento    @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  manillas Manilla[]
+}
+
+model AccesoEvento {
+  id              String     @id @default(cuid())
+  eventoId        String
+  entradaId       String
+  fechaId         String?
+  encargadoId     String?
+  tipo            AccesoTipo
+  fotoIngresoUrl  String?
+  createdAt       DateTime   @default(now())
+
+  evento    Evento       @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  entrada   Entrada      @relation(fields: [entradaId], references: [id], onDelete: Cascade)
+  fecha     FechaEvento? @relation(fields: [fechaId], references: [id])
+  encargado Usuario?     @relation("EncargadoAccesos", fields: [encargadoId], references: [id])
+}
+
+// Saldo cashless por evento (regla técnica: NO billetera global)
+model SaldoEvento {
+  id        String   @id @default(cuid())
+  usuarioId String
+  eventoId  String
+  saldo     Decimal  @default(0) @db.Decimal(12, 2)
+  updatedAt DateTime @updatedAt
+
+  usuario        Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  evento         Evento             @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  transacciones  TransaccionSaldo[]
+
+  @@unique([usuarioId, eventoId])
+}
+
+model TransaccionSaldo {
+  id              String              @id @default(cuid())
+  saldoEventoId   String
+  usuarioId       String
+  eventoId        String
+  operadorId      String?
+  tipo            TipoTransaccionSaldo
+  monto           Decimal             @db.Decimal(12, 2)
+  saldoResultante Decimal             @db.Decimal(12, 2)
+  estado          EstadoTransaccion   @default(COMPLETADA)
+  nota            String?
+  ventaId         String?
+  evidenciaUrl    String?
+  createdAt       DateTime            @default(now())
+
+  saldoEvento SaldoEvento @relation(fields: [saldoEventoId], references: [id], onDelete: Cascade)
+  usuario     Usuario     @relation("UsuarioTransacciones", fields: [usuarioId], references: [id])
+  evento      Evento      @relation(fields: [eventoId], references: [id])
+  operador    Usuario?    @relation("OperadorTransacciones", fields: [operadorId], references: [id])
+  venta       Venta?      @relation(fields: [ventaId], references: [id])
+}
+
+// Negocios (Sprint 1 + ventas Sprint 2)
+model Negocio {
+  id          String   @id @default(cuid())
+  duenoId     String
+  eventoId    String?
+  nombre      String
+  descripcion String?  @db.Text
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  dueno     Usuario           @relation(fields: [duenoId], references: [id])
+  evento    Evento?           @relation(fields: [eventoId], references: [id])
+  productos Producto[]
+  ayudantes AyudanteNegocio[]
+  ventas    Venta[]
+  retiros   RetiroGanancias[]
+}
+
+model Producto {
+  id          String   @id @default(cuid())
+  negocioId   String
+  nombre      String
+  precio      Decimal  @db.Decimal(10, 2)
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  negocio Negocio       @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  detalles DetalleVenta[]
+}
+
+model AyudanteNegocio {
+  id         String   @id @default(cuid())
+  negocioId  String
+  usuarioId  String   @unique
+  jefeId     String
+  rolFuncion String   @default("cajero")
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  negocio Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  jefe    Usuario @relation("JefeAyudantes", fields: [jefeId], references: [id])
+}
+
+model Venta {
+  id          String   @id @default(cuid())
+  negocioId   String
+  eventoId    String
+  ayudanteId  String
+  clienteId   String?
+  entradaId   String?
+  total       Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+
+  negocio       Negocio           @relation(fields: [negocioId], references: [id])
+  evento        Evento            @relation(fields: [eventoId], references: [id])
+  ayudante      Usuario           @relation("AyudanteVentas", fields: [ayudanteId], references: [id])
+  detalles      DetalleVenta[]
+  transacciones TransaccionSaldo[]
+}
+
+model DetalleVenta {
+  id         String  @id @default(cuid())
+  ventaId    String
+  productoId String
+  cantidad   Int     @default(1)
+  precioUnit Decimal @db.Decimal(10, 2)
+  subtotal   Decimal @db.Decimal(12, 2)
+
+  venta    Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [id])
+}
+
+model RetiroGanancias {
+  id          String   @id @default(cuid())
+  negocioId   String
+  monto       Decimal  @db.Decimal(12, 2)
+  estado      String   @default("SOLICITADO")
+  evidenciaUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  negocio Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+}
+
+// Liquidación (Sprint 3)
+model LiquidacionEvento {
+  id              String             @id @default(cuid())
+  eventoId        String             @unique
+  montoTotal      Decimal            @db.Decimal(14, 2)
+  estado          LiquidacionEstado  @default(PENDIENTE)
+  aprobadoPorId   String?
+  aprobadoAt      DateTime?
+  entregadoPorId  String?
+  entregadoAt     DateTime?
+  evidenciaUrl    String?
+  nota            String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  evento       Evento   @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  aprobadoPor  Usuario? @relation("AdminLiquidaciones", fields: [aprobadoPorId], references: [id])
+  entregadoPor Usuario? @relation("EntregaLiquidaciones", fields: [entregadoPorId], references: [id])
+}
+
+// Archivos / evidencias
+model Archivo {
+  id        String   @id @default(cuid())
+  usuarioId String?
+  url       String
+  tipo      String
+  nombre    String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+}

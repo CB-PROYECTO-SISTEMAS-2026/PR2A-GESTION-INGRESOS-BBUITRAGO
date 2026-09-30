@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --color-navy: #0a1128;
+  --color-navy-2: #0d1630;
+  --color-sidebar: #0b1220;
+  --color-teal: #00c9d4;
+  --color-teal-dark: #00a8b3;
+  --color-page: #f8fafc;
+  --color-surface: #ffffff;
+  --color-muted: #64748b;
+  --color-ink: #0a1128;
+  --color-border: #e2e8f0;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: var(--color-page);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+  }
+}
+
+/*
+ * Van en la capa "components" para que las utilidades de Tailwind (pl-10, w-32, etc.)
+ * puedan sobrescribirlas; fuera de una capa ganarían siempre.
+ */
+@layer components {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    padding: 0.65rem 1.15rem;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .btn-primary {
+    background: var(--color-teal);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--color-teal-dark);
+  }
+
+  .btn-secondary {
+    background: white;
+    color: var(--color-ink);
+    border: 1px solid var(--color-border);
+  }
+
+  .btn-secondary:hover {
+    background: #f1f5f9;
+  }
+
+  .btn-danger {
+    background: #dc2626;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+  }
+
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-danger:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .btn-sm {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    background: white;
+    padding: 0.625rem 0.8rem;
+    outline: none;
+  }
+
+  .input:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 2px rgba(0, 201, 212, 0.2);
+  }
+
+  .input[aria-invalid='true'] {
+    border-color: #f87171;
+  }
+
+  .input:disabled,
+  .input[readonly] {
+    background: #f8fafc;
+    color: #64748b;
+  }
+
+  .input:disabled {
+    cursor: not-allowed;
+  }
+
+  .label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .field-error {
+    margin-top: 0.35rem;
+    font-size: 0.8125rem;
+    color: #dc2626;
+  }
+
+  .card-surface {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    white-space: nowrap;
+  }
+
+  .toast {
+    max-width: 24rem;
+    border: 1px solid var(--color-border);
+    border-left-width: 4px;
+    border-radius: 0.375rem;
+    background: white;
+    color: var(--color-ink);
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  }
+}
