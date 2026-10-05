@@ -9,18 +9,14 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "nest start",
+    "prestart:dev": "prisma generate",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"src/**/*.ts\" --fix",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node --project prisma/tsconfig.seed.json prisma/seed.ts",
-    "db:seed": "npm run prisma:seed",
-    "prisma:deploy": "prisma migrate deploy"
-  },
-  "prisma": {
-    "seed": "ts-node --project prisma/tsconfig.seed.json prisma/seed.ts"
+    "db:sync": "prisma db pull && prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -68,7 +64,6 @@
     "prisma": "^6.19.3",
     "source-map-support": "^0.5.21",
     "ts-loader": "^9.5.2",
-    "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"

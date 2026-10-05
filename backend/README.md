@@ -4,31 +4,37 @@ NestJS + Prisma + MySQL 8 · API REST con JWT
 
 ## Requisitos
 - Node.js 20+
-- MySQL 8
+- Acceso a la base MySQL compartida en Aiven (credenciales y certificado `ca.pem`)
 - Cuenta de Cloudinary (todos los archivos: mapas, fotos de eventos)
 - Cuenta de correo SMTP (Gmail con contraseña de aplicación) para invitaciones y recuperación de contraseña
 
 ## Configuración
-1. `npm install`
-2. Copia `.env.example` como `.env` y completa todos los valores. La API no arranca si falta alguno
+1. Copia `.env.example` como `.env` y completa todos los valores. La API no arranca si falta alguno
    obligatorio o si `JWT_SECRET` es débil. Las credenciales se comparten por un canal privado, nunca en el repositorio.
-3. Aplica las migraciones y, en desarrollo, carga los datos de prueba:
-```bash
-npm run prisma:deploy
-npm run prisma:seed
-```
+2. Guarda el certificado de Aiven como `prisma/ca.pem` (está ignorado por git).
+3. `npm install`
 4. `npm run start:dev` → API en `http://localhost:3000/api`
 
-Para cambiar el schema: edita `prisma/schema.prisma` y crea una migración con `npm run prisma:migrate`.
-No uses `prisma db push` sobre la base compartida.
+## Base de datos compartida
+Todo el equipo trabaja sobre la misma base MySQL en Aiven: los datos que alguien crea o modifica
+desde la app los ven los demás al instante. No hay seeds ni base local.
+
+- La estructura (tablas y columnas) solo la modifica el responsable de la base, directamente en Aiven.
+  El resto del equipo usa un usuario sin permisos para alterar tablas.
+- Después de cada cambio de estructura, el responsable ejecuta `npm run db:sync`, que actualiza
+  `prisma/schema.prisma` desde la base, y sube ese archivo al repositorio.
+- El resto solo hace `git pull`: `npm run start:dev` regenera el cliente de Prisma al arrancar.
+- `db:sync` reescribe `schema.prisma` completo: los comentarios sueltos se pierden.
+- Prohibido sobre la base compartida: `prisma migrate dev`, `prisma migrate reset` y `prisma db push`.
+- Antes de cada cambio de estructura se saca un respaldo con `mysqldump`.
 
 ## Scripts útiles
 | Script | Uso |
 |--------|-----|
-| `npm run prisma:deploy` | Aplica las migraciones pendientes |
-| `npm run prisma:seed` | Borra y recrea los datos de prueba (bloqueado con `NODE_ENV=production`) |
+| `npm run start:dev` | Regenera el cliente de Prisma y levanta la API en modo watch |
+| `npm run db:sync` | Actualiza `prisma/schema.prisma` desde la base y regenera el cliente |
 
-## Usuarios de prueba (solo seed de desarrollo)
+## Usuarios de prueba
 | Rol | Email | Password |
 |-----|-------|----------|
 | ADMIN | admin@eventix.com | Admin123! |

@@ -3,4 +3,5 @@ dist/
 uploads/
 mysql-data/
 .env
+prisma/ca.pem
 *.log

@@ -12,19 +12,18 @@ publicación de eventos, entradas y negocios dentro del evento.
 ```
 Eventix/
 ├── assets/     Logo e imagen por defecto de eventos (originales)
-├── backend/    API REST (NestJS + Prisma + MySQL)
+├── backend/    API REST (NestJS + Prisma + MySQL en Aiven)
 └── frontend/   Aplicación web (React + Vite + Tailwind)
 ```
 
 ## Ejecución local
 
-Backend (ver `backend/README.md` para la configuración del `.env`):
+Backend (ver `backend/README.md` para la configuración del `.env`, el certificado `ca.pem` y las
+reglas de la base compartida):
 
 ```bash
 cd backend
 npm install
-npm run prisma:deploy
-npm run prisma:seed
 npm run start:dev
 ```
 
