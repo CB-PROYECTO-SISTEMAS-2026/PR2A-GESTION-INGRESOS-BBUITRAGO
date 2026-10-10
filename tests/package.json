@@ -3,9 +3,12 @@
   "private": true,
   "description": "Pruebas automatizadas de Eventix (ver README.md)",
   "scripts": {
-    "test": "jest",
+    "test": "npm run test:unit && npm run test:integracion",
     "test:unit": "jest --selectProjects unit",
-    "test:watch": "jest --selectProjects unit --watch"
+    "test:watch": "jest --selectProjects unit --watch",
+    "test:integracion": "jest --selectProjects integracion --runInBand",
+    "limpiar": "node scripts/limpiar-datos-prueba.js",
+    "limpiar:confirmar": "node scripts/limpiar-datos-prueba.js --confirmar"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
