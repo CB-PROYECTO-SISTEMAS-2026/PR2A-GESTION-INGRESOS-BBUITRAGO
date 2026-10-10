@@ -16,6 +16,11 @@ export function newTicketCode() {
 export function buildPoolRows(categoriaId: string, cantidad: number) {
   return Array.from({ length: cantidad }, () => {
     const codigo = newTicketCode();
-    return { categoriaId, codigo, codigoQr: codigo, estado: TICKET_ESTADO_DISPONIBLE };
+    return {
+      categoriaId,
+      codigo,
+      codigoQr: codigo,
+      estado: TICKET_ESTADO_DISPONIBLE,
+    };
   });
 }

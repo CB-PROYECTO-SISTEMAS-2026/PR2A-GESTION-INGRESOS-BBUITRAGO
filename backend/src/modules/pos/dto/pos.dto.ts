@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -21,6 +22,8 @@ import {
 
 export const MAX_CANTIDAD_POR_PRODUCTO = 99;
 export const MAX_ITEMS_POR_COBRO = 50;
+/** UUID u otro identificador aleatorio de 20 a 64 caracteres seguros. */
+export const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9-]{20,64}$/;
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MESSAGE = 'La fecha debe tener el formato AAAA-MM-DD.';
@@ -57,6 +60,17 @@ export class CreateCobroDto {
   @ValidateNested({ each: true })
   @Type(() => CobroItemDto)
   items: CobroItemDto[];
+
+  /**
+   * Clave que el terminal genera una vez por intento de cobro y repite en los reintentos.
+   * Si el cobro ya se registró con esta clave, se devuelve el mismo resultado en lugar de cobrar
+   * otra vez (evita cobros dobles cuando se pierde la respuesta por la red).
+   */
+  @IsOptional()
+  @Matches(IDEMPOTENCY_KEY_RE, {
+    message: 'La clave del cobro no es válida.',
+  })
+  idempotencyKey?: string;
 }
 
 export class ConsultaClienteDto {
@@ -107,4 +121,18 @@ export class SolicitarRetiroDto {
   @IsString()
   @IsNotEmpty()
   negocioId: string;
+}
+
+export class FiltroRetirosDto {
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsIn(['SOLICITADO', 'APROBADO', 'PAGADO', 'RECHAZADO'])
+  estado?: 'SOLICITADO' | 'APROBADO' | 'PAGADO' | 'RECHAZADO';
+}
+
+export class CambiarEstadoRetiroDto {
+  @IsIn(['APROBADO', 'RECHAZADO'], {
+    message: 'El estado debe ser APROBADO o RECHAZADO.',
+  })
+  estado: 'APROBADO' | 'RECHAZADO';
 }

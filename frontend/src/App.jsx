@@ -30,6 +30,7 @@ import EventoEditPage from './modules/admin/EventoEditPage'
 import CategoriasPage from './modules/admin/CategoriasPage'
 import MapaHistorialPage from './modules/admin/MapaHistorialPage'
 import UsuariosPage from './modules/admin/UsuariosPage'
+import RetirosPage from './modules/admin/RetirosPage'
 
 import NegociosPage from './modules/business/NegociosPage'
 import ProductosPage from './modules/business/ProductosPage'
@@ -97,6 +98,7 @@ const router = createBrowserRouter([
               { path: 'eventos/:id/mapa', element: <MapaHistorialPage /> },
               { path: 'mapa/:solicitudId', element: <MapaHistorialPage /> },
               { path: 'usuarios', element: <UsuariosPage /> },
+              { path: 'retiros', element: <RetirosPage /> },
             ],
           },
         ],

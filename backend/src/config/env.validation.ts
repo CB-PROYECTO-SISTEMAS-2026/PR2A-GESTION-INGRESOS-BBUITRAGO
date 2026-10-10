@@ -13,17 +13,28 @@ const REQUIRED = [
   'MAIL_FROM',
 ] as const;
 
-const INSECURE_JWT_SECRETS = ['eventix_dev_jwt_secret_change_in_production', 'changeme', 'secret'];
+const INSECURE_JWT_SECRETS = [
+  'eventix_dev_jwt_secret_change_in_production',
+  'changeme',
+  'secret',
+];
 
 export function validateEnv(config: Record<string, unknown>) {
-  const missing = REQUIRED.filter((key) => !String(config[key] ?? '').trim());
+  const missing = REQUIRED.filter((key) => {
+    const value = config[key];
+    return typeof value === 'string' ? !value.trim() : value == null;
+  });
   if (missing.length) {
-    throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}. Revisa backend/.env.example.`);
+    throw new Error(
+      `Variables de entorno faltantes: ${missing.join(', ')}. Revisa backend/.env.example.`,
+    );
   }
 
   const jwtSecret = String(config.JWT_SECRET);
   if (jwtSecret.length < 32 || INSECURE_JWT_SECRETS.includes(jwtSecret)) {
-    throw new Error('JWT_SECRET debe ser aleatorio y tener al menos 32 caracteres.');
+    throw new Error(
+      'JWT_SECRET debe ser aleatorio y tener al menos 32 caracteres.',
+    );
   }
 
   if (Number.isNaN(Number(config.MAIL_PORT))) {

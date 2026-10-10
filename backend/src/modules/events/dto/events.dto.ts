@@ -47,20 +47,29 @@ class ScheduleFields {
 }
 
 export class ActividadDto {
-  @Matches(TIME, { message: 'Cada actividad del cronograma necesita una hora válida.' })
+  @Matches(TIME, {
+    message: 'Cada actividad del cronograma necesita una hora válida.',
+  })
   hora: string;
 
   @IsString()
   @Transform(trimString)
-  @MinLength(2, { message: 'Describe cada actividad del cronograma (mínimo 2 caracteres).' })
-  @MaxLength(120, { message: 'La descripción de una actividad no puede superar los 120 caracteres.' })
+  @MinLength(2, {
+    message: 'Describe cada actividad del cronograma (mínimo 2 caracteres).',
+  })
+  @MaxLength(120, {
+    message:
+      'La descripción de una actividad no puede superar los 120 caracteres.',
+  })
   actividad: string;
 }
 
 /** Solo las actividades intermedias: la apertura y el cierre salen de la hora de inicio y fin del evento. */
 export class CronogramaDto {
   @IsArray()
-  @ArrayMaxSize(MAX_ACTIVIDADES, { message: `El cronograma admite hasta ${MAX_ACTIVIDADES} actividades.` })
+  @ArrayMaxSize(MAX_ACTIVIDADES, {
+    message: `El cronograma admite hasta ${MAX_ACTIVIDADES} actividades.`,
+  })
   @ValidateNested({ each: true })
   @Type(() => ActividadDto)
   actividades: ActividadDto[];
@@ -69,19 +78,26 @@ export class CronogramaDto {
 export class CreateSolicitudDto extends ScheduleFields {
   @IsString()
   @Transform(trimString)
-  @MinLength(5, { message: 'El nombre del evento debe tener al menos 5 caracteres.' })
+  @MinLength(5, {
+    message: 'El nombre del evento debe tener al menos 5 caracteres.',
+  })
   @MaxLength(120)
   nombreEvento: string;
 
   @IsString()
   @Transform(trimString)
-  @MinLength(20, { message: 'La descripción debe tener al menos 20 caracteres.' })
+  @MinLength(20, {
+    message: 'La descripción debe tener al menos 20 caracteres.',
+  })
   @MaxLength(5000)
   descripcion: string;
 
   @IsString()
   @Transform(trimString)
-  @MinLength(5, { message: 'Escribe la dirección o el nombre del lugar (mínimo 5 caracteres).' })
+  @MinLength(5, {
+    message:
+      'Escribe la dirección o el nombre del lugar (mínimo 5 caracteres).',
+  })
   @MaxLength(191)
   ubicacion: string;
 
@@ -137,7 +153,9 @@ export class CreateEventoDto extends ScheduleFields {
 
   @IsString()
   @Transform(trimString)
-  @MinLength(10, { message: 'La descripción debe tener al menos 10 caracteres.' })
+  @MinLength(10, {
+    message: 'La descripción debe tener al menos 10 caracteres.',
+  })
   @MaxLength(5000)
   descripcion: string;
 
@@ -154,9 +172,14 @@ export class CreateEventoDto extends ScheduleFields {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(MAX_SERVICIOS, { message: `Puedes agregar hasta ${MAX_SERVICIOS} servicios.` })
+  @ArrayMaxSize(MAX_SERVICIOS, {
+    message: `Puedes agregar hasta ${MAX_SERVICIOS} servicios.`,
+  })
   @IsString({ each: true })
-  @MaxLength(80, { each: true, message: 'Cada servicio puede tener hasta 80 caracteres.' })
+  @MaxLength(80, {
+    each: true,
+    message: 'Cada servicio puede tener hasta 80 caracteres.',
+  })
   servicios?: string[];
 
   @IsOptional()
@@ -190,7 +213,9 @@ export class UpdateEventoDto {
   @IsOptional()
   @IsString()
   @Transform(trimString)
-  @MinLength(10, { message: 'La descripción debe tener al menos 10 caracteres.' })
+  @MinLength(10, {
+    message: 'La descripción debe tener al menos 10 caracteres.',
+  })
   @MaxLength(5000)
   descripcion?: string;
 
@@ -209,9 +234,14 @@ export class UpdateEventoDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(MAX_SERVICIOS, { message: `Puedes agregar hasta ${MAX_SERVICIOS} servicios.` })
+  @ArrayMaxSize(MAX_SERVICIOS, {
+    message: `Puedes agregar hasta ${MAX_SERVICIOS} servicios.`,
+  })
   @IsString({ each: true })
-  @MaxLength(80, { each: true, message: 'Cada servicio puede tener hasta 80 caracteres.' })
+  @MaxLength(80, {
+    each: true,
+    message: 'Cada servicio puede tener hasta 80 caracteres.',
+  })
   servicios?: string[];
 
   @IsOptional()

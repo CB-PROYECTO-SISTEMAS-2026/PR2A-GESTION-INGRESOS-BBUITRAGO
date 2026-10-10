@@ -1,10 +1,24 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { TicketsService } from './tickets.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CreateCategoriaDto, ListCodigosQuery, UpdateCategoriaDto } from './dto/tickets.dto';
+import {
+  CreateCategoriaDto,
+  ListCodigosQuery,
+  UpdateCategoriaDto,
+} from './dto/tickets.dto';
 
 @Controller('api')
 @UseGuards(JwtAuthGuard, RolesGuard)

@@ -16,7 +16,12 @@ import {
   normalizePhone,
   rethrowUniqueViolation,
 } from '../../common/security/user-identity';
-import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth.dto';
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+} from './dto/auth.dto';
 
 const RESET_TOKEN_MINUTES = 60;
 const FORGOT_PASSWORD_MESSAGE =
@@ -99,7 +104,8 @@ export class AuthService {
       where: { email: this.normalizeEmail(dto.email) },
       include: { roles: true },
     });
-    if (!user || !user.activo) throw new UnauthorizedException('Credenciales inválidas');
+    if (!user || !user.activo)
+      throw new UnauthorizedException('Credenciales inválidas');
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Credenciales inválidas');
     return this.issueSession(user);
@@ -109,7 +115,9 @@ export class AuthService {
     const email = this.normalizeEmail(dto.email);
     const user = await this.prisma.usuario.findUnique({ where: { email } });
     if (!user || !user.activo || user.eliminadoAt) {
-      this.logger.warn(`Recuperación solicitada para un correo sin cuenta activa: ${email}`);
+      this.logger.warn(
+        `Recuperación solicitada para un correo sin cuenta activa: ${email}`,
+      );
       return { message: FORGOT_PASSWORD_MESSAGE };
     }
 
@@ -129,10 +137,17 @@ export class AuthService {
     ]);
 
     try {
-      await this.mail.sendPasswordReset(user.email, user.nombre, token, RESET_TOKEN_MINUTES);
+      await this.mail.sendPasswordReset(
+        user.email,
+        user.nombre,
+        token,
+        RESET_TOKEN_MINUTES,
+      );
     } catch (err) {
       // La respuesta es idéntica exista o no la cuenta, para no revelar correos registrados.
-      this.logger.error(`Falló el envío de recuperación para ${user.id}: ${(err as Error).message}`);
+      this.logger.error(
+        `Falló el envío de recuperación para ${user.id}: ${(err as Error).message}`,
+      );
     }
     return { message: FORGOT_PASSWORD_MESSAGE };
   }
@@ -142,7 +157,9 @@ export class AuthService {
       where: { tokenHash: hashToken(dto.token) },
     });
     if (!record || record.used || record.expiresAt < new Date()) {
-      throw new BadRequestException('El enlace es inválido o ya expiró. Solicita uno nuevo.');
+      throw new BadRequestException(
+        'El enlace es inválido o ya expiró. Solicita uno nuevo.',
+      );
     }
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.$transaction([

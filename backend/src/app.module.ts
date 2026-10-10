@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { validateEnv } from './config/env.validation';
+import {
+  AppThrottlerGuard,
+  clientIp,
+} from './common/guards/app-throttler.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { MailModule } from './common/mail/mail.module';
 import { StorageModule } from './common/storage/storage.module';
@@ -17,7 +21,17 @@ import { PosModule } from './modules/pos/pos.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    // default: por usuario autenticado (o IP + correo sin sesión). ip: tope de respaldo por IP,
+    // holgado para que el personal de un evento comparta el WiFi sin bloquearse.
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: 120 },
+      {
+        name: 'ip',
+        ttl: 60_000,
+        limit: 1000,
+        getTracker: (req) => clientIp(req),
+      },
+    ]),
     PrismaModule,
     MailModule,
     StorageModule,
@@ -29,6 +43,6 @@ import { PosModule } from './modules/pos/pos.module';
     AdminUsersModule,
     PosModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: AppThrottlerGuard }],
 })
 export class AppModule {}

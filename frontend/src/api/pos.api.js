@@ -13,3 +13,9 @@ export const exportarVentas = (params) =>
   api.get('/negocio-panel/ventas/export', { params, responseType: 'blob' })
 export const getLiquidacion = (params) => api.get('/negocio-panel/liquidacion', { params })
 export const solicitarRetiro = (negocioId) => api.post('/negocio-panel/retiros', { negocioId })
+
+// Retiros de los negocios (administrador)
+export const getRetirosAdmin = (params) => api.get('/admin/retiros', { params })
+export const cambiarEstadoRetiro = (id, estado) => api.patch(`/admin/retiros/${id}/estado`, { estado })
+export const pagarRetiro = (id, formData) =>
+  api.post(`/admin/retiros/${id}/pagar`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })

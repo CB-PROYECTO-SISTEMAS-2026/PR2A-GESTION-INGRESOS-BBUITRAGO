@@ -48,8 +48,12 @@ export class BusinessesService {
 
   private async ensureEventoExiste(eventoId?: string) {
     if (!eventoId) return;
-    const evento = await this.prisma.evento.findUnique({ where: { id: eventoId }, select: { id: true } });
-    if (!evento) throw new NotFoundException('El evento seleccionado no existe');
+    const evento = await this.prisma.evento.findUnique({
+      where: { id: eventoId },
+      select: { id: true },
+    });
+    if (!evento)
+      throw new NotFoundException('El evento seleccionado no existe');
   }
 
   misNegocios(duenoId: string) {
@@ -57,7 +61,13 @@ export class BusinessesService {
       where: { duenoId },
       include: {
         productos: true,
-        ayudantes: { include: { usuario: { select: { id: true, email: true, nombre: true, apellido: true } } } },
+        ayudantes: {
+          include: {
+            usuario: {
+              select: { id: true, email: true, nombre: true, apellido: true },
+            },
+          },
+        },
         evento: { select: { id: true, titulo: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -71,14 +81,21 @@ export class BusinessesService {
       where: { id },
       data: {
         nombre: dto.nombre?.trim(),
-        descripcion: dto.descripcion === undefined ? undefined : dto.descripcion.trim() || null,
+        descripcion:
+          dto.descripcion === undefined
+            ? undefined
+            : dto.descripcion.trim() || null,
         eventoId: dto.eventoId === undefined ? undefined : dto.eventoId || null,
       },
       include: { productos: true, ayudantes: true },
     });
   }
 
-  async createProducto(negocioId: string, duenoId: string, dto: CreateProductoDto) {
+  async createProducto(
+    negocioId: string,
+    duenoId: string,
+    dto: CreateProductoDto,
+  ) {
     await this.ensureOwner(negocioId, duenoId);
     return this.prisma.producto.create({
       data: {
@@ -111,12 +128,24 @@ export class BusinessesService {
     return { message: 'Producto eliminado' };
   }
 
-  async createAyudante(negocioId: string, jefeId: string, dto: CreateAyudanteDto) {
+  async createAyudante(
+    negocioId: string,
+    jefeId: string,
+    dto: CreateAyudanteDto,
+  ) {
     const negocio = await this.ensureOwner(negocioId, jefeId);
     const email = normalizeEmail(dto.email);
-    await assertIdentityAvailable(this.prisma, { email }, USER_EXISTS_FOR_OTHER_MESSAGE);
+    await assertIdentityAvailable(
+      this.prisma,
+      { email },
+      USER_EXISTS_FOR_OTHER_MESSAGE,
+    );
     const invitado = await this.prisma.invitacionUsuario.findFirst({
-      where: { email, estado: InvitacionEstado.PENDIENTE, expiresAt: { gt: new Date() } },
+      where: {
+        email,
+        estado: InvitacionEstado.PENDIENTE,
+        expiresAt: { gt: new Date() },
+      },
       select: { id: true },
     });
     if (invitado) throw new ConflictException(USER_EXISTS_FOR_OTHER_MESSAGE);
@@ -142,12 +171,16 @@ export class BusinessesService {
             rolFuncion: dto.rolFuncion?.trim() || 'cajero',
           },
           include: {
-            usuario: { select: { id: true, email: true, nombre: true, apellido: true } },
+            usuario: {
+              select: { id: true, email: true, nombre: true, apellido: true },
+            },
             negocio: true,
           },
         });
       })
-      .catch((err) => rethrowUniqueViolation(err, USER_EXISTS_FOR_OTHER_MESSAGE));
+      .catch((err) =>
+        rethrowUniqueViolation(err, USER_EXISTS_FOR_OTHER_MESSAGE),
+      );
 
     const jefe = await this.prisma.usuario.findUnique({
       where: { id: jefeId },
@@ -155,19 +188,33 @@ export class BusinessesService {
     });
     let correoEnviado = true;
     try {
-      await this.mail.sendAyudanteBienvenida(ayudante.usuario.email, ayudante.usuario.nombre, {
-        negocio: negocio.nombre,
-        jefe: [jefe?.nombre, jefe?.apellido].filter(Boolean).join(' ') || 'Tu jefe de negocio',
-      });
+      await this.mail.sendAyudanteBienvenida(
+        ayudante.usuario.email,
+        ayudante.usuario.nombre,
+        {
+          negocio: negocio.nombre,
+          jefe:
+            [jefe?.nombre, jefe?.apellido].filter(Boolean).join(' ') ||
+            'Tu jefe de negocio',
+        },
+      );
     } catch (err) {
       correoEnviado = false;
-      this.logger.warn(`Bienvenida de ayudante no enviada: ${(err as Error).message}`);
+      this.logger.warn(
+        `Bienvenida de ayudante no enviada: ${(err as Error).message}`,
+      );
     }
     return { ...ayudante, correoEnviado };
   }
 
-  async asignarAyudante(ayudanteId: string, jefeId: string, dto: AsignarAyudanteDto) {
-    const ayudante = await this.prisma.ayudanteNegocio.findUnique({ where: { id: ayudanteId } });
+  async asignarAyudante(
+    ayudanteId: string,
+    jefeId: string,
+    dto: AsignarAyudanteDto,
+  ) {
+    const ayudante = await this.prisma.ayudanteNegocio.findUnique({
+      where: { id: ayudanteId },
+    });
     if (!ayudante) throw new NotFoundException('Ayudante no encontrado');
     if (ayudante.jefeId !== jefeId) throw new ForbiddenException();
     await this.ensureOwner(dto.negocioId, jefeId);
@@ -182,9 +229,12 @@ export class BusinessesService {
   }
 
   private async ensureOwner(negocioId: string, duenoId: string) {
-    const negocio = await this.prisma.negocio.findUnique({ where: { id: negocioId } });
+    const negocio = await this.prisma.negocio.findUnique({
+      where: { id: negocioId },
+    });
     if (!negocio) throw new NotFoundException('Negocio no encontrado');
-    if (negocio.duenoId !== duenoId) throw new ForbiddenException('No eres dueño de este negocio');
+    if (negocio.duenoId !== duenoId)
+      throw new ForbiddenException('No eres dueño de este negocio');
     return negocio;
   }
 }

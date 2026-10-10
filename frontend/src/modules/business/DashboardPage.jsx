@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const k = data?.kpis
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold">Dashboard</h1>

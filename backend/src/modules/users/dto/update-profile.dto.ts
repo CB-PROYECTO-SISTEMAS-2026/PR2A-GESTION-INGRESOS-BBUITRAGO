@@ -1,4 +1,12 @@
-import { IsOptional, IsString, IsNotEmpty, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNotEmpty,
+  Matches,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -27,6 +35,8 @@ export class UpdateProfileDto {
   /** Día (AAAA-MM-DD); vacío o null quita la fecha. */
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== '')
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Ingresa una fecha de nacimiento válida.' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'Ingresa una fecha de nacimiento válida.',
+  })
   fechaNac?: string | null;
 }

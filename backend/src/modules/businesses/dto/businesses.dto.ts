@@ -12,7 +12,10 @@ import {
   MinLength,
 } from 'class-validator';
 import { PASSWORD_MESSAGE, PASSWORD_RULE } from '../../auth/dto/auth.dto';
-import { MAX_PRECIO, toStrictMoney } from '../../../common/validation/validators';
+import {
+  MAX_PRECIO,
+  toStrictMoney,
+} from '../../../common/validation/validators';
 
 const PRECIO_MESSAGE = `El precio debe ser un monto entre 0 y ${MAX_PRECIO.toLocaleString('es-BO')} Bs, con hasta 2 decimales.`;
 
@@ -56,7 +59,10 @@ export class CreateProductoDto {
   nombre: string;
 
   @Transform(toStrictMoney)
-  @IsNumber({ maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false }, { message: PRECIO_MESSAGE })
+  @IsNumber(
+    { maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false },
+    { message: PRECIO_MESSAGE },
+  )
   @Min(0, { message: PRECIO_MESSAGE })
   @Max(MAX_PRECIO, { message: PRECIO_MESSAGE })
   precio: number;
@@ -76,7 +82,10 @@ export class UpdateProductoDto {
 
   @IsOptional()
   @Transform(toStrictMoney)
-  @IsNumber({ maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false }, { message: PRECIO_MESSAGE })
+  @IsNumber(
+    { maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false },
+    { message: PRECIO_MESSAGE },
+  )
   @Min(0, { message: PRECIO_MESSAGE })
   @Max(MAX_PRECIO, { message: PRECIO_MESSAGE })
   precio?: number;

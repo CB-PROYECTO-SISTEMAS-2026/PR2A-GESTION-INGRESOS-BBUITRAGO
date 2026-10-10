@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { dayToDate, todayIn } from '../events/event-schedule';
+import { dateToDay, dayToDate, todayIn } from '../events/event-schedule';
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -77,4 +77,70 @@ export function resolveDayRange(
     gte: startOfDayIn(from, timeZone),
     lt: startOfDayIn(next, timeZone),
   };
+}
+
+/** Margen para cobrar antes de la apertura y después del cierre (preparar y cerrar caja). */
+export const MARGEN_HORARIO_MIN = 30;
+
+export interface FechaHorario {
+  fecha: Date;
+  horaInicio: string;
+  horaFin: string;
+}
+
+function toMinutes(hhmm: string) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/** Minuto del día (0–1439) de un instante en la zona horaria dada. */
+export function minuteOfDayIn(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const value = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return (value('hour') % 24) * 60 + value('minute');
+}
+
+/**
+ * Indica si un evento está abierto ahora según el horario de sus días. Un horario que cruza la
+ * medianoche (p. ej. 20:00–02:00) sigue abierto la madrugada del día siguiente.
+ */
+export function horarioActual(
+  fechas: FechaHorario[],
+  timeZone: string,
+  now = new Date(),
+) {
+  const today = dayIn(now, timeZone);
+  const yesterday = dateToDay(new Date(dayToDate(today).getTime() - DAY_MS));
+  const minuto = minuteOfDayIn(now, timeZone);
+  let abierto = false;
+  let horarioHoy: string | null = null;
+
+  for (const f of fechas) {
+    const dia = dateToDay(f.fecha);
+    const inicio = toMinutes(f.horaInicio);
+    const fin = toMinutes(f.horaFin);
+    const cruzaMedianoche = fin <= inicio;
+    if (dia === today) {
+      horarioHoy = `${f.horaInicio} – ${f.horaFin}`;
+      if (
+        minuto >= inicio - MARGEN_HORARIO_MIN &&
+        (cruzaMedianoche || minuto < fin + MARGEN_HORARIO_MIN)
+      ) {
+        abierto = true;
+      }
+    } else if (
+      dia === yesterday &&
+      cruzaMedianoche &&
+      minuto < fin + MARGEN_HORARIO_MIN
+    ) {
+      abierto = true;
+    }
+  }
+  return { abierto, horarioHoy };
 }

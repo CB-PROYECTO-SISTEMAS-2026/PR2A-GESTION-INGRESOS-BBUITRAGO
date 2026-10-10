@@ -16,10 +16,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { dateToDay, dayToDate, todayIn } from '../events/event-schedule';
 import {
   AYUDANTE_ACTIVO,
+  descontarStock,
   findAyudanteAsignacion,
   findEventosAceptados,
+  findStockNegocio,
 } from './negocio-compat';
-import { resolveDayRange } from './pos-dates';
+import { horarioActual, resolveDayRange } from './pos-dates';
 import {
   VENTA_ROW_SELECT,
   codigoTransaccion,
@@ -41,6 +43,8 @@ const HISTORIAL_LIMIT = 500;
 /** La base es remota: se da margen a la transacción del cobro antes de abortarla. */
 const COBRO_TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const ENTRADA_INVALIDA: EntradaEstado[] = [
   EntradaEstado.REEMBOLSADA,
   EntradaEstado.ANULADA,
@@ -54,6 +58,12 @@ export interface ClienteResuelto {
   medio: 'QR_DIGITAL' | 'MANILLA';
   identificador: string;
   categoria: string;
+}
+
+function isUniqueViolation(err: unknown) {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
+  );
 }
 
 /*
@@ -76,14 +86,17 @@ export class PosService {
     const asignacion = await this.requireAyudante(usuarioId);
     const today = todayIn(this.timeZone);
 
-    const [eventos, productos] = await Promise.all([
+    const [eventos, productos, stock] = await Promise.all([
       findEventosAceptados(this.prisma, [asignacion.negocioId]).then((ids) =>
         this.prisma.evento.findMany({
           where: { id: { in: ids }, estado: EventoEstado.PUBLICADO },
           select: {
             id: true,
             titulo: true,
-            fechas: { select: { fecha: true }, orderBy: { fecha: 'asc' } },
+            fechas: {
+              select: { fecha: true, horaInicio: true, horaFin: true },
+              orderBy: { fecha: 'asc' },
+            },
           },
         }),
       ),
@@ -92,6 +105,7 @@ export class PosService {
         select: { id: true, nombre: true, precio: true, descripcion: true },
         orderBy: { nombre: 'asc' },
       }),
+      findStockNegocio(this.prisma, asignacion.negocioId),
     ]);
 
     return {
@@ -100,12 +114,19 @@ export class PosService {
       eventos: eventos
         .map((e) => {
           const dias = e.fechas.map((f) => dateToDay(f.fecha));
+          const { abierto, horarioHoy } = horarioActual(
+            e.fechas,
+            this.timeZone,
+          );
           return {
             id: e.id,
             titulo: e.titulo,
             fechaInicio: dias[0] ?? null,
             fechaFin: dias[dias.length - 1] ?? null,
-            enCurso: dias.includes(today),
+            /** Abierto ahora: es día del evento y está dentro de su horario. */
+            enCurso: abierto,
+            /** Horario de hoy ("18:00 – 23:00") o null si hoy no es día del evento. */
+            horarioHoy,
           };
         })
         .sort(
@@ -113,7 +134,12 @@ export class PosService {
             Number(b.enCurso) - Number(a.enCurso) ||
             (a.fechaInicio ?? '').localeCompare(b.fechaInicio ?? ''),
         ),
-      productos: productos.map((p) => ({ ...p, precio: money(p.precio) })),
+      productos: productos.map((p) => ({
+        ...p,
+        precio: money(p.precio),
+        /** Unidades disponibles; null si el producto no controla stock. */
+        stock: stock.get(p.id) ?? null,
+      })),
     };
   }
 
@@ -148,6 +174,10 @@ export class PosService {
    * HU-022 / HU-023: cobra los productos descontando el saldo del cliente en el evento.
    * El descuento es condicional (`saldo >= total`) y atómico, así dos cobros simultáneos
    * nunca dejan el saldo en negativo. Los precios siempre se toman de la base de datos.
+   *
+   * Idempotencia: la `idempotencyKey` se usa como id de la venta. Si el terminal reintenta un
+   * cobro que ya se registró (se perdió la respuesta), la clave choca con la venta existente y
+   * se devuelve ese resultado en lugar de cobrar otra vez.
    */
   async cobrar(ayudanteId: string, dto: CreateCobroDto) {
     const cantidades = new Map<string, number>();
@@ -165,8 +195,14 @@ export class PosService {
       }
     }
 
+    const ventaId = dto.idempotencyKey ?? newId();
+    if (dto.idempotencyKey) {
+      const previo = await this.cobroRegistrado(ventaId, ayudanteId);
+      if (previo) return previo;
+    }
+
     const asignacion = await this.requireAyudante(ayudanteId);
-    const [evento, cliente, productos] = await Promise.all([
+    const [evento, cliente, productos, stock] = await Promise.all([
       this.requireEventoEnCurso(asignacion.negocioId, dto.eventoId),
       this.resolveCliente(dto.eventoId, dto.codigo),
       this.prisma.producto.findMany({
@@ -177,6 +213,7 @@ export class PosService {
         },
         select: { id: true, nombre: true, precio: true },
       }),
+      findStockNegocio(this.prisma, asignacion.negocioId),
     ]);
     if (productos.length !== cantidades.size) {
       throw new BadRequestException(
@@ -194,6 +231,17 @@ export class PosService {
         subtotal: p.precio.mul(cantidad),
       };
     });
+    for (const l of lineas) {
+      const disponible = stock.get(l.productoId);
+      if (disponible != null && disponible < l.cantidad) {
+        throw new BadRequestException(
+          disponible > 0
+            ? `No hay stock suficiente de ${l.nombre}: quedan ${disponible}.`
+            : `${l.nombre} está agotado.`,
+        );
+      }
+    }
+    const conStock = lineas.filter((l) => stock.get(l.productoId) != null);
     const total = lineas.reduce(
       (acc, l) => acc.add(l.subtotal),
       new Prisma.Decimal(0),
@@ -208,83 +256,98 @@ export class PosService {
         eventoId: dto.eventoId,
       },
     };
-    const ventaId = newId();
     const transaccionId = newId();
     const fecha = new Date();
 
-    const saldoResultante = await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.saldoEvento.updateMany({
-        where: {
-          usuarioId: cliente.usuarioId,
-          eventoId: dto.eventoId,
-          saldo: { gte: total },
-        },
-        data: { saldo: { decrement: total } },
-      });
-      if (!count) {
-        const actual = await tx.saldoEvento.findUnique({
-          where: saldoKey,
-          select: { saldo: true },
-        });
-        throw this.saldoInsuficiente(
-          actual?.saldo ?? new Prisma.Decimal(0),
-          total,
-        );
-      }
-
-      const saldo = await tx.saldoEvento.findUniqueOrThrow({
-        where: saldoKey,
-        select: { id: true, saldo: true },
-      });
-      await tx.venta.createMany({
-        data: [
-          {
-            id: ventaId,
-            negocioId: asignacion.negocioId,
-            eventoId: dto.eventoId,
-            ayudanteId,
-            clienteId: cliente.usuarioId,
-            entradaId: cliente.entradaId,
-            total,
-            createdAt: fecha,
-          },
-        ],
-      });
-      await tx.detalleVenta.createMany({
-        data: lineas.map((l) => ({
-          id: newId(),
-          ventaId,
-          productoId: l.productoId,
-          cantidad: l.cantidad,
-          precioUnit: l.precioUnit,
-          subtotal: l.subtotal,
-        })),
-      });
-      await tx.transaccionSaldo.createMany({
-        data: [
-          {
-            id: transaccionId,
-            saldoEventoId: saldo.id,
+    let saldoResultante: Prisma.Decimal;
+    try {
+      saldoResultante = await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.saldoEvento.updateMany({
+          where: {
             usuarioId: cliente.usuarioId,
             eventoId: dto.eventoId,
-            operadorId: ayudanteId,
-            tipo: TipoTransaccionSaldo.COMPRA_PRODUCTO,
-            monto: total,
-            saldoResultante: saldo.saldo,
-            ventaId,
-            nota: `Compra en ${asignacion.negocioNombre}`,
-            createdAt: fecha,
+            saldo: { gte: total },
           },
-        ],
-      });
-      return saldo.saldo;
-    }, COBRO_TX_OPTIONS);
+          data: { saldo: { decrement: total } },
+        });
+        if (!count) {
+          const actual = await tx.saldoEvento.findUnique({
+            where: saldoKey,
+            select: { saldo: true },
+          });
+          throw this.saldoInsuficiente(
+            actual?.saldo ?? new Prisma.Decimal(0),
+            total,
+          );
+        }
+        if (!(await descontarStock(tx, conStock))) {
+          throw new ConflictException(
+            'Un producto se agotó mientras se cobraba. Actualiza el catálogo e inténtalo de nuevo.',
+          );
+        }
+
+        const saldo = await tx.saldoEvento.findUniqueOrThrow({
+          where: saldoKey,
+          select: { id: true, saldo: true },
+        });
+        await tx.venta.createMany({
+          data: [
+            {
+              id: ventaId,
+              negocioId: asignacion.negocioId,
+              eventoId: dto.eventoId,
+              ayudanteId,
+              clienteId: cliente.usuarioId,
+              entradaId: cliente.entradaId,
+              total,
+              createdAt: fecha,
+            },
+          ],
+        });
+        await tx.detalleVenta.createMany({
+          data: lineas.map((l) => ({
+            id: newId(),
+            ventaId,
+            productoId: l.productoId,
+            cantidad: l.cantidad,
+            precioUnit: l.precioUnit,
+            subtotal: l.subtotal,
+          })),
+        });
+        await tx.transaccionSaldo.createMany({
+          data: [
+            {
+              id: transaccionId,
+              saldoEventoId: saldo.id,
+              usuarioId: cliente.usuarioId,
+              eventoId: dto.eventoId,
+              operadorId: ayudanteId,
+              tipo: TipoTransaccionSaldo.COMPRA_PRODUCTO,
+              monto: total,
+              saldoResultante: saldo.saldo,
+              ventaId,
+              nota: `Compra en ${asignacion.negocioNombre}`,
+              createdAt: fecha,
+            },
+          ],
+        });
+        return saldo.saldo;
+      }, COBRO_TX_OPTIONS);
+    } catch (err) {
+      // Dos envíos simultáneos con la misma clave: el segundo choca con la venta del primero.
+      if (dto.idempotencyKey && isUniqueViolation(err)) {
+        const previo = await this.cobroRegistrado(ventaId, ayudanteId);
+        if (previo) return previo;
+      }
+      throw err;
+    }
 
     return {
       ventaId,
       transaccionId,
       codigo: codigoTransaccion(transaccionId),
       fecha,
+      repetido: false,
       negocio: asignacion.negocioNombre,
       evento: evento.titulo,
       cliente: {
@@ -342,6 +405,65 @@ export class PosService {
     };
   }
 
+  /**
+   * Resultado de un cobro ya registrado con esta clave (reintento del terminal), o null si no
+   * existe. Si la clave pertenece a la venta de otro ayudante, se rechaza.
+   */
+  private async cobroRegistrado(ventaId: string, ayudanteId: string) {
+    const venta = await this.prisma.venta.findUnique({
+      where: { id: ventaId },
+      select: {
+        ...VENTA_ROW_SELECT,
+        detalles: {
+          select: {
+            cantidad: true,
+            productoId: true,
+            precioUnit: true,
+            subtotal: true,
+          },
+        },
+        transacciones: {
+          select: { id: true, saldoResultante: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+      },
+    });
+    if (!venta) return null;
+    if (venta.ayudanteId !== ayudanteId) {
+      throw new ConflictException('La clave de este cobro ya fue utilizada.');
+    }
+    const nombres = await nombresDeVentas(this.prisma, [venta]);
+    const productos = await this.prisma.producto.findMany({
+      where: { id: { in: venta.detalles.map((d) => d.productoId) } },
+      select: { id: true, nombre: true },
+    });
+    const transaccion = venta.transacciones[0];
+    return {
+      ventaId: venta.id,
+      transaccionId: transaccion?.id ?? null,
+      codigo: transaccion ? codigoTransaccion(transaccion.id) : null,
+      fecha: venta.createdAt,
+      repetido: true,
+      negocio: nombres.negocio(venta),
+      evento: nombres.evento(venta),
+      cliente: {
+        nombre: nombres.cliente(venta),
+        medio: null,
+        identificador: null,
+      },
+      total: money(venta.total),
+      saldoResultante: money(transaccion?.saldoResultante),
+      detalles: venta.detalles.map((d) => ({
+        nombre:
+          productos.find((p) => p.id === d.productoId)?.nombre ?? 'Producto',
+        cantidad: d.cantidad,
+        precioUnit: money(d.precioUnit),
+        subtotal: money(d.subtotal),
+      })),
+    };
+  }
+
   private async requireAyudante(usuarioId: string) {
     const asignacion = await findAyudanteAsignacion(this.prisma, usuarioId);
     if (!asignacion) {
@@ -358,17 +480,25 @@ export class PosService {
     return asignacion;
   }
 
-  /** El negocio debe estar aceptado en el evento y el evento debe realizarse hoy. */
+  /**
+   * El negocio debe estar aceptado en el evento, y el evento debe realizarse hoy y estar dentro
+   * de su horario (ver `horarioActual`: admite horarios que cruzan la medianoche).
+   */
   private async requireEventoEnCurso(negocioId: string, eventoId: string) {
+    const today = dayToDate(todayIn(this.timeZone));
+    const yesterday = new Date(today.getTime() - DAY_MS);
     const [aceptados, evento] = await Promise.all([
       findEventosAceptados(this.prisma, [negocioId]),
       this.prisma.evento.findFirst({
-        where: {
-          id: eventoId,
-          estado: EventoEstado.PUBLICADO,
-          fechas: { some: { fecha: dayToDate(todayIn(this.timeZone)) } },
+        where: { id: eventoId, estado: EventoEstado.PUBLICADO },
+        select: {
+          id: true,
+          titulo: true,
+          fechas: {
+            where: { fecha: { in: [today, yesterday] } },
+            select: { fecha: true, horaInicio: true, horaFin: true },
+          },
         },
-        select: { id: true, titulo: true },
       }),
     ]);
     if (!aceptados.includes(eventoId)) {
@@ -376,12 +506,20 @@ export class PosService {
         'Tu negocio no está habilitado para vender en este evento.',
       );
     }
-    if (!evento) {
+    if (!evento?.fechas.length) {
       throw new BadRequestException(
         'Solo se puede cobrar durante los días del evento.',
       );
     }
-    return evento;
+    const { abierto, horarioHoy } = horarioActual(evento.fechas, this.timeZone);
+    if (!abierto) {
+      throw new BadRequestException(
+        horarioHoy
+          ? `El evento está cerrado en este momento. Horario de hoy: ${horarioHoy}.`
+          : 'Solo se puede cobrar durante el horario del evento.',
+      );
+    }
+    return { id: evento.id, titulo: evento.titulo };
   }
 
   /** Identifica al cliente por el código de su manilla física o el QR de su entrada digital. */

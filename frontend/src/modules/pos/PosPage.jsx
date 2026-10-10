@@ -4,21 +4,49 @@ import { cobrar, consultarCliente, getPosContexto } from '../../api/pos.api'
 import { IconCheck, IconQr, IconWarning } from '../../components/ui/icons'
 import { formatBs, formatDayRange, formatTime, getErrorMessage } from '../../utils/format'
 import { feedbackError, feedbackOk } from '../../utils/feedback'
+import { useAuth } from '../../context/AuthContext'
 
 // La librería de escaneo solo se descarga cuando el ayudante va a cobrar.
 const CodigoScanner = lazy(() => import('./components/CodigoScanner'))
 
-const EVENTO_KEY = 'eventix_pos_evento'
 const MAX_CANTIDAD = 99
 
 function toCents(value) {
   return Math.round(Number(value) * 100)
 }
 
+/** Máximo que se puede agregar de un producto: 99 o lo que quede en stock. */
+function maxCantidad(producto) {
+  return producto.stock == null ? MAX_CANTIDAD : Math.min(MAX_CANTIDAD, producto.stock)
+}
+
+/**
+ * Clave única por intento de cobro. Se repite en los reintentos para que el servidor no cobre
+ * dos veces si se perdió la respuesta. crypto.randomUUID solo existe con HTTPS o localhost, por
+ * eso se arma con getRandomValues como alternativa (p. ej. el celular entrando por la IP local).
+ */
+function nuevaClaveCobro() {
+  if (crypto.randomUUID) return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key) || ''
+  } catch {
+    return ''
+  }
+}
+
 export default function PosPage() {
+  const { user } = useAuth()
+  // El evento elegido se recuerda por usuario: varios ayudantes pueden compartir un celular.
+  const eventoKey = `eventix_pos_evento:${user?.id ?? ''}`
   const [ctx, setCtx] = useState(null)
   const [loadError, setLoadError] = useState('')
-  const [eventoId, setEventoId] = useState(() => localStorage.getItem(EVENTO_KEY) || '')
+  const [eventoId, setEventoId] = useState(() => readStorage(eventoKey))
+  const [claveCobro, setClaveCobro] = useState(null)
   const [carrito, setCarrito] = useState({})
   const [paso, setPaso] = useState('catalogo')
   const [cliente, setCliente] = useState(null)
@@ -35,9 +63,16 @@ export default function PosPage() {
       setLoadError('')
       const enCurso = data.eventos.filter((e) => e.enCurso)
       setEventoId((prev) => (enCurso.some((e) => e.id === prev) ? prev : enCurso[0]?.id || ''))
-      // Quita del carrito productos que ya no estén disponibles.
+      // Quita del carrito productos que ya no estén disponibles y ajusta lo que supere el stock.
       setCarrito((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([id]) => data.productos.some((p) => p.id === id))),
+        Object.fromEntries(
+          Object.entries(prev)
+            .map(([id, cantidad]) => {
+              const producto = data.productos.find((p) => p.id === id)
+              return [id, producto ? Math.min(cantidad, maxCantidad(producto)) : 0]
+            })
+            .filter(([, cantidad]) => cantidad > 0),
+        ),
       )
     } catch (err) {
       setLoadError(getErrorMessage(err, 'No se pudo cargar el punto de venta.'))
@@ -49,8 +84,12 @@ export default function PosPage() {
   }, [cargar])
 
   useEffect(() => {
-    if (eventoId) localStorage.setItem(EVENTO_KEY, eventoId)
-  }, [eventoId])
+    try {
+      if (eventoId) localStorage.setItem(eventoKey, eventoId)
+    } catch {
+      // Sin almacenamiento disponible: se vuelve a elegir el evento al recargar.
+    }
+  }, [eventoKey, eventoId])
 
   const productos = useMemo(() => ctx?.productos ?? [], [ctx])
   const eventosHoy = ctx?.eventos.filter((e) => e.enCurso) ?? []
@@ -67,9 +106,10 @@ export default function PosPage() {
   const total = totalCents / 100
   const articulos = lineas.reduce((acc, l) => acc + l.cantidad, 0)
 
-  const cambiarCantidad = (id, delta) =>
+  const cambiarCantidad = (producto, delta) =>
     setCarrito((prev) => {
-      const next = Math.min(MAX_CANTIDAD, Math.max(0, (prev[id] || 0) + delta))
+      const id = producto.id
+      const next = Math.min(maxCantidad(producto), Math.max(0, (prev[id] || 0) + delta))
       const copy = { ...prev }
       if (next) copy[id] = next
       else delete copy[id]
@@ -82,6 +122,7 @@ export default function PosPage() {
     setRechazo(null)
     setResultado(null)
     setScanError('')
+    setClaveCobro(null)
     setPaso('catalogo')
     cargar()
   }
@@ -94,6 +135,8 @@ export default function PosPage() {
       const { data } = await consultarCliente({ eventoId, codigo })
       setCliente({ ...data, codigo })
       setRechazo(null)
+      // Nueva clave para este cliente y este pedido; se conserva en los reintentos.
+      setClaveCobro(nuevaClaveCobro())
       setPaso('confirmar')
       if (toCents(data.saldo) < totalCents) feedbackError()
       else feedbackOk()
@@ -113,13 +156,20 @@ export default function PosPage() {
         eventoId,
         codigo: cliente.codigo,
         items: lineas.map((l) => ({ productoId: l.id, cantidad: l.cantidad })),
+        idempotencyKey: claveCobro,
       })
       setResultado(data)
       setPaso('resultado')
       feedbackOk()
     } catch (err) {
       const body = err?.response?.data
-      if (body?.code === 'SALDO_INSUFICIENTE') {
+      if (!err?.response) {
+        // No llegó la respuesta: el cobro pudo registrarse o no. Reintentar con la misma clave es
+        // seguro, el servidor devuelve el cobro existente en lugar de cobrar otra vez.
+        setRechazo(
+          'No se pudo confirmar el cobro por un problema de conexión. Revisa la red y vuelve a confirmar: no se cobrará dos veces.',
+        )
+      } else if (body?.code === 'SALDO_INSUFICIENTE') {
         // El saldo cambió entre la consulta y el cobro (otro cobro simultáneo).
         setCliente((c) => ({ ...c, saldo: body.saldo }))
         setRechazo(body.message)
@@ -152,15 +202,19 @@ export default function PosPage() {
       <div className="m-4 rounded-xl border border-border bg-white p-5">
         <h1 className="font-display text-xl font-bold">{ctx.negocio.nombre}</h1>
         <p className="mt-2 text-sm text-muted">
-          Hoy no hay eventos en curso donde tu negocio esté habilitado. Solo se puede cobrar durante los días del
-          evento.
+          No hay eventos abiertos ahora donde tu negocio esté habilitado. Solo se puede cobrar durante los días y el
+          horario del evento.
         </p>
         {proximos.length > 0 && (
           <ul className="mt-4 divide-y divide-border text-sm">
             {proximos.map((e) => (
               <li key={e.id} className="py-2">
                 <p className="font-medium">{e.titulo}</p>
-                <p className="text-xs text-muted">{formatDayRange(e.fechaInicio, e.fechaFin)}</p>
+                <p className="text-xs text-muted">
+                  {e.horarioHoy
+                    ? `Hoy de ${e.horarioHoy} (fuera de horario en este momento)`
+                    : formatDayRange(e.fechaInicio, e.fechaFin)}
+                </p>
               </li>
             ))}
           </ul>
@@ -188,7 +242,10 @@ export default function PosPage() {
             ))}
           </select>
         ) : (
-          <p className="mt-1 truncate text-sm text-muted">Evento: {evento?.titulo}</p>
+          <p className="mt-1 truncate text-sm text-muted">
+            Evento: {evento?.titulo}
+            {evento?.horarioHoy && <span> · Hoy {evento.horarioHoy}</span>}
+          </p>
         )}
       </div>
 
@@ -207,13 +264,20 @@ export default function PosPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{p.nombre}</p>
                     {p.descripcion && <p className="truncate text-xs text-muted">{p.descripcion}</p>}
-                    <p className="text-sm font-semibold text-teal-dark">{formatBs(p.precio)}</p>
+                    <p className="text-sm font-semibold text-teal-dark">
+                      {formatBs(p.precio)}
+                      {p.stock != null && (
+                        <span className={`ml-2 text-xs font-medium ${p.stock ? 'text-muted' : 'text-red-600'}`}>
+                          {p.stock ? `Quedan ${p.stock}` : 'Agotado'}
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       className="h-9 w-9 rounded-md border border-border text-lg font-bold text-muted disabled:opacity-40"
-                      onClick={() => cambiarCantidad(p.id, -1)}
+                      onClick={() => cambiarCantidad(p, -1)}
                       disabled={!cantidad}
                       aria-label={`Quitar ${p.nombre}`}
                     >
@@ -225,8 +289,8 @@ export default function PosPage() {
                     <button
                       type="button"
                       className="h-9 w-9 rounded-md bg-teal text-lg font-bold text-white hover:bg-teal-dark disabled:opacity-40"
-                      onClick={() => cambiarCantidad(p.id, 1)}
-                      disabled={cantidad >= MAX_CANTIDAD}
+                      onClick={() => cambiarCantidad(p, 1)}
+                      disabled={cantidad >= maxCantidad(p)}
                       aria-label={`Agregar ${p.nombre}`}
                     >
                       +
@@ -437,6 +501,11 @@ function CobroExitoso({ resultado, onNuevaVenta }) {
       <div className="text-center">
         <p className="font-display text-2xl font-bold">Pago exitoso</p>
         <p className="text-sm text-muted">Transacción {resultado.codigo}</p>
+        {resultado.repetido && (
+          <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Este cobro ya se había registrado: se muestra el comprobante original y no se cobró otra vez.
+          </p>
+        )}
       </div>
       <dl className="grid w-full gap-2 rounded-xl border border-border bg-white p-4 text-sm">
         {[

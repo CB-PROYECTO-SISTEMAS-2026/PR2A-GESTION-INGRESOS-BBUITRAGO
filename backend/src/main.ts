@@ -17,7 +17,10 @@ async function bootstrap() {
 
   app.use(helmet());
   app.enableCors({ origin: origins, credentials: true });
-  app.set('trust proxy', config.get<string>('TRUST_PROXY') === 'true' ? 1 : false);
+  app.set(
+    'trust proxy',
+    config.get<string>('TRUST_PROXY') === 'true' ? 1 : false,
+  );
   app.useBodyParser('json', { limit: '1mb' });
   app.useGlobalPipes(
     new ValidationPipe({
@@ -34,4 +37,4 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`EvenTix API running on port ${port}`);
 }
-bootstrap();
+void bootstrap();

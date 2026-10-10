@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EntradaEstado, EventoEstado } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -53,7 +57,9 @@ export class UsersService {
         entradas: {
           some: {
             titularId: userId,
-            estado: { notIn: [EntradaEstado.REEMBOLSADA, EntradaEstado.ANULADA] },
+            estado: {
+              notIn: [EntradaEstado.REEMBOLSADA, EntradaEstado.ANULADA],
+            },
           },
         },
       },
@@ -74,16 +80,27 @@ export class UsersService {
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {
-    const telefono = dto.telefono === undefined ? undefined : normalizePhone(dto.telefono);
-    const documento = dto.documento === undefined ? undefined : normalizeDocument(dto.documento);
-    await assertIdentityAvailable(this.prisma, { telefono, documento }, DATA_IN_USE_MESSAGE, userId);
+    const telefono =
+      dto.telefono === undefined ? undefined : normalizePhone(dto.telefono);
+    const documento =
+      dto.documento === undefined
+        ? undefined
+        : normalizeDocument(dto.documento);
+    await assertIdentityAvailable(
+      this.prisma,
+      { telefono, documento },
+      DATA_IN_USE_MESSAGE,
+      userId,
+    );
 
     let fechaNac: Date | null | undefined;
     if (dto.fechaNac === null || dto.fechaNac === '') fechaNac = null;
     else if (dto.fechaNac !== undefined) {
       const day = dto.fechaNac.slice(0, 10);
       if (day < MIN_BIRTH_DAY || day > todayIn(this.timeZone)) {
-        throw new BadRequestException('Ingresa una fecha de nacimiento válida.');
+        throw new BadRequestException(
+          'Ingresa una fecha de nacimiento válida.',
+        );
       }
       fechaNac = dayToDate(day);
     }
@@ -105,7 +122,9 @@ export class UsersService {
   }
 
   async updateFoto(userId: string, foto: Express.Multer.File | undefined) {
-    const user = await this.prisma.usuario.findUnique({ where: { id: userId } });
+    const user = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new NotFoundException('Usuario no encontrado');
     const stored = await this.storage.upload(foto, 'usuarios', 'image');
     try {
@@ -122,18 +141,27 @@ export class UsersService {
   }
 
   async removeFoto(userId: string) {
-    const user = await this.prisma.usuario.findUnique({ where: { id: userId } });
+    const user = await this.prisma.usuario.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new NotFoundException('Usuario no encontrado');
     if (user.fotoPublicId || user.fotoUrl) {
-      await this.prisma.usuario.update({ where: { id: userId }, data: { fotoUrl: null, fotoPublicId: null } });
+      await this.prisma.usuario.update({
+        where: { id: userId },
+        data: { fotoUrl: null, fotoPublicId: null },
+      });
       await this.storage.remove(user.fotoPublicId);
     }
     return this.me(userId);
   }
 
-  private toPublic<T extends { passwordHash: string; fotoPublicId: string | null; roles: { role: string }[] }>(
-    user: T,
-  ) {
+  private toPublic<
+    T extends {
+      passwordHash: string;
+      fotoPublicId: string | null;
+      roles: { role: string }[];
+    },
+  >(user: T) {
     const { passwordHash, fotoPublicId, ...rest } = user;
     return { ...rest, roles: user.roles.map((r) => r.role) };
   }

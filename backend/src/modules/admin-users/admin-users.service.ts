@@ -17,7 +17,11 @@ import {
   rethrowUniqueViolation,
 } from '../../common/security/user-identity';
 import { AuthService } from '../auth/auth.service';
-import { AceptarInvitacionDto, CreateInvitacionDto, ListUsuariosQuery } from './dto/admin-users.dto';
+import {
+  AceptarInvitacionDto,
+  CreateInvitacionDto,
+  ListUsuariosQuery,
+} from './dto/admin-users.dto';
 
 const INVITATION_HOURS = 72;
 const USUARIOS_POR_PAGINA = 20;
@@ -35,7 +39,9 @@ const invitacionPublicSelect = {
   expiresAt: true,
   aceptadaAt: true,
   createdAt: true,
-  creadoPor: { select: { id: true, nombre: true, apellido: true, email: true } },
+  creadoPor: {
+    select: { id: true, nombre: true, apellido: true, email: true },
+  },
 } satisfies Prisma.InvitacionUsuarioSelect;
 
 @Injectable()
@@ -47,13 +53,21 @@ export class AdminUsersService {
   ) {}
 
   async listUsuarios(query: ListUsuariosQuery) {
-    const words = (query.q ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 5);
+    const words = (query.q ?? '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 5);
     const where: Prisma.UsuarioWhereInput = {
       eliminadoAt: null,
       ...(query.role ? { roles: { some: { role: query.role } } } : {}),
       // Cada palabra debe coincidir con el nombre, el apellido o el correo (p. ej. "maría quispe").
       AND: words.map((w) => ({
-        OR: [{ nombre: { contains: w } }, { apellido: { contains: w } }, { email: { contains: w } }],
+        OR: [
+          { nombre: { contains: w } },
+          { apellido: { contains: w } },
+          { email: { contains: w } },
+        ],
       })),
     };
     const total = await this.prisma.usuario.count({ where });
@@ -104,7 +118,9 @@ export class AdminUsersService {
           select: {
             rolFuncion: true,
             activo: true,
-            negocio: { select: { nombre: true, evento: { select: { titulo: true } } } },
+            negocio: {
+              select: { nombre: true, evento: { select: { titulo: true } } },
+            },
             jefe: { select: { nombre: true, apellido: true } },
           },
         },
@@ -133,12 +149,27 @@ export class AdminUsersService {
         solicitudes: {
           orderBy: { createdAt: 'desc' },
           take: RECIENTES,
-          select: { id: true, nombreEvento: true, estado: true, fechaInicio: true, createdAt: true },
+          select: {
+            id: true,
+            nombreEvento: true,
+            estado: true,
+            fechaInicio: true,
+            createdAt: true,
+          },
         },
         eventosOrganizados: {
           orderBy: { createdAt: 'desc' },
           take: RECIENTES,
-          select: { id: true, titulo: true, estado: true, fechas: { select: { fecha: true }, orderBy: { fecha: 'asc' }, take: 1 } },
+          select: {
+            id: true,
+            titulo: true,
+            estado: true,
+            fechas: {
+              select: { fecha: true },
+              orderBy: { fecha: 'asc' },
+              take: 1,
+            },
+          },
         },
         negocios: {
           orderBy: { createdAt: 'desc' },
@@ -171,7 +202,8 @@ export class AdminUsersService {
    * La fila se conserva porque eventos, solicitudes y compras la referencian.
    */
   async eliminarUsuario(adminId: string, id: string) {
-    if (id === adminId) throw new BadRequestException('No puedes eliminar tu propia cuenta.');
+    if (id === adminId)
+      throw new BadRequestException('No puedes eliminar tu propia cuenta.');
     const user = await this.prisma.usuario.findFirst({
       where: { id, eliminadoAt: null },
       include: { roles: true },
@@ -180,9 +212,17 @@ export class AdminUsersService {
 
     if (user.roles.some((r) => r.role === Role.ADMIN)) {
       const otrosAdmins = await this.prisma.usuario.count({
-        where: { id: { not: id }, activo: true, eliminadoAt: null, roles: { some: { role: Role.ADMIN } } },
+        where: {
+          id: { not: id },
+          activo: true,
+          eliminadoAt: null,
+          roles: { some: { role: Role.ADMIN } },
+        },
       });
-      if (!otrosAdmins) throw new BadRequestException('No puedes eliminar al único administrador activo.');
+      if (!otrosAdmins)
+        throw new BadRequestException(
+          'No puedes eliminar al único administrador activo.',
+        );
     }
 
     await this.prisma.$transaction([
@@ -199,8 +239,14 @@ export class AdminUsersService {
       }),
       this.prisma.usuarioRol.deleteMany({ where: { usuarioId: id } }),
       this.prisma.passwordResetToken.deleteMany({ where: { usuarioId: id } }),
-      this.prisma.staffEvento.updateMany({ where: { usuarioId: id }, data: { activo: false } }),
-      this.prisma.ayudanteNegocio.updateMany({ where: { usuarioId: id }, data: { activo: false } }),
+      this.prisma.staffEvento.updateMany({
+        where: { usuarioId: id },
+        data: { activo: false },
+      }),
+      this.prisma.ayudanteNegocio.updateMany({
+        where: { usuarioId: id },
+        data: { activo: false },
+      }),
     ]);
     return { message: 'Usuario eliminado' };
   }
@@ -221,7 +267,11 @@ export class AdminUsersService {
   async createInvitacion(adminId: string, dto: CreateInvitacionDto) {
     const email = this.auth.normalizeEmail(dto.email);
     const telefono = normalizePhone(dto.telefono);
-    await assertIdentityAvailable(this.prisma, { email, telefono }, USER_EXISTS_FOR_OTHER_MESSAGE);
+    await assertIdentityAvailable(
+      this.prisma,
+      { email, telefono },
+      USER_EXISTS_FOR_OTHER_MESSAGE,
+    );
 
     const pendientes = await this.prisma.invitacionUsuario.findMany({
       where: {
@@ -259,9 +309,17 @@ export class AdminUsersService {
     });
 
     try {
-      await this.mail.sendInvitation(email, invitacion.nombre, invitacion.role, token, INVITATION_HOURS);
+      await this.mail.sendInvitation(
+        email,
+        invitacion.nombre,
+        invitacion.role,
+        token,
+        INVITATION_HOURS,
+      );
     } catch (err) {
-      await this.prisma.invitacionUsuario.delete({ where: { id: invitacion.id } });
+      await this.prisma.invitacionUsuario.delete({
+        where: { id: invitacion.id },
+      });
       throw err;
     }
     return invitacion;
@@ -275,7 +333,10 @@ export class AdminUsersService {
       USER_EXISTS_FOR_OTHER_MESSAGE,
     );
 
-    const previous = { tokenHash: invitacion.tokenHash, expiresAt: invitacion.expiresAt };
+    const previous = {
+      tokenHash: invitacion.tokenHash,
+      expiresAt: invitacion.expiresAt,
+    };
     const { token, tokenHash } = generateToken();
     const updated = await this.prisma.invitacionUsuario.update({
       where: { id },
@@ -283,9 +344,18 @@ export class AdminUsersService {
       select: invitacionPublicSelect,
     });
     try {
-      await this.mail.sendInvitation(updated.email, updated.nombre, updated.role, token, INVITATION_HOURS);
+      await this.mail.sendInvitation(
+        updated.email,
+        updated.nombre,
+        updated.role,
+        token,
+        INVITATION_HOURS,
+      );
     } catch (err) {
-      await this.prisma.invitacionUsuario.update({ where: { id }, data: previous });
+      await this.prisma.invitacionUsuario.update({
+        where: { id },
+        data: previous,
+      });
       throw err;
     }
     return updated;
@@ -328,9 +398,14 @@ export class AdminUsersService {
           where: { id: invitacion.id, estado: InvitacionEstado.PENDIENTE },
           data: { estado: InvitacionEstado.ACEPTADA, aceptadaAt: new Date() },
         });
-        if (claimed.count !== 1) throw new BadRequestException('La invitación ya fue utilizada.');
+        if (claimed.count !== 1)
+          throw new BadRequestException('La invitación ya fue utilizada.');
 
-        await assertIdentityAvailable(tx, { email: invitacion.email, telefono }, USER_EXISTS_MESSAGE);
+        await assertIdentityAvailable(
+          tx,
+          { email: invitacion.email, telefono },
+          USER_EXISTS_MESSAGE,
+        );
 
         return tx.usuario.create({
           data: {
@@ -354,10 +429,14 @@ export class AdminUsersService {
   }
 
   private async findPending(id: string) {
-    const invitacion = await this.prisma.invitacionUsuario.findUnique({ where: { id } });
+    const invitacion = await this.prisma.invitacionUsuario.findUnique({
+      where: { id },
+    });
     if (!invitacion) throw new NotFoundException('Invitación no encontrada');
     if (invitacion.estado !== InvitacionEstado.PENDIENTE) {
-      throw new BadRequestException('Solo se pueden modificar invitaciones pendientes.');
+      throw new BadRequestException(
+        'Solo se pueden modificar invitaciones pendientes.',
+      );
     }
     return invitacion;
   }
@@ -367,10 +446,14 @@ export class AdminUsersService {
       where: { tokenHash: hashToken(token) },
     });
     if (!invitacion || invitacion.estado !== InvitacionEstado.PENDIENTE) {
-      throw new BadRequestException('La invitación no es válida o ya fue utilizada.');
+      throw new BadRequestException(
+        'La invitación no es válida o ya fue utilizada.',
+      );
     }
     if (invitacion.expiresAt < new Date()) {
-      throw new BadRequestException('La invitación expiró. Pide al administrador que te la reenvíe.');
+      throw new BadRequestException(
+        'La invitación expiró. Pide al administrador que te la reenvíe.',
+      );
     }
     return invitacion;
   }

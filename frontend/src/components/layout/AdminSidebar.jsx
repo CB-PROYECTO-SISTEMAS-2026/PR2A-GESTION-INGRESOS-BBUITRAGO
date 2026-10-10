@@ -11,10 +11,11 @@ const items = [
   { label: 'Accesos' },
   { label: 'Recargas' },
   { label: 'Ventas' },
+  { to: '/admin/retiros', label: 'Retiros' },
   { label: 'Devoluciones' },
   { label: 'Reportes' },
 ]
 
-export default function AdminSidebar() {
-  return <PanelSidebar items={items} roleLabel="Administrador" />
+export default function AdminSidebar(props) {
+  return <PanelSidebar items={items} roleLabel="Administrador" {...props} />
 }

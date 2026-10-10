@@ -88,8 +88,80 @@ function UserMenu({ user, logout }) {
   )
 }
 
+/** Enlaces de la barra según los roles del usuario (los que no tienen `to` aún no tienen pantalla). */
+function navLinks(hasRole) {
+  const links = [
+    { to: '/', label: 'Inicio', end: true },
+    { to: '/eventos', label: 'Eventos' },
+  ]
+  if (hasRole('CLIENTE')) links.push({ label: 'Mis Entradas' })
+  if (hasRole('ADMIN')) links.push({ to: '/admin', label: 'Admin' })
+  if (hasRole('ORGANIZADOR')) {
+    links.push({ to: '/organizador/solicitudes', label: 'Solicitudes' })
+    links.push({ to: '/organizador/nueva-solicitud', label: 'Nueva solicitud' })
+  }
+  if (hasRole('JEFE_NEGOCIO')) links.push({ to: '/negocio', label: 'Negocios' })
+  if (hasRole('AYUDANTE')) links.push({ to: '/pos', label: 'Punto de venta' })
+  return links
+}
+
+/** En celulares los enlaces de la barra se muestran en un menú desplegable. */
+function MobileNav({ links }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  return (
+    <div className="relative md:hidden" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label="Abrir menú de navegación"
+        className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-600 text-white hover:border-teal hover:text-teal"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      {open && (
+        <nav className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-md border border-border bg-white py-1 text-ink shadow-lg">
+          {links.map((l) =>
+            l.to ? (
+              <NavLink
+                key={l.label}
+                to={l.to}
+                end={l.end}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `block px-3 py-2.5 text-sm hover:bg-slate-50 ${isActive ? 'font-semibold text-teal-dark' : ''}`
+                }
+              >
+                {l.label}
+              </NavLink>
+            ) : (
+              <span key={l.label} className="block px-3 py-2.5 text-sm text-slate-400">
+                {l.label}
+              </span>
+            ),
+          )}
+        </nav>
+      )}
+    </div>
+  )
+}
+
 export default function Navbar() {
   const { user, isAuthenticated, logout, hasRole } = useAuth()
+  const links = navLinks(hasRole)
 
   return (
     <header className="sticky top-0 z-40 bg-navy text-white shadow-md">
@@ -97,41 +169,21 @@ export default function Navbar() {
         <BrandLogo to="/" imgClassName="h-9 w-auto max-w-[160px] object-contain" />
 
         <nav className="hidden items-center gap-6 md:flex">
-          <NavLink to="/" end className={linkClass}>
-            Inicio
-          </NavLink>
-          <NavLink to="/eventos" className={linkClass}>
-            Eventos
-          </NavLink>
-          {hasRole('CLIENTE') && <span className="cursor-default text-sm font-medium text-slate-500">Mis Entradas</span>}
-          {hasRole('ADMIN') && (
-            <NavLink to="/admin" className={linkClass}>
-              Admin
-            </NavLink>
-          )}
-          {hasRole('ORGANIZADOR') && (
-            <>
-              <NavLink to="/organizador/solicitudes" className={linkClass}>
-                Solicitudes
+          {links.map((l) =>
+            l.to ? (
+              <NavLink key={l.label} to={l.to} end={l.end} className={linkClass}>
+                {l.label}
               </NavLink>
-              <NavLink to="/organizador/nueva-solicitud" className={linkClass}>
-                Nueva solicitud
-              </NavLink>
-            </>
-          )}
-          {hasRole('JEFE_NEGOCIO') && (
-            <NavLink to="/negocio" className={linkClass}>
-              Negocios
-            </NavLink>
-          )}
-          {hasRole('AYUDANTE') && (
-            <NavLink to="/pos" className={linkClass}>
-              Punto de venta
-            </NavLink>
+            ) : (
+              <span key={l.label} className="cursor-default text-sm font-medium text-slate-500">
+                {l.label}
+              </span>
+            ),
           )}
         </nav>
 
         <div className="flex items-center gap-3">
+          <MobileNav links={links} />
           {isAuthenticated ? (
             <>
               {hasRole('CLIENTE') && <SaldoEvento />}

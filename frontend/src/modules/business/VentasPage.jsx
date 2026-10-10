@@ -62,7 +62,7 @@ export default function VentasPage() {
   const promedio = data?.totalItems ? Number(data.totalRecaudado) / data.totalItems : 0
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <h1 className="font-display text-3xl font-bold">Registro de ventas</h1>
       <p className="mt-1 text-sm text-muted">Detalle de los cobros realizados en tus puntos de venta</p>
 

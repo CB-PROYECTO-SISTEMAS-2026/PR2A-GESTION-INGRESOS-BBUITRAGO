@@ -27,21 +27,31 @@ export const MAX_CODIGOS_POR_PAGINA = 48;
 export class CreateCategoriaDto {
   @IsString()
   @Transform(trimString)
-  @MinLength(2, { message: 'El nombre de la categoría debe tener al menos 2 caracteres.' })
+  @MinLength(2, {
+    message: 'El nombre de la categoría debe tener al menos 2 caracteres.',
+  })
   @MaxLength(100)
   nombre: string;
 
   @Transform(toStrictMoney)
-  @IsNumber({ maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false }, { message: PRECIO_MESSAGE })
+  @IsNumber(
+    { maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false },
+    { message: PRECIO_MESSAGE },
+  )
   @Min(0, { message: PRECIO_MESSAGE })
   @Max(MAX_PRECIO, { message: PRECIO_MESSAGE })
   precio: number;
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(MAX_BENEFICIOS, { message: `Puedes agregar hasta ${MAX_BENEFICIOS} beneficios.` })
+  @ArrayMaxSize(MAX_BENEFICIOS, {
+    message: `Puedes agregar hasta ${MAX_BENEFICIOS} beneficios.`,
+  })
   @IsString({ each: true })
-  @MaxLength(120, { each: true, message: 'Cada beneficio puede tener hasta 120 caracteres.' })
+  @MaxLength(120, {
+    each: true,
+    message: 'Cada beneficio puede tener hasta 120 caracteres.',
+  })
   beneficios?: string[];
 
   @Transform(toStrictInt)
@@ -61,22 +71,32 @@ export class UpdateCategoriaDto {
   @IsOptional()
   @IsString()
   @Transform(trimString)
-  @MinLength(2, { message: 'El nombre de la categoría debe tener al menos 2 caracteres.' })
+  @MinLength(2, {
+    message: 'El nombre de la categoría debe tener al menos 2 caracteres.',
+  })
   @MaxLength(100)
   nombre?: string;
 
   @IsOptional()
   @Transform(toStrictMoney)
-  @IsNumber({ maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false }, { message: PRECIO_MESSAGE })
+  @IsNumber(
+    { maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false },
+    { message: PRECIO_MESSAGE },
+  )
   @Min(0, { message: PRECIO_MESSAGE })
   @Max(MAX_PRECIO, { message: PRECIO_MESSAGE })
   precio?: number;
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(MAX_BENEFICIOS, { message: `Puedes agregar hasta ${MAX_BENEFICIOS} beneficios.` })
+  @ArrayMaxSize(MAX_BENEFICIOS, {
+    message: `Puedes agregar hasta ${MAX_BENEFICIOS} beneficios.`,
+  })
   @IsString({ each: true })
-  @MaxLength(120, { each: true, message: 'Cada beneficio puede tener hasta 120 caracteres.' })
+  @MaxLength(120, {
+    each: true,
+    message: 'Cada beneficio puede tener hasta 120 caracteres.',
+  })
   beneficios?: string[];
 
   @IsOptional()

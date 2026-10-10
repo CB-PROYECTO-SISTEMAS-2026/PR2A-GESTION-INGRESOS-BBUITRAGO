@@ -9,6 +9,6 @@ const items = [
   { to: '/negocio/liquidacion', label: 'Liquidación' },
 ]
 
-export default function BusinessSidebar() {
-  return <PanelSidebar items={items} roleLabel="Jefe de negocio" />
+export default function BusinessSidebar(props) {
+  return <PanelSidebar items={items} roleLabel="Jefe de negocio" {...props} />
 }

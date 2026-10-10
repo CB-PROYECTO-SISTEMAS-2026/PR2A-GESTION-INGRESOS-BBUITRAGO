@@ -3,11 +3,16 @@ import {
   Controller,
   Get,
   Header,
+  Param,
+  Patch,
   Post,
   Query,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -16,9 +21,13 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PosService } from './pos.service';
 import { NegocioVentasService } from './negocio-ventas.service';
+import { RetirosAdminService } from './retiros-admin.service';
+import { memoryUpload } from '../../common/storage/upload.options';
 import {
+  CambiarEstadoRetiroDto,
   ConsultaClienteDto,
   CreateCobroDto,
+  FiltroRetirosDto,
   FiltroVentasNegocioDto,
   ListadoVentasNegocioDto,
   RangoFechasDto,
@@ -108,5 +117,32 @@ export class NegocioPanelController {
     @Body() dto: SolicitarRetiroDto,
   ) {
     return this.ventasService.solicitarRetiro(userId, dto.negocioId);
+  }
+}
+
+/** Gestión de retiros de los dueños de negocio por parte del administrador (HU-025). */
+@Controller('api/admin/retiros')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
+export class RetirosAdminController {
+  constructor(private retirosService: RetirosAdminService) {}
+
+  @Get()
+  listar(@Query() dto: FiltroRetirosDto) {
+    return this.retirosService.listar(dto.estado);
+  }
+
+  @Patch(':id/estado')
+  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoRetiroDto) {
+    return this.retirosService.cambiarEstado(id, dto.estado);
+  }
+
+  @Post(':id/pagar')
+  @UseInterceptors(FileInterceptor('evidencia', memoryUpload))
+  pagar(
+    @Param('id') id: string,
+    @UploadedFile() evidencia?: Express.Multer.File,
+  ) {
+    return this.retirosService.pagar(id, evidencia);
   }
 }
