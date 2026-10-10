@@ -11,7 +11,8 @@
     "skipLibCheck": true,
     "types": [
       "jest",
-      "node"
+      "node",
+      "multer"
     ],
     "baseUrl": ".",
     "paths": {
@@ -21,7 +22,11 @@
         "../backend/node_modules/@types/*"
       ]
     },
-    "allowJs": true
+    "allowJs": true,
+    "typeRoots": [
+      "node_modules/@types",
+      "../backend/node_modules/@types"
+    ]
   },
   "include": [
     "**/*.ts"

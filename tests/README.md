@@ -15,7 +15,7 @@ Comandos (siempre desde la carpeta `tests/`):
 
 | Comando | Qué hace |
 |---|---|
-| `npm test` | Corre todas: primero las unitarias y, si pasan, las de integración (~2 min) |
+| `npm test` | Corre todas: primero las unitarias y, si pasan, las de integración (~3 min) |
 | `npm run test:unit` | Solo las unitarias (~1 s, no necesitan base de datos ni servidor) |
 | `npm run test:integracion` | Solo las de integración (usan la base compartida, una tras otra) |
 | `npm run test:watch` | Modo vigilancia: vuelve a correr las unitarias cada vez que guardas un archivo |
@@ -57,8 +57,14 @@ Necesitan `backend/.env`, `backend/prisma/ca.pem` e internet. No hace falta leva
 | Archivo | Casos | Qué protege |
 |---|---|---|
 | `integracion/pos-cobro.test.ts` | 25 | Cobro real contra la base: saldo insuficiente, cobros simultáneos, clave anti-duplicado, stock, horario, permisos, consulta previa e historial |
+| `integracion/pos-liquidacion.test.ts` | 23 | Panel de ventas del dueño (totales, días, eventos, productos, CSV), liquidación (acreditado/pendiente) y retiros (solicitud, aprobación, pago, rechazo, solicitudes simultáneas) |
 
-Para comprobar que estas pruebas detectan errores reales, se rompió a propósito la protección del saldo (permitir cobrar aunque no alcance) y las pruebas de saldo insuficiente fallaron, como se esperaba.
+Para comprobar que estas pruebas detectan errores reales, se rompieron a propósito dos protecciones y las pruebas fallaron, como se esperaba:
+
+- permitir cobrar aunque el saldo no alcance (fallan las de saldo insuficiente);
+- quitar el bloqueo de las solicitudes de retiro (falla la de solicitudes simultáneas).
+
+`pos-liquidacion.test.ts` **no sube archivos a Cloudinary**: reemplaza el almacenamiento de comprobantes por uno simulado.
 
 ## Plan de pruebas (orden de importancia)
 
@@ -66,7 +72,7 @@ Para comprobar que estas pruebas detectan errores reales, se rompió a propósit
 |---|---|---|---|
 | 1 | Unitarias de la lógica del POS | ✅ Hecha | No |
 | 2 | Integración del cobro (saldo, concurrencia, clave anti-duplicado, stock, horario, permisos) | ✅ Hecha | Sí |
-| 3 | Integración de liquidación y retiros | Pendiente | Sí |
+| 3 | Integración de liquidación y retiros | ✅ Hecha | Sí |
 | 4 | Seguridad de la API (roles, validación, límite de peticiones) | Pendiente | Sí |
 | 5 | Recorrido en navegador con Playwright (flujo del POS y pantallas por rol) | Pendiente | Sí |
 | 6 | Unitarias del frontend (formatos y carrito) | Pendiente | No |

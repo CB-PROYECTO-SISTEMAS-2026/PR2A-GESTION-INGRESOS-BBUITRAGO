@@ -77,12 +77,18 @@ const hhmm = (minutos: number) => {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 };
 
-async function crearUsuario(prisma: PrismaService, alias: string, sufijo: string, roles: Role[]) {
+export async function crearUsuario(
+  prisma: PrismaService,
+  alias: string,
+  sufijo: string,
+  roles: Role[],
+  nombre = `Prueba ${alias}`,
+) {
   const usuario = await prisma.usuario.create({
     data: {
       email: `${alias}.${sufijo}${DOMINIO}`,
       passwordHash: 'sin-login-en-pruebas-de-integracion',
-      nombre: `Prueba ${alias}`,
+      nombre,
       apellido: 'Auto',
       roles: { create: roles.map((role) => ({ role })) },
     },
@@ -292,4 +298,94 @@ export async function setEstadoAyudante(prisma: PrismaService, usuarioId: string
 
 export async function contarVentas(prisma: PrismaService, esc: Escenario) {
   return prisma.venta.count({ where: { eventoId: esc.eventos.abierto } });
+}
+
+/** Día "AAAA-MM-DD" de La Paz, `dias` días atrás (0 = hoy). */
+export function diaLaPaz(dias = 0) {
+  const hoy = new Date(`${todayIn(TZ)}T00:00:00.000Z`);
+  return new Date(hoy.getTime() - dias * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Instante UTC de una hora local de La Paz (UTC-4) en el día dado. */
+export function instanteLaPaz(dia: string, hora: string) {
+  return new Date(new Date(`${dia}T${hora}:00.000Z`).getTime() + 4 * 3_600_000);
+}
+
+/**
+ * Crea un evento de prueba que ya ocurrió (para la liquidación) y acepta en él al negocio del
+ * escenario. `estado` permite probar eventos FINALIZADO, CANCELADO o PUBLICADO ya pasados.
+ */
+export async function crearEventoPasado(
+  prisma: PrismaService,
+  esc: Escenario,
+  titulo: string,
+  estado: EventoEstado,
+  diasAtras: number,
+) {
+  const evento = await prisma.evento.create({
+    data: {
+      titulo: `${MARCA} ${titulo} ${esc.sufijo.toUpperCase()}`,
+      descripcion: 'Evento pasado creado por las pruebas automatizadas.',
+      ubicacion: 'Pruebas automatizadas',
+      estado,
+      organizadorId: esc.usuarios.organizador,
+      fechas: {
+        create: [
+          {
+            fecha: new Date(`${diaLaPaz(diasAtras)}T00:00:00.000Z`),
+            horaInicio: '10:00',
+            horaFin: '20:00',
+          },
+        ],
+      },
+    },
+    select: { id: true },
+  });
+  await aceptarEnEvento(prisma, esc.negocioId, evento.id);
+  return evento.id;
+}
+
+/**
+ * Registra una venta ya ocurrida directamente en la base (el POS no permite cobrar en eventos
+ * pasados). Los precios se leen de los productos, como haría el cobro real.
+ */
+export async function registrarVenta(
+  prisma: PrismaService,
+  esc: Escenario,
+  opciones: {
+    eventoId: string;
+    fecha: Date;
+    items: { productoId: string; cantidad: number }[];
+    clienteId?: string;
+    ayudanteId?: string;
+  },
+) {
+  const productos = await prisma.producto.findMany({
+    where: { id: { in: opciones.items.map((i) => i.productoId) } },
+    select: { id: true, precio: true },
+  });
+  const lineas = opciones.items.map((i) => {
+    const precio = productos.find((p) => p.id === i.productoId)!.precio;
+    return { ...i, precioUnit: precio, subtotal: precio.mul(i.cantidad) };
+  });
+  const total = lineas.reduce((acc, l) => acc.add(l.subtotal), new Prisma.Decimal(0));
+  return prisma.venta.create({
+    data: {
+      negocioId: esc.negocioId,
+      eventoId: opciones.eventoId,
+      ayudanteId: opciones.ayudanteId ?? esc.usuarios.ayudante,
+      clienteId: opciones.clienteId ?? esc.usuarios.cliente,
+      total,
+      createdAt: opciones.fecha,
+      detalles: {
+        create: lineas.map((l) => ({
+          productoId: l.productoId,
+          cantidad: l.cantidad,
+          precioUnit: l.precioUnit,
+          subtotal: l.subtotal,
+        })),
+      },
+    },
+    select: { id: true, total: true },
+  });
 }
