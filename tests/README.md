@@ -51,6 +51,7 @@ Ordenadas por prioridad (ver el plan completo más abajo).
 | `unit/pos-helpers.test.ts` | Montos con 2 decimales, CSV seguro para Excel (sin inyección de fórmulas), códigos e ids |
 | `unit/pos-validacion.test.ts` | Datos aceptados por la API del POS: cantidades, código del cliente, clave anti-cobro-duplicado, campos no permitidos |
 | `unit/app-throttler.test.ts` | Límite de peticiones por usuario (y no por IP), resistente a tokens falsificados |
+| `unit/recargas-validacion.test.ts` | Módulo D: montos de recarga (mínimo Bs 10, máximo Bs 1.000, 2 decimales, solo efectivo), motivo de anulación, filtros de historiales, roles de personal y signo de los movimientos |
 
 Estas pruebas ya encontraron y ayudaron a corregir dos errores:
 
@@ -67,9 +68,10 @@ Prueban las pantallas y utilidades reales de `frontend/src` en un navegador simu
 | `frontend-unit/pos/PosPage.test.jsx` | 11 | Pantalla del POS: catálogo y stock, total sin errores de redondeo, cobro completo (sin enviar precios), saldo insuficiente con aviso, **misma clave al reintentar**, saldo que cambió, errores |
 | `frontend-unit/admin/RetirosPage.test.jsx` | 3 | **Regresión** de respuestas desactualizadas al cambiar de pestaña, aprobar y pago con comprobante |
 | `frontend-unit/business/VentasUI.test.jsx` | 8 | Gráfico de ventas por día (escala, montos, tabla) y filtros de fecha y negocio |
+| `frontend-unit/recargas/RecargaPage.test.jsx` | 16 | Terminal del recargador: recarga completa (sin enviar saldos), límites de monto y saldo máximo, **recargas pendientes sin conexión que se reintentan con la misma clave**, rechazos del servidor |
 
 - **Una sola copia de React.** Las pruebas usan React y React Router de `frontend/node_modules`, porque con dos copias los hooks fallan. Por eso `tests/.npmrc` no instala las dependencias "peer" de Testing Library. Los alias están en `vitest.config.mjs`.
-- **Verificación de mutación.** Se quitó a propósito la protección contra respuestas viejas de `RetirosPage` y la prueba de regresión falló, como se esperaba.
+- **Verificación de mutación.** Se quitó a propósito la protección contra respuestas viejas de `RetirosPage` y la prueba de regresión falló, como se esperaba. Lo mismo con el recargador: si el reintento genera una clave nueva (y acreditaría dos veces), la prueba falla.
 
 ### 2. Integración (`integracion/`): usan la base compartida de Aiven
 
@@ -83,12 +85,18 @@ Necesitan `backend/.env`, `backend/prisma/ca.pem` e internet. No hace falta leva
 | `integracion/pos-cobro.test.ts` | 25 | Cobro real contra la base: saldo insuficiente, cobros simultáneos, clave anti-duplicado, stock, horario, permisos, consulta previa e historial |
 | `integracion/api-seguridad.test.ts` | 73 | Seguridad por HTTP: tokens falsos, vencidos o de cuentas desactivadas; roles de cada endpoint (50 combinaciones); datos ajenos; validación (JSON mal formado, más de 1 MB, inyección SQL); cabeceras de seguridad y CORS; límite de peticiones por usuario y de intentos de login |
 | `integracion/pos-liquidacion.test.ts` | 23 | Panel de ventas del dueño (totales, días, eventos, productos, CSV), liquidación (acreditado/pendiente) y retiros (solicitud, aprobación, pago, rechazo, solicitudes simultáneas) |
+| `integracion/recargas.test.ts` | 37 | Módulo D: recarga 1:1 por manilla o QR, primera recarga que crea el saldo, evento no asignado o fuera de horario, saldo máximo (también con recargas simultáneas), reintentos sin duplicar, anulación por el admin (doble, simultánea, saldo ya gastado), historiales y personal del evento |
+| `integracion/recargas-seguridad.test.ts` | 79 | Seguridad por HTTP del Módulo D: roles de cada endpoint (60 combinaciones), recargador no asignado, el recargador no puede anular, el cliente solo ve lo suyo, validación y flujo completo con reintento |
 
 Para comprobar que estas pruebas detectan errores reales, se rompieron a propósito dos protecciones y las pruebas fallaron, como se esperaba:
 
 - permitir cobrar aunque el saldo no alcance (fallan las de saldo insuficiente);
 - quitar el bloqueo de las solicitudes de retiro (falla la de solicitudes simultáneas);
-- quitar la restricción de roles del panel del dueño (fallan exactamente los 9 casos de roles sin permiso).
+- quitar la restricción de roles del panel del dueño (fallan exactamente los 9 casos de roles sin permiso);
+- quitar el tope de saldo por evento en las recargas (fallan las 2 pruebas de saldo máximo);
+- quitar la restricción de rol ADMIN de la anulación de recargas (fallan los 9 casos de roles sin permiso).
+
+La prueba de recargas encontró un error real: con el filtro "Anuladas", el listado del administrador mostraba como "total vigente" la suma de las recargas vigentes. Ya está corregido.
 
 `pos-liquidacion.test.ts` **no sube archivos a Cloudinary**: reemplaza el almacenamiento de comprobantes por uno simulado.
 
@@ -101,9 +109,10 @@ Abren la aplicación real en **Microsoft Edge** (ya instalado en Windows; no se 
 | `e2e/01-pos.spec.ts` | 7 | Login del ayudante y punto de venta en el celular: cobro con manilla, comprobante, historial, saldo insuficiente, stock y código inexistente |
 | `e2e/02-panel-negocio.spec.ts` | 4 | Panel del dueño: dashboard, registro de ventas, CSV, solicitud de retiro y menú lateral en el celular |
 | `e2e/03-admin-retiros.spec.ts` | 3 | El administrador aprueba el retiro, el pago exige comprobante y el rechazo |
-| `e2e/04-navegacion.spec.ts` | 42 | Las 15 pantallas de cada rol en escritorio y celular, sin errores ni desbordes; rutas protegidas; menú móvil |
+| `e2e/04-navegacion.spec.ts` | 55 | Las pantallas de cada rol (incluido el recargador) en escritorio y celular, sin errores ni desbordes; rutas protegidas; menú móvil |
+| `e2e/05-recargas.spec.ts` | 9 | Módulo D: login del recargador, recarga en efectivo con la manilla, "Mis recargas", monto mínimo, "Mi Manilla" y movimientos del cliente (también en el celular), anulación por el admin, personal del evento y movimientos del evento |
 
-- Los archivos corren **en orden y de a uno** (01 → 04) porque comparten un escenario `[PRUEBA-AUTO]`: la venta de 01 aparece en el panel de 02, y el retiro que pide 02 lo revisa el administrador en 03.
+- Los archivos corren **en orden y de a uno** (01 → 05) porque comparten un escenario `[PRUEBA-AUTO]`: la venta de 01 aparece en el panel de 02, el retiro que pide 02 lo revisa el administrador en 03, y la recarga de 05 es la que el administrador anula después.
 - El escenario se crea al inicio (`e2e/setup/global-setup.ts`) y se borra al final, aunque las pruebas fallen. Las sesiones de cada rol se guardan en `e2e/.auth/` (ignorada por git), así las pruebas no repiten el login.
 - **No suben archivos a Cloudinary.**
 - Las 3 pantallas rotas conocidas (Mis Negocios, Productos y Ayudantes del jefe, pendientes del schema nuevo de negocios) aparecen como **"skipped"** (`test.fixme`). Cuando se arreglen, cámbialas a `test` en `04-navegacion.spec.ts`.
@@ -111,6 +120,8 @@ Abren la aplicación real en **Microsoft Edge** (ya instalado en Windows; no se 
 - Para usar Chromium en vez de Edge: `npx playwright install chromium` y la variable `PW_CHANNEL=chromium`.
 
 Estas pruebas encontraron un error real: en **Retiros** (administrador) y en el **Dashboard** (dueño), al cambiar rápido de pestaña o de filtro, una respuesta lenta anterior podía llegar después y mostrar los datos equivocados. Ya está corregido: ahora se descartan las respuestas viejas.
+
+También detectaron que **Mi Manilla** se desbordaba 60 px a lo ancho en el celular cuando el título del evento era largo. Ya está corregido.
 
 ## Plan de pruebas (orden de importancia)
 
@@ -122,6 +133,7 @@ Estas pruebas encontraron un error real: en **Retiros** (administrador) y en el 
 | 4 | Seguridad de la API (roles, validación, límite de peticiones) | ✅ Hecha | Sí |
 | 5 | Recorrido en navegador con Playwright (flujo del POS y pantallas por rol) | ✅ Hecha | Sí |
 | 6 | Unitarias del frontend (formatos, POS, retiros, gráfico y filtros) | ✅ Hecha | No |
+| 7 | Módulo D (recargas): unitarias, integración, seguridad, frontend y e2e | ✅ Hecha | Sí (salvo unitarias) |
 
 ### Datos de prueba en la base compartida (pruebas 2 a 5)
 
@@ -157,7 +169,7 @@ tests/
 │       ├── app.ts         ← levanta la API real en un puerto libre y hace peticiones HTTP
 │       ├── entorno.js     ← carga backend/.env y la ruta del certificado SSL
 │       ├── tiempo.js      ← tiempo máximo por prueba (la base remota es lenta)
-│       ├── escenario.ts   ← crea usuarios, negocio, productos, eventos y entradas de prueba
+│       ├── escenario.ts   ← crea usuarios (incluye recargadores y un admin), negocio, productos, eventos y entradas de prueba
 │       └── limpieza.js    ← busca y borra los datos [PRUEBA-AUTO] (reglas de seguridad)
 └── scripts/
     └── limpiar-datos-prueba.js   ← limpieza manual (npm run limpiar)

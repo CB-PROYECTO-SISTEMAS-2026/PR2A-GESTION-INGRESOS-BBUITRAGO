@@ -73,6 +73,7 @@ export default async function globalSetup() {
       jefe: `jefe.${sufijo}${DOMINIO}`,
       organizador: `organizador.${sufijo}${DOMINIO}`,
       admin: `admin.${sufijo}${DOMINIO}`,
+      recargador: `recargador.${sufijo}${DOMINIO}`,
     };
 
     fs.mkdirSync(AUTH_DIR, { recursive: true });

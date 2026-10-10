@@ -9,7 +9,7 @@ import type { Escenario } from '../../integracion/helpers/escenario';
 
 export const AUTH_DIR = path.resolve(__dirname, '../.auth');
 
-export const ROLES_E2E = ['cliente', 'ayudante', 'jefe', 'organizador', 'admin'] as const;
+export const ROLES_E2E = ['cliente', 'ayudante', 'jefe', 'organizador', 'admin', 'recargador'] as const;
 export type RolE2E = (typeof ROLES_E2E)[number];
 
 export interface DatosE2E {

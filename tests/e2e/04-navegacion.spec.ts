@@ -38,11 +38,12 @@ const TAMANOS = {
 };
 
 const PANTALLAS: Record<RolE2E, string[]> = {
-  cliente: ['/', '/eventos', '/perfil'],
+  cliente: ['/', '/eventos', '/perfil', '/mi-manilla'],
   organizador: ['/organizador/solicitudes', '/organizador/nueva-solicitud'],
-  admin: ['/admin', '/admin/eventos', '/admin/solicitudes', '/admin/usuarios', '/admin/retiros'],
+  admin: ['/admin', '/admin/eventos', '/admin/solicitudes', '/admin/usuarios', '/admin/retiros', '/admin/recargas'],
   jefe: ['/negocio/dashboard', '/negocio/ventas', '/negocio/liquidacion'],
   ayudante: ['/pos', '/pos/historial'],
+  recargador: ['/recargas', '/recargas/historial'],
 };
 
 /** Rotas hasta integrar el schema nuevo de negocios (ver el encabezado). */
@@ -88,7 +89,7 @@ test.describe('Pantallas pendientes (schema nuevo de negocios)', () => {
 test.describe('Rutas protegidas', () => {
   test.describe('sin sesión', () => {
     test.use({ storageState: { cookies: [], origins: [] } });
-    for (const ruta of ['/pos', '/negocio/dashboard', '/admin', '/perfil']) {
+    for (const ruta of ['/pos', '/negocio/dashboard', '/admin', '/perfil', '/recargas', '/mi-manilla']) {
       test(`${ruta} lleva al login`, async ({ page }) => {
         await page.goto(ruta);
         await expect(page).toHaveURL(/\/login/);
@@ -101,6 +102,9 @@ test.describe('Rutas protegidas', () => {
     ['cliente', '/admin'],
     ['jefe', '/pos'],
     ['organizador', '/admin/retiros'],
+    ['ayudante', '/recargas'],
+    ['recargador', '/admin/recargas'],
+    ['recargador', '/pos'],
   ];
   for (const [rol, ruta] of sinPermiso) {
     test.describe(`${rol} en ${ruta}`, () => {

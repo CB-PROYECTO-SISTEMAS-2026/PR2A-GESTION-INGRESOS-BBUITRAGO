@@ -26,6 +26,7 @@
  *  CÓDIGO PROBADO
  *    backend/src/modules/pos/pos.service.ts      (cobrar, consultarCliente, misVentas)
  *    backend/src/modules/pos/negocio-compat.ts   (stock y validaciones del negocio)
+ *    backend/src/modules/saldo/codigo-cliente.service.ts (identificación por QR o manilla)
  *
  *  CÓMO EJECUTARLA
  *    cd tests
@@ -69,6 +70,7 @@ import { TipoTransaccionSaldo } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../backend/src/prisma/prisma.service';
 import { PosService } from '../../backend/src/modules/pos/pos.service';
+import { CodigoClienteService } from '../../backend/src/modules/saldo/codigo-cliente.service';
 import {
   Escenario,
   SALDO_INICIAL,
@@ -118,9 +120,11 @@ const cobro = (items: { productoId: string; cantidad: number }[], extra: Record<
 beforeAll(async () => {
   prisma = new PrismaService();
   await prisma.$connect();
-  pos = new PosService(prisma, {
-    get: (_key: string, fallback?: string) => process.env.APP_TIMEZONE ?? fallback,
-  } as unknown as ConfigService);
+  pos = new PosService(
+    prisma,
+    { get: (_key: string, fallback?: string) => process.env.APP_TIMEZONE ?? fallback } as unknown as ConfigService,
+    new CodigoClienteService(prisma),
+  );
 
   // Restos de ejecuciones anteriores que se cortaron (de más de 2 horas, para no borrar los
   // datos de otra persona que esté corriendo las pruebas en este momento).

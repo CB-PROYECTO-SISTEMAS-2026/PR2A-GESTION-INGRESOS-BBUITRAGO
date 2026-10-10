@@ -1,5 +1,6 @@
 /**
- * Crea en la base compartida el escenario que usan las pruebas de integración del POS.
+ * Crea en la base compartida el escenario que usan las pruebas de integración del POS (Módulo E)
+ * y de recargas (Módulo D).
  *
  * Todo lo creado lleva la marca "[PRUEBA-AUTO]" (eventos, negocios) o un correo
  * "@pruebas.eventix.test" (usuarios), para que helpers/limpieza.js pueda encontrarlo y borrarlo
@@ -33,6 +34,16 @@ export interface Escenario {
     jefe: string;
     jefeOtroNegocio: string;
     organizador: string;
+    /** Otro organizador (no es dueño de los eventos del escenario). */
+    organizador2: string;
+    /** Recargador asignado a los eventos "abierto" y "cerrado" (Módulo D). */
+    recargador: string;
+    /** Recargador sin ningún evento asignado. */
+    recargador2: string;
+    /** Administrador general (anula recargas). */
+    admin: string;
+    /** Cliente con entrada en el evento abierto pero todavía SIN saldo (sin fila SaldoEvento). */
+    cliente2: string;
   };
   negocioId: string;
   otroNegocioId: string;
@@ -67,6 +78,8 @@ export interface Escenario {
     entradaAnulada: string;
     /** Entrada del cliente en el evento "cerrado" (para probar códigos de otro evento). */
     entradaOtroEvento: string;
+    /** QR digital de la entrada de cliente2 en el evento abierto. */
+    qrCliente2: string;
   };
   /** Horario del evento "cerrado" (lejos de la hora actual). */
   horarioCerrado: string;
@@ -167,13 +180,30 @@ export const nuevoSufijo = () => randomBytes(4).toString('hex');
 export async function crearEscenario(prisma: PrismaService, sufijo: string): Promise<Escenario> {
   const S = sufijo.toUpperCase();
 
-  const [cliente, ayudante, ayudante2, jefe, jefeOtroNegocio, organizador] = await Promise.all([
+  const [
+    cliente,
+    ayudante,
+    ayudante2,
+    jefe,
+    jefeOtroNegocio,
+    organizador,
+    organizador2,
+    recargador,
+    recargador2,
+    admin,
+    cliente2,
+  ] = await Promise.all([
     crearUsuario(prisma, 'cliente', sufijo, [Role.CLIENTE]),
     crearUsuario(prisma, 'ayudante', sufijo, [Role.AYUDANTE]),
     crearUsuario(prisma, 'ayudante2', sufijo, [Role.AYUDANTE]),
     crearUsuario(prisma, 'jefe', sufijo, [Role.JEFE_NEGOCIO]),
     crearUsuario(prisma, 'jefe2', sufijo, [Role.JEFE_NEGOCIO]),
     crearUsuario(prisma, 'organizador', sufijo, [Role.ORGANIZADOR]),
+    crearUsuario(prisma, 'organizador2', sufijo, [Role.ORGANIZADOR]),
+    crearUsuario(prisma, 'recargador', sufijo, [Role.RECARGADOR]),
+    crearUsuario(prisma, 'recargador2', sufijo, [Role.RECARGADOR]),
+    crearUsuario(prisma, 'admin-saldo', sufijo, [Role.ADMIN]),
+    crearUsuario(prisma, 'cliente2', sufijo, [Role.CLIENTE]),
   ]);
 
   const [negocioId, otroNegocioId] = await Promise.all([
@@ -222,6 +252,7 @@ export async function crearEscenario(prisma: PrismaService, sufijo: string): Pro
     manillaSinVincular: `PRUEBA-AUTO-${S}-MANILLA-LIBRE`,
     entradaAnulada: `PRUEBA-AUTO-${S}-ANULADA`,
     entradaOtroEvento: `PRUEBA-AUTO-${S}-OTRO-EVENTO`,
+    qrCliente2: `PRUEBA-AUTO-${S}-QR-CLIENTE2`,
   };
   const categoria = abierto.categorias[0].id;
   const entrada = await crearEntrada(prisma, abierto.id, categoria, cliente, codigos.qr);
@@ -243,11 +274,31 @@ export async function crearEscenario(prisma: PrismaService, sufijo: string): Pro
     prisma.saldoEvento.create({
       data: { usuarioId: cliente, eventoId: abierto.id, saldo: SALDO_INICIAL },
     }),
+    crearEntrada(prisma, abierto.id, categoria, cliente2, codigos.qrCliente2),
+    // Módulo D: el recargador trabaja en el evento abierto y en el que está fuera de horario.
+    prisma.staffEvento.createMany({
+      data: [
+        { usuarioId: recargador, eventoId: abierto.id, role: Role.RECARGADOR },
+        { usuarioId: recargador, eventoId: cerrado.id, role: Role.RECARGADOR },
+      ],
+    }),
   ]);
 
   return {
     sufijo,
-    usuarios: { cliente, ayudante, ayudante2, jefe, jefeOtroNegocio, organizador },
+    usuarios: {
+      cliente,
+      ayudante,
+      ayudante2,
+      jefe,
+      jefeOtroNegocio,
+      organizador,
+      organizador2,
+      recargador,
+      recargador2,
+      admin,
+      cliente2,
+    },
     negocioId,
     otroNegocioId,
     productos: { empanada, refresco, limitado, inactivo, ajeno },
