@@ -8,9 +8,14 @@
     "test:watch": "jest --selectProjects unit --watch",
     "test:integracion": "jest --selectProjects integracion --runInBand",
     "limpiar": "node scripts/limpiar-datos-prueba.js",
-    "limpiar:confirmar": "node scripts/limpiar-datos-prueba.js --confirmar"
+    "limpiar:confirmar": "node scripts/limpiar-datos-prueba.js --confirmar",
+    "test:e2e": "playwright test",
+    "test:e2e:ver": "playwright test --headed",
+    "test:e2e:reporte": "playwright show-report e2e-reporte",
+    "test:todo": "npm run test:unit && npm run test:integracion && npm run test:e2e"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.5",
     "jest": "^30.5.2",

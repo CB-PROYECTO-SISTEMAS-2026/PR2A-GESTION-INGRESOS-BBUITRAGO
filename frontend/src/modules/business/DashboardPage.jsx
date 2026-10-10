@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getResumenVentas } from '../../api/pos.api'
 import { formatBs, formatTime, getErrorMessage } from '../../utils/format'
 import { FiltrosVentas, KpiCard, VentasPorDiaChart } from './components/VentasUI'
@@ -12,13 +12,19 @@ export default function DashboardPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
+  // Número de la última petición: al cambiar los filtros (o con el refresco periódico), una
+  // respuesta vieja que llega tarde se descarta y no pisa los datos de los filtros nuevos.
+  const ultimaPeticion = useRef(0)
+
   const cargar = useCallback(async () => {
+    const peticion = ++ultimaPeticion.current
     try {
       const { data } = await getResumenVentas(filtros)
+      if (peticion !== ultimaPeticion.current) return
       setData(data)
       setError('')
     } catch (err) {
-      setError(getErrorMessage(err))
+      if (peticion === ultimaPeticion.current) setError(getErrorMessage(err))
     }
   }, [filtros])
 

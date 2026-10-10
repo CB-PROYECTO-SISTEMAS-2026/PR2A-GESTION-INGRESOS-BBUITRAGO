@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cambiarEstadoRetiro, getRetirosAdmin, pagarRetiro } from '../../api/pos.api'
 import { toast } from '../../components/Toast'
 import Modal from '../../components/ui/Modal'
@@ -25,13 +25,19 @@ export default function RetirosPage() {
   const [ocupado, setOcupado] = useState(null)
   const [pagando, setPagando] = useState(null)
 
+  // Número de la última petición: si el usuario cambia de pestaña antes de que llegue la
+  // respuesta anterior, esa respuesta vieja se descarta (no pisa la tabla de la pestaña nueva).
+  const ultimaPeticion = useRef(0)
+
   const cargar = useCallback(async () => {
+    const peticion = ++ultimaPeticion.current
     try {
       const { data } = await getRetirosAdmin({ estado })
+      if (peticion !== ultimaPeticion.current) return
       setData(data)
       setError('')
     } catch (err) {
-      setError(getErrorMessage(err))
+      if (peticion === ultimaPeticion.current) setError(getErrorMessage(err))
     }
   }, [estado])
 

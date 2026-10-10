@@ -22,6 +22,10 @@ Comandos (siempre desde la carpeta `tests/`):
 | `npx jest unit/pos-dates.test.ts` | Corre un solo archivo unitario |
 | `npx jest --runInBand integracion/pos-cobro` | Corre un solo archivo de integración |
 | `npx jest -t "medianoche"` | Corre solo las pruebas cuyo nombre contiene ese texto |
+| `npm run test:e2e` | Pruebas en navegador (Playwright, ~4 min; levanta backend y frontend si no están corriendo) |
+| `npm run test:e2e:ver` | Las mismas, con el navegador visible para mirar lo que hacen |
+| `npm run test:e2e:reporte` | Abre el informe de la última ejecución e2e (pasos, capturas, red) |
+| `npm run test:todo` | Unitarias + integración + e2e (~9 min) |
 | `npm run limpiar` | Muestra los datos de prueba que hay en la base (no borra nada) |
 | `npm run limpiar:confirmar` | Borra los datos de prueba (solo los marcados `[PRUEBA-AUTO]`) |
 
@@ -71,6 +75,26 @@ Para comprobar que estas pruebas detectan errores reales, se rompieron a propós
 
 `pos-liquidacion.test.ts` **no sube archivos a Cloudinary**: reemplaza el almacenamiento de comprobantes por uno simulado.
 
+### 3. De punta a punta en navegador (`e2e/`): Playwright
+
+Abren la aplicación real en **Microsoft Edge** (ya instalado en Windows; no se descarga ningún navegador) y la usan como una persona. Necesitan `backend/.env`, `backend/prisma/ca.pem`, `frontend/.env` e internet. Si el backend (puerto 3000) y el frontend (puerto 5173) no están corriendo, Playwright los levanta solo.
+
+| Archivo | Casos | Qué protege |
+|---|---|---|
+| `e2e/01-pos.spec.ts` | 7 | Login del ayudante y punto de venta en el celular: cobro con manilla, comprobante, historial, saldo insuficiente, stock y código inexistente |
+| `e2e/02-panel-negocio.spec.ts` | 4 | Panel del dueño: dashboard, registro de ventas, CSV, solicitud de retiro y menú lateral en el celular |
+| `e2e/03-admin-retiros.spec.ts` | 3 | El administrador aprueba el retiro, el pago exige comprobante y el rechazo |
+| `e2e/04-navegacion.spec.ts` | 42 | Las 15 pantallas de cada rol en escritorio y celular, sin errores ni desbordes; rutas protegidas; menú móvil |
+
+- Los archivos corren **en orden y de a uno** (01 → 04) porque comparten un escenario `[PRUEBA-AUTO]`: la venta de 01 aparece en el panel de 02, y el retiro que pide 02 lo revisa el administrador en 03.
+- El escenario se crea al inicio (`e2e/setup/global-setup.ts`) y se borra al final, aunque las pruebas fallen. Las sesiones de cada rol se guardan en `e2e/.auth/` (ignorada por git), así las pruebas no repiten el login.
+- **No suben archivos a Cloudinary.**
+- Las 3 pantallas rotas conocidas (Mis Negocios, Productos y Ayudantes del jefe, pendientes del schema nuevo de negocios) aparecen como **"skipped"** (`test.fixme`). Cuando se arreglen, cámbialas a `test` en `04-navegacion.spec.ts`.
+- Si una prueba falla: `npm run test:e2e:reporte` muestra cada paso con capturas y peticiones de red, y `e2e-resultados/` guarda la captura del fallo.
+- Para usar Chromium en vez de Edge: `npx playwright install chromium` y la variable `PW_CHANNEL=chromium`.
+
+Estas pruebas encontraron un error real: en **Retiros** (administrador) y en el **Dashboard** (dueño), al cambiar rápido de pestaña o de filtro, una respuesta lenta anterior podía llegar después y mostrar los datos equivocados. Ya está corregido: ahora se descartan las respuestas viejas.
+
 ## Plan de pruebas (orden de importancia)
 
 | # | Prueba | Estado | ¿Base de datos? |
@@ -79,7 +103,7 @@ Para comprobar que estas pruebas detectan errores reales, se rompieron a propós
 | 2 | Integración del cobro (saldo, concurrencia, clave anti-duplicado, stock, horario, permisos) | ✅ Hecha | Sí |
 | 3 | Integración de liquidación y retiros | ✅ Hecha | Sí |
 | 4 | Seguridad de la API (roles, validación, límite de peticiones) | ✅ Hecha | Sí |
-| 5 | Recorrido en navegador con Playwright (flujo del POS y pantallas por rol) | Pendiente | Sí |
+| 5 | Recorrido en navegador con Playwright (flujo del POS y pantallas por rol) | ✅ Hecha | Sí |
 | 6 | Unitarias del frontend (formatos y carrito) | Pendiente | No |
 
 ### Datos de prueba en la base compartida (pruebas 2 a 5)
@@ -104,6 +128,10 @@ tests/
 ├── jest.config.js     ← configuración de Jest (resuelve librerías desde backend/node_modules)
 ├── tsconfig.json      ← configuración de TypeScript para las pruebas
 ├── unit/              ← pruebas unitarias (sin base de datos)
+├── playwright.config.ts ← configuración de Playwright (Edge, servidores, orden)
+├── e2e/               ← pruebas en navegador (Playwright)
+│   ├── setup/             ← crea y borra el escenario, guarda sesiones por rol
+│   └── helpers/datos.ts   ← datos del escenario y detector de errores
 ├── integracion/       ← pruebas de integración (base compartida)
 │   └── helpers/
 │       ├── app.ts         ← levanta la API real en un puerto libre y hace peticiones HTTP
