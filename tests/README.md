@@ -1,6 +1,6 @@
 # Pruebas automatizadas de Eventix
 
-Esta carpeta contiene las pruebas automatizadas del proyecto. Es independiente del backend y del frontend: tiene su propio `package.json`, pero prueba **el código real** de `backend/src` usando las mismas librerías instaladas en `backend/node_modules`.
+Esta carpeta contiene las pruebas automatizadas del proyecto. Es independiente del backend y del frontend: tiene su propio `package.json`, pero prueba **el código real** de `backend/src` y `frontend/src`, usando las mismas librerías instaladas en `backend/node_modules` y `frontend/node_modules`.
 
 ## Cómo ejecutarlas
 
@@ -8,24 +8,27 @@ Requisitos previos (una sola vez):
 
 ```bash
 cd backend && npm install     # el backend debe tener sus dependencias y el cliente de Prisma
-cd ../tests && npm install    # instala Jest y TypeScript para las pruebas
+cd ../frontend && npm install # el frontend debe tener sus dependencias (React, React Router)
+cd ../tests && npm install    # instala Jest, Vitest, Playwright y TypeScript para las pruebas
 ```
 
 Comandos (siempre desde la carpeta `tests/`):
 
 | Comando | Qué hace |
 |---|---|
-| `npm test` | Corre todas: primero las unitarias y, si pasan, las de integración (~5 min) |
+| `npm test` | Unitarias del backend, del frontend y luego las de integración (~5 min) |
 | `npm run test:unit` | Solo las unitarias (~1 s, no necesitan base de datos ni servidor) |
 | `npm run test:integracion` | Solo las de integración (usan la base compartida, una tras otra) |
 | `npm run test:watch` | Modo vigilancia: vuelve a correr las unitarias cada vez que guardas un archivo |
+| `npm run test:frontend` | Solo las unitarias del frontend (~6 s, Vitest) |
+| `npm run test:frontend:watch` | Las del frontend en modo vigilancia |
 | `npx jest unit/pos-dates.test.ts` | Corre un solo archivo unitario |
 | `npx jest --runInBand integracion/pos-cobro` | Corre un solo archivo de integración |
 | `npx jest -t "medianoche"` | Corre solo las pruebas cuyo nombre contiene ese texto |
 | `npm run test:e2e` | Pruebas en navegador (Playwright, ~4 min; levanta backend y frontend si no están corriendo) |
 | `npm run test:e2e:ver` | Las mismas, con el navegador visible para mirar lo que hacen |
 | `npm run test:e2e:reporte` | Abre el informe de la última ejecución e2e (pasos, capturas, red) |
-| `npm run test:todo` | Unitarias + integración + e2e (~9 min) |
+| `npm run test:todo` | Todo: unitarias (backend y frontend) + integración + e2e (~9 min) |
 | `npm run limpiar` | Muestra los datos de prueba que hay en la base (no borra nada) |
 | `npm run limpiar:confirmar` | Borra los datos de prueba (solo los marcados `[PRUEBA-AUTO]`) |
 
@@ -53,6 +56,20 @@ Estas pruebas ya encontraron y ayudaron a corregir dos errores:
 
 - Una fecha inexistente como `2026-02-30` no se rechazaba (se convertía en silencio al 2 de marzo).
 - Una cantidad `1.5` respondía "cantidad máxima 99" en lugar de "debe ser un número entero".
+
+### 1b. Unitarias del frontend (`frontend-unit/`): Vitest + React Testing Library
+
+Prueban las pantallas y utilidades reales de `frontend/src` en un navegador simulado (jsdom), con la API **simulada**. No usan base de datos, backend ni navegador real, y tardan unos segundos.
+
+| Archivo | Casos | Qué protege |
+|---|---|---|
+| `frontend-unit/utils/format.test.js` | 18 | Montos en Bs, fechas sin correrse un día por la zona horaria, horas y mensajes de error para el usuario |
+| `frontend-unit/pos/PosPage.test.jsx` | 11 | Pantalla del POS: catálogo y stock, total sin errores de redondeo, cobro completo (sin enviar precios), saldo insuficiente con aviso, **misma clave al reintentar**, saldo que cambió, errores |
+| `frontend-unit/admin/RetirosPage.test.jsx` | 3 | **Regresión** de respuestas desactualizadas al cambiar de pestaña, aprobar y pago con comprobante |
+| `frontend-unit/business/VentasUI.test.jsx` | 8 | Gráfico de ventas por día (escala, montos, tabla) y filtros de fecha y negocio |
+
+- **Una sola copia de React.** Las pruebas usan React y React Router de `frontend/node_modules`, porque con dos copias los hooks fallan. Por eso `tests/.npmrc` no instala las dependencias "peer" de Testing Library. Los alias están en `vitest.config.mjs`.
+- **Verificación de mutación.** Se quitó a propósito la protección contra respuestas viejas de `RetirosPage` y la prueba de regresión falló, como se esperaba.
 
 ### 2. Integración (`integracion/`): usan la base compartida de Aiven
 
@@ -104,7 +121,7 @@ Estas pruebas encontraron un error real: en **Retiros** (administrador) y en el 
 | 3 | Integración de liquidación y retiros | ✅ Hecha | Sí |
 | 4 | Seguridad de la API (roles, validación, límite de peticiones) | ✅ Hecha | Sí |
 | 5 | Recorrido en navegador con Playwright (flujo del POS y pantallas por rol) | ✅ Hecha | Sí |
-| 6 | Unitarias del frontend (formatos y carrito) | Pendiente | No |
+| 6 | Unitarias del frontend (formatos, POS, retiros, gráfico y filtros) | ✅ Hecha | No |
 
 ### Datos de prueba en la base compartida (pruebas 2 a 5)
 
@@ -127,7 +144,10 @@ tests/
 ├── package.json       ← scripts y dependencias de las pruebas (Jest, ts-jest, TypeScript)
 ├── jest.config.js     ← configuración de Jest (resuelve librerías desde backend/node_modules)
 ├── tsconfig.json      ← configuración de TypeScript para las pruebas
-├── unit/              ← pruebas unitarias (sin base de datos)
+├── vitest.config.mjs  ← configuración de Vitest (pruebas del frontend)
+├── .npmrc             ← evita instalar una segunda copia de React
+├── unit/              ← pruebas unitarias del backend (sin base de datos)
+├── frontend-unit/     ← pruebas unitarias del frontend (Vitest + jsdom)
 ├── playwright.config.ts ← configuración de Playwright (Edge, servidores, orden)
 ├── e2e/               ← pruebas en navegador (Playwright)
 │   ├── setup/             ← crea y borra el escenario, guarda sesiones por rol
@@ -150,4 +170,4 @@ tests/
 - **Validación igual a la de producción.** Las pruebas de validación usan `backend/src/common/validation/validation-pipe.options.ts`, la misma configuración que `main.ts`.
 - **API igual a la de producción.** La prueba de seguridad usa `backend/src/app.setup.ts` (helmet, CORS, límite de 1 MB, validación), la misma función que llama `main.ts`.
 - **Cuentas de prueba con contraseña.** La prueba de seguridad inicia sesión de verdad: sus usuarios (incluido un administrador de prueba) reciben una contraseña aleatoria distinta en cada ejecución, que nunca se muestra, y se borran al terminar.
-- **Vulnerabilidad conocida en las herramientas.** `npm audit` reporta una vulnerabilidad moderada en `sprintf-js`, que es una dependencia interna de Jest. Solo afecta a las herramientas de prueba (no llega al backend ni al frontend) y corregirla exige `npm audit fix --force`, que cambia versiones de Jest. Por eso no se aplicó.
+- **Vulnerabilidad conocida en las herramientas.** `npm audit` reporta "19 vulnerabilidades moderadas", pero es **una sola**: la de `sprintf-js`, contada una vez por cada paquete que depende de ella. Es una dependencia interna de Jest. Solo afecta a las herramientas de prueba (no llega al backend ni al frontend) y corregirla exige `npm audit fix --force`, que cambia versiones de Jest. Por eso no se aplicó.
