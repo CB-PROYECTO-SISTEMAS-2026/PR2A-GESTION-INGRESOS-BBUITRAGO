@@ -29,7 +29,9 @@ export default function LoginPage() {
       } else if (user?.roles?.includes('ADMIN')) {
         navigate('/admin')
       } else if (user?.roles?.includes('JEFE_NEGOCIO')) {
-        navigate('/negocio')
+        navigate('/negocio/dashboard')
+      } else if (user?.roles?.includes('AYUDANTE')) {
+        navigate('/pos')
       } else {
         navigate('/')
       }

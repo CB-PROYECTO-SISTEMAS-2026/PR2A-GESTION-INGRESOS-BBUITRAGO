@@ -78,6 +78,21 @@ export function formatDateTime(value) {
   })
 }
 
+/** Día calendario local "AAAA-MM-DD" (hoy por defecto), con `offsetDays` días de diferencia. */
+export function localDay(offsetDays = 0) {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+}
+
+/** "14:32" */
+export function formatTime(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
 export function lowestPrice(evento) {
   const cats = evento?.categorias ?? []
   if (!cats.length) return null

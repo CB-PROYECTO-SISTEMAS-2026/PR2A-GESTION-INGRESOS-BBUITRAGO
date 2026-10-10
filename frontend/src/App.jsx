@@ -34,6 +34,13 @@ import UsuariosPage from './modules/admin/UsuariosPage'
 import NegociosPage from './modules/business/NegociosPage'
 import ProductosPage from './modules/business/ProductosPage'
 import AyudantesPage from './modules/business/AyudantesPage'
+import DashboardPage from './modules/business/DashboardPage'
+import VentasPage from './modules/business/VentasPage'
+import LiquidacionPage from './modules/business/LiquidacionPage'
+
+import PosLayout from './modules/pos/PosLayout'
+import PosPage from './modules/pos/PosPage'
+import PosHistorialPage from './modules/pos/PosHistorialPage'
 
 function RootLayout() {
   return (
@@ -104,6 +111,22 @@ const router = createBrowserRouter([
               { index: true, element: <NegociosPage /> },
               { path: 'productos', element: <ProductosPage /> },
               { path: 'ayudantes', element: <AyudantesPage /> },
+              { path: 'dashboard', element: <DashboardPage /> },
+              { path: 'ventas', element: <VentasPage /> },
+              { path: 'liquidacion', element: <LiquidacionPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        path: 'pos',
+        element: <ProtectedRoute roles={['AYUDANTE']} />,
+        children: [
+          {
+            element: <PosLayout />,
+            children: [
+              { index: true, element: <PosPage /> },
+              { path: 'historial', element: <PosHistorialPage /> },
             ],
           },
         ],

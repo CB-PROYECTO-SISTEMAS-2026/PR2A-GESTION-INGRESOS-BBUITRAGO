@@ -10,7 +10,7 @@ const linkClass = ({ isActive }) =>
 
 function roleLabel(roles = []) {
   if (!roles.length) return 'Usuario'
-  const preferred = ['ADMIN', 'ORGANIZADOR', 'JEFE_NEGOCIO', 'CLIENTE']
+  const preferred = ['ADMIN', 'ORGANIZADOR', 'JEFE_NEGOCIO', 'AYUDANTE', 'CLIENTE']
   const found = preferred.find((r) => roles.includes(r)) || roles[0]
   return ROLE_LABELS[found] || found
 }
@@ -122,6 +122,11 @@ export default function Navbar() {
           {hasRole('JEFE_NEGOCIO') && (
             <NavLink to="/negocio" className={linkClass}>
               Negocios
+            </NavLink>
+          )}
+          {hasRole('AYUDANTE') && (
+            <NavLink to="/pos" className={linkClass}>
+              Punto de venta
             </NavLink>
           )}
         </nav>

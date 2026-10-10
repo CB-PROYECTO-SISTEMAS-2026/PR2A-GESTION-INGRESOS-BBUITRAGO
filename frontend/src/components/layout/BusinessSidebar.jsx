@@ -1,12 +1,12 @@
 import PanelSidebar from './PanelSidebar'
 
 const items = [
-  { label: 'Dashboard' },
+  { to: '/negocio/dashboard', label: 'Dashboard' },
   { to: '/negocio', label: 'Mis Negocios', end: true },
   { to: '/negocio/productos', label: 'Productos' },
-  { label: 'Ventas' },
+  { to: '/negocio/ventas', label: 'Ventas' },
   { to: '/negocio/ayudantes', label: 'Ayudantes' },
-  { label: 'Historial' },
+  { to: '/negocio/liquidacion', label: 'Liquidación' },
 ]
 
 export default function BusinessSidebar() {

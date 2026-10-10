@@ -12,6 +12,7 @@ import { EventsModule } from './modules/events/events.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { BusinessesModule } from './modules/businesses/businesses.module';
 import { AdminUsersModule } from './modules/admin-users/admin-users.module';
+import { PosModule } from './modules/pos/pos.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
     TicketsModule,
     BusinessesModule,
     AdminUsersModule,
+    PosModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
