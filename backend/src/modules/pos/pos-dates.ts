@@ -42,6 +42,16 @@ export interface DayRange {
   lt: Date;
 }
 
+/**
+ * "AAAA-MM-DD" que existe en el calendario. Sin esta comprobación, "2026-02-30" se convertiría
+ * en silencio al 2 de marzo y "2026-13-01" en una fecha inválida.
+ */
+function isCalendarDay(day: string) {
+  if (!DAY_RE.test(day)) return false;
+  const date = dayToDate(day);
+  return !Number.isNaN(date.getTime()) && dateToDay(date) === day;
+}
+
 /** Rango de días inclusivo; sin parámetros es el día de hoy. */
 export function resolveDayRange(
   timeZone: string,
@@ -55,6 +65,9 @@ export function resolveDayRange(
     throw new BadRequestException(
       'Las fechas deben tener el formato AAAA-MM-DD.',
     );
+  }
+  if (!isCalendarDay(from) || !isCalendarDay(to)) {
+    throw new BadRequestException('La fecha indicada no existe.');
   }
   if (from > to)
     throw new BadRequestException(

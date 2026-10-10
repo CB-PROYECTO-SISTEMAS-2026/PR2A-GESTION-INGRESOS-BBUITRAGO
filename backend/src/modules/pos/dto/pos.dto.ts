@@ -33,12 +33,15 @@ export class CobroItemDto {
   @IsNotEmpty()
   productoId: string;
 
+  // Con stopAtFirstError se informa el primer validador que falla, y class-validator los evalúa
+  // de abajo hacia arriba: @IsInt va pegado a la propiedad para que "1.5" diga "número entero"
+  // y no "cantidad máxima".
   @Transform(toStrictInt)
-  @IsInt({ message: 'La cantidad debe ser un número entero.' })
-  @Min(1, { message: 'La cantidad mínima es 1.' })
   @Max(MAX_CANTIDAD_POR_PRODUCTO, {
     message: `La cantidad máxima por producto es ${MAX_CANTIDAD_POR_PRODUCTO}.`,
   })
+  @Min(1, { message: 'La cantidad mínima es 1.' })
+  @IsInt({ message: 'La cantidad debe ser un número entero.' })
   cantidad: number;
 }
 

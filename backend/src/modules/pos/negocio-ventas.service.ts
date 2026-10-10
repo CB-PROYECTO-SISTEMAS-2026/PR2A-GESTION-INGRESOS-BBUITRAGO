@@ -12,6 +12,7 @@ import { dayIn, resolveDayRange } from './pos-dates';
 import {
   VENTA_ROW_SELECT,
   VentaRow,
+  csvCell,
   money,
   nombresDeVentas,
 } from './pos-helpers';
@@ -473,15 +474,4 @@ export class NegocioVentasService {
       total: money(v.total),
     };
   }
-}
-
-/**
- * Celda CSV segura. Nombres de clientes y productos los escriben los usuarios: si empiezan con
- * =, +, -, @, tab o retorno, Excel los ejecutaría como fórmula (inyección CSV). Se les antepone
- * un apóstrofo para que se muestren como texto. Los montos son números y no se tocan.
- */
-export function csvCell(value: string | number) {
-  let text = String(value ?? '');
-  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return /[";\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }

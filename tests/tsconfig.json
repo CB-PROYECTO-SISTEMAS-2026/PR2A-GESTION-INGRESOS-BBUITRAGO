@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "types": [
+      "jest",
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "*": [
+        "node_modules/*",
+        "../backend/node_modules/*",
+        "../backend/node_modules/@types/*"
+      ]
+    },
+    "allowJs": true
+  },
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

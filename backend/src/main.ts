@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { VALIDATION_PIPE_OPTIONS } from './common/validation/validation-pipe.options';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -22,15 +23,7 @@ async function bootstrap() {
     config.get<string>('TRUST_PROXY') === 'true' ? 1 : false,
   );
   app.useBodyParser('json', { limit: '1mb' });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      stopAtFirstError: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
   app.enableShutdownHooks();
 
   const port = Number(config.get<string>('PORT') || 3000);
