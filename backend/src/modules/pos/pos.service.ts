@@ -3,15 +3,9 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  EntradaEstado,
-  EventoEstado,
-  Prisma,
-  TipoTransaccionSaldo,
-} from '@prisma/client';
+import { EventoEstado, Prisma, TipoTransaccionSaldo } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { dateToDay, dayToDate, todayIn } from '../events/event-schedule';
 import {
@@ -27,7 +21,6 @@ import {
   codigoTransaccion,
   money,
   newId,
-  nombreCompleto,
   nombresDeVentas,
 } from './pos-helpers';
 import {
@@ -36,6 +29,7 @@ import {
   MAX_CANTIDAD_POR_PRODUCTO,
   RangoFechasDto,
 } from './dto/pos.dto';
+import { CodigoClienteService } from '../saldo/codigo-cliente.service';
 
 /** Máximo de ventas que se devuelven en el historial del ayudante (los totales cubren todo el rango). */
 const HISTORIAL_LIMIT = 500;
@@ -44,21 +38,6 @@ const HISTORIAL_LIMIT = 500;
 const COBRO_TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const ENTRADA_INVALIDA: EntradaEstado[] = [
-  EntradaEstado.REEMBOLSADA,
-  EntradaEstado.ANULADA,
-];
-
-export interface ClienteResuelto {
-  entradaId: string;
-  usuarioId: string;
-  nombre: string;
-  /** Cómo se identificó al cliente: QR de la entrada o manilla física. */
-  medio: 'QR_DIGITAL' | 'MANILLA';
-  identificador: string;
-  categoria: string;
-}
 
 function isUniqueViolation(err: unknown) {
   return (
@@ -77,6 +56,7 @@ export class PosService {
   constructor(
     private prisma: PrismaService,
     config: ConfigService,
+    private codigoCliente: CodigoClienteService,
   ) {
     this.timeZone = config.get<string>('APP_TIMEZONE', 'America/La_Paz');
   }
@@ -148,7 +128,7 @@ export class PosService {
     const asignacion = await this.requireAyudante(usuarioId);
     const [, cliente] = await Promise.all([
       this.requireEventoEnCurso(asignacion.negocioId, dto.eventoId),
-      this.resolveCliente(dto.eventoId, dto.codigo),
+      this.codigoCliente.resolver(dto.eventoId, dto.codigo),
     ]);
     const saldo = await this.prisma.saldoEvento.findUnique({
       where: {
@@ -204,7 +184,7 @@ export class PosService {
     const asignacion = await this.requireAyudante(ayudanteId);
     const [evento, cliente, productos, stock] = await Promise.all([
       this.requireEventoEnCurso(asignacion.negocioId, dto.eventoId),
-      this.resolveCliente(dto.eventoId, dto.codigo),
+      this.codigoCliente.resolver(dto.eventoId, dto.codigo),
       this.prisma.producto.findMany({
         where: {
           id: { in: [...cantidades.keys()] },
@@ -520,107 +500,6 @@ export class PosService {
       );
     }
     return { id: evento.id, titulo: evento.titulo };
-  }
-
-  /** Identifica al cliente por el código de su manilla física o el QR de su entrada digital. */
-  private async resolveCliente(
-    eventoId: string,
-    rawCodigo: string,
-  ): Promise<ClienteResuelto> {
-    const codigo = rawCodigo.trim();
-    const candidatos = [...new Set([codigo, codigo.toUpperCase()])];
-
-    const entrada = await this.prisma.entrada.findFirst({
-      where: {
-        OR: [
-          { codigoQr: { in: candidatos } },
-          { codigo: { in: candidatos } },
-          {
-            credencial: { is: { codigoQr: { in: candidatos }, activa: true } },
-          },
-          {
-            manilla: {
-              is: {
-                eventoId,
-                codigoFisico: { in: candidatos },
-                vinculada: true,
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        codigo: true,
-        codigoQr: true,
-        eventoId: true,
-        estado: true,
-        titularId: true,
-        categoriaId: true,
-      },
-    });
-
-    if (!entrada) {
-      const manillaSinVincular = await this.prisma.manilla.findFirst({
-        where: { eventoId, codigoFisico: { in: candidatos } },
-        select: { id: true },
-      });
-      if (manillaSinVincular) {
-        throw new BadRequestException(
-          'Esta manilla todavía no está vinculada a una entrada.',
-        );
-      }
-      throw new NotFoundException(
-        'No se encontró ninguna entrada o manilla con ese código.',
-      );
-    }
-    if (entrada.eventoId !== eventoId) {
-      throw new BadRequestException('Este código pertenece a otro evento.');
-    }
-    if (ENTRADA_INVALIDA.includes(entrada.estado)) {
-      throw new BadRequestException(
-        'La entrada está anulada o fue reembolsada.',
-      );
-    }
-    if (!entrada.titularId) {
-      throw new BadRequestException(
-        'La entrada no tiene un titular con cuenta activa.',
-      );
-    }
-
-    const esQrDigital =
-      candidatos.includes(entrada.codigo) ||
-      candidatos.includes(entrada.codigoQr);
-    const [titular, categoria, manilla] = await Promise.all([
-      this.prisma.usuario.findUnique({
-        where: { id: entrada.titularId },
-        select: { id: true, nombre: true, apellido: true, activo: true },
-      }),
-      this.prisma.categoriaEntrada.findUnique({
-        where: { id: entrada.categoriaId },
-        select: { nombre: true },
-      }),
-      esQrDigital
-        ? null
-        : this.prisma.manilla.findFirst({
-            where: { entradaId: entrada.id, codigoFisico: { in: candidatos } },
-            select: { codigoFisico: true },
-          }),
-    ]);
-    if (!titular?.activo) {
-      throw new BadRequestException(
-        'La entrada no tiene un titular con cuenta activa.',
-      );
-    }
-
-    return {
-      entradaId: entrada.id,
-      usuarioId: titular.id,
-      nombre: nombreCompleto(titular) ?? 'Cliente',
-      medio: manilla ? 'MANILLA' : 'QR_DIGITAL',
-      identificador: manilla ? manilla.codigoFisico : entrada.codigo,
-      categoria: categoria?.nombre ?? '',
-    };
   }
 
   private saldoInsuficiente(saldo: Prisma.Decimal, total: Prisma.Decimal) {

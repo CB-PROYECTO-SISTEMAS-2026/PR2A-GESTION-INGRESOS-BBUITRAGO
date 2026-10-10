@@ -20,6 +20,7 @@ export const INVITABLE_ROLES = [
   Role.ADMIN,
   Role.ORGANIZADOR,
   Role.JEFE_NEGOCIO,
+  Role.RECARGADOR,
 ] as const;
 
 export class CreateInvitacionDto {

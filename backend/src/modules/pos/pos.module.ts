@@ -7,8 +7,10 @@ import {
 import { PosService } from './pos.service';
 import { NegocioVentasService } from './negocio-ventas.service';
 import { RetirosAdminService } from './retiros-admin.service';
+import { SaldoModule } from '../saldo/saldo.module';
 
 @Module({
+  imports: [SaldoModule],
   controllers: [PosController, NegocioPanelController, RetirosAdminController],
   providers: [PosService, NegocioVentasService, RetirosAdminService],
 })
