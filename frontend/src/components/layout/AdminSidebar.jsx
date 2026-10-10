@@ -9,7 +9,7 @@ const items = [
   { to: '/admin/usuarios', label: 'Usuarios' },
   { label: 'Negocios' },
   { label: 'Accesos' },
-  { label: 'Recargas' },
+  { to: '/admin/recargas', label: 'Recargas' },
   { label: 'Ventas' },
   { to: '/admin/retiros', label: 'Retiros' },
   { label: 'Devoluciones' },

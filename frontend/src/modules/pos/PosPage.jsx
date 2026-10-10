@@ -5,6 +5,7 @@ import { IconCheck, IconQr, IconWarning } from '../../components/ui/icons'
 import { formatBs, formatDayRange, formatTime, getErrorMessage } from '../../utils/format'
 import { feedbackError, feedbackOk } from '../../utils/feedback'
 import { useAuth } from '../../context/AuthContext'
+import { nuevaClave, readStorage, writeStorage } from '../../utils/storage'
 
 // La librería de escaneo solo se descarga cuando el ayudante va a cobrar.
 const CodigoScanner = lazy(() => import('./components/CodigoScanner'))
@@ -18,25 +19,6 @@ function toCents(value) {
 /** Máximo que se puede agregar de un producto: 99 o lo que quede en stock. */
 function maxCantidad(producto) {
   return producto.stock == null ? MAX_CANTIDAD : Math.min(MAX_CANTIDAD, producto.stock)
-}
-
-/**
- * Clave única por intento de cobro. Se repite en los reintentos para que el servidor no cobre
- * dos veces si se perdió la respuesta. crypto.randomUUID solo existe con HTTPS o localhost, por
- * eso se arma con getRandomValues como alternativa (p. ej. el celular entrando por la IP local).
- */
-function nuevaClaveCobro() {
-  if (crypto.randomUUID) return crypto.randomUUID()
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key) || ''
-  } catch {
-    return ''
-  }
 }
 
 export default function PosPage() {
@@ -84,11 +66,7 @@ export default function PosPage() {
   }, [cargar])
 
   useEffect(() => {
-    try {
-      if (eventoId) localStorage.setItem(eventoKey, eventoId)
-    } catch {
-      // Sin almacenamiento disponible: se vuelve a elegir el evento al recargar.
-    }
+    if (eventoId) writeStorage(eventoKey, eventoId)
   }, [eventoKey, eventoId])
 
   const productos = useMemo(() => ctx?.productos ?? [], [ctx])
@@ -136,7 +114,7 @@ export default function PosPage() {
       setCliente({ ...data, codigo })
       setRechazo(null)
       // Nueva clave para este cliente y este pedido; se conserva en los reintentos.
-      setClaveCobro(nuevaClaveCobro())
+      setClaveCobro(nuevaClave())
       setPaso('confirmar')
       if (toCents(data.saldo) < totalCents) feedbackError()
       else feedbackOk()

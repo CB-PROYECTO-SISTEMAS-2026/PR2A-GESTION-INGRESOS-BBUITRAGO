@@ -32,6 +32,8 @@ export default function LoginPage() {
         navigate('/negocio/dashboard')
       } else if (user?.roles?.includes('AYUDANTE')) {
         navigate('/pos')
+      } else if (user?.roles?.includes('RECARGADOR')) {
+        navigate('/recargas')
       } else {
         navigate('/')
       }

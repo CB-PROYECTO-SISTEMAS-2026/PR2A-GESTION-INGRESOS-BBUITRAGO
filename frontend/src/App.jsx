@@ -31,6 +31,9 @@ import CategoriasPage from './modules/admin/CategoriasPage'
 import MapaHistorialPage from './modules/admin/MapaHistorialPage'
 import UsuariosPage from './modules/admin/UsuariosPage'
 import RetirosPage from './modules/admin/RetirosPage'
+import RecargasAdminPage from './modules/admin/RecargasAdminPage'
+import PersonalEventoPage from './modules/admin/PersonalEventoPage'
+import MovimientosEventoPage from './modules/admin/MovimientosEventoPage'
 
 import NegociosPage from './modules/business/NegociosPage'
 import ProductosPage from './modules/business/ProductosPage'
@@ -42,6 +45,13 @@ import LiquidacionPage from './modules/business/LiquidacionPage'
 import PosLayout from './modules/pos/PosLayout'
 import PosPage from './modules/pos/PosPage'
 import PosHistorialPage from './modules/pos/PosHistorialPage'
+
+import RecargasLayout from './modules/recargas/RecargasLayout'
+import RecargaPage from './modules/recargas/RecargaPage'
+import RecargasHistorialPage from './modules/recargas/RecargasHistorialPage'
+
+import MiManillaPage from './modules/billetera/MiManillaPage'
+import MovimientosPage from './modules/billetera/MovimientosPage'
 
 function RootLayout() {
   return (
@@ -74,6 +84,13 @@ const router = createBrowserRouter([
             children: [{ path: 'perfil', element: <ProfilePage /> }],
           },
           {
+            element: <ProtectedRoute roles={['CLIENTE']} />,
+            children: [
+              { path: 'mi-manilla', element: <MiManillaPage /> },
+              { path: 'mi-manilla/movimientos', element: <MovimientosPage /> },
+            ],
+          },
+          {
             element: <ProtectedRoute roles={['ORGANIZADOR', 'ADMIN']} />,
             children: [
               { path: 'organizador/solicitudes', element: <MisSolicitudesPage /> },
@@ -96,9 +113,12 @@ const router = createBrowserRouter([
               { path: 'eventos/:id', element: <EventoEditPage /> },
               { path: 'eventos/:id/categorias', element: <CategoriasPage /> },
               { path: 'eventos/:id/mapa', element: <MapaHistorialPage /> },
+              { path: 'eventos/:id/personal', element: <PersonalEventoPage /> },
+              { path: 'eventos/:id/movimientos', element: <MovimientosEventoPage /> },
               { path: 'mapa/:solicitudId', element: <MapaHistorialPage /> },
               { path: 'usuarios', element: <UsuariosPage /> },
               { path: 'retiros', element: <RetirosPage /> },
+              { path: 'recargas', element: <RecargasAdminPage /> },
             ],
           },
         ],
@@ -129,6 +149,19 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <PosPage /> },
               { path: 'historial', element: <PosHistorialPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        path: 'recargas',
+        element: <ProtectedRoute roles={['RECARGADOR']} />,
+        children: [
+          {
+            element: <RecargasLayout />,
+            children: [
+              { index: true, element: <RecargaPage /> },
+              { path: 'historial', element: <RecargasHistorialPage /> },
             ],
           },
         ],

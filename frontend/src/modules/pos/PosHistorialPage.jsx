@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getMisVentas } from '../../api/pos.api'
+import RangoDiasFiltro from '../../components/staff/RangoDiasFiltro'
 import { formatBs, formatDay, formatDayRange, formatTime, getErrorMessage, localDay } from '../../utils/format'
 
 /** HU-024: ventas cobradas por el ayudante, por día o rango de fechas. */
@@ -29,11 +30,6 @@ export default function PosHistorialPage() {
   }, [desde, hasta])
 
   const esUnDia = desde === hasta
-  const rapidos = [
-    ['Hoy', localDay(), localDay()],
-    ['Ayer', localDay(-1), localDay(-1)],
-    ['7 días', localDay(-6), localDay()],
-  ]
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
@@ -42,38 +38,14 @@ export default function PosHistorialPage() {
         <p className="text-sm text-muted">Los cobros que realizaste</p>
       </div>
 
-      <div className="grid gap-2 rounded-xl border border-border bg-white p-3">
-        <div className="flex gap-2">
-          {rapidos.map(([label, d, h]) => {
-            const activo = desde === d && hasta === h
-            return (
-              <button
-                key={label}
-                type="button"
-                className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold ${
-                  activo ? 'border-teal bg-teal/10 text-teal-dark' : 'border-border text-muted'
-                }`}
-                onClick={() => {
-                  setDesde(d)
-                  setHasta(h)
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-xs text-muted">
-            Desde
-            <input type="date" className="input mt-1 !py-1.5 text-sm" value={desde} max={hasta} onChange={(e) => setDesde(e.target.value)} />
-          </label>
-          <label className="text-xs text-muted">
-            Hasta
-            <input type="date" className="input mt-1 !py-1.5 text-sm" value={hasta} min={desde} max={localDay()} onChange={(e) => setHasta(e.target.value)} />
-          </label>
-        </div>
-      </div>
+      <RangoDiasFiltro
+        desde={desde}
+        hasta={hasta}
+        onChange={(d, h) => {
+          setDesde(d)
+          setHasta(h)
+        }}
+      />
 
       {error && (
         <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">

@@ -10,7 +10,7 @@ const linkClass = ({ isActive }) =>
 
 function roleLabel(roles = []) {
   if (!roles.length) return 'Usuario'
-  const preferred = ['ADMIN', 'ORGANIZADOR', 'JEFE_NEGOCIO', 'AYUDANTE', 'CLIENTE']
+  const preferred = ['ADMIN', 'ORGANIZADOR', 'JEFE_NEGOCIO', 'AYUDANTE', 'RECARGADOR', 'CLIENTE']
   const found = preferred.find((r) => roles.includes(r)) || roles[0]
   return ROLE_LABELS[found] || found
 }
@@ -94,7 +94,10 @@ function navLinks(hasRole) {
     { to: '/', label: 'Inicio', end: true },
     { to: '/eventos', label: 'Eventos' },
   ]
-  if (hasRole('CLIENTE')) links.push({ label: 'Mis Entradas' })
+  if (hasRole('CLIENTE')) {
+    links.push({ label: 'Mis Entradas' })
+    links.push({ to: '/mi-manilla', label: 'Mi Manilla' })
+  }
   if (hasRole('ADMIN')) links.push({ to: '/admin', label: 'Admin' })
   if (hasRole('ORGANIZADOR')) {
     links.push({ to: '/organizador/solicitudes', label: 'Solicitudes' })
@@ -102,6 +105,7 @@ function navLinks(hasRole) {
   }
   if (hasRole('JEFE_NEGOCIO')) links.push({ to: '/negocio', label: 'Negocios' })
   if (hasRole('AYUDANTE')) links.push({ to: '/pos', label: 'Punto de venta' })
+  if (hasRole('RECARGADOR')) links.push({ to: '/recargas', label: 'Recargas' })
   return links
 }
 
