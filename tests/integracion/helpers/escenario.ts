@@ -300,6 +300,23 @@ export async function contarVentas(prisma: PrismaService, esc: Escenario) {
   return prisma.venta.count({ where: { eventoId: esc.eventos.abierto } });
 }
 
+/**
+ * Contraseña aleatoria para los usuarios de prueba que necesitan iniciar sesión. Es distinta en
+ * cada ejecución y nunca se muestra: aunque la limpieza fallara, nadie podría usar esas cuentas.
+ */
+export const nuevaClave = () => `${randomBytes(12).toString('base64url')}Aa1!`;
+
+/** Asigna la contraseña a usuarios de prueba (bcrypt con costo bajo: solo para pruebas). */
+export async function asignarClave(prisma: PrismaService, usuarioIds: string[], clave: string) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const bcrypt = require('bcryptjs') as { hash(s: string, rounds: number): Promise<string> };
+  const passwordHash = await bcrypt.hash(clave, 4);
+  await prisma.usuario.updateMany({
+    where: { id: { in: usuarioIds }, email: { endsWith: DOMINIO } },
+    data: { passwordHash },
+  });
+}
+
 /** Día "AAAA-MM-DD" de La Paz, `dias` días atrás (0 = hoy). */
 export function diaLaPaz(dias = 0) {
   const hoy = new Date(`${todayIn(TZ)}T00:00:00.000Z`);

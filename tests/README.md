@@ -15,7 +15,7 @@ Comandos (siempre desde la carpeta `tests/`):
 
 | Comando | Qué hace |
 |---|---|
-| `npm test` | Corre todas: primero las unitarias y, si pasan, las de integración (~3 min) |
+| `npm test` | Corre todas: primero las unitarias y, si pasan, las de integración (~5 min) |
 | `npm run test:unit` | Solo las unitarias (~1 s, no necesitan base de datos ni servidor) |
 | `npm run test:integracion` | Solo las de integración (usan la base compartida, una tras otra) |
 | `npm run test:watch` | Modo vigilancia: vuelve a correr las unitarias cada vez que guardas un archivo |
@@ -52,17 +52,22 @@ Estas pruebas ya encontraron y ayudaron a corregir dos errores:
 
 ### 2. Integración (`integracion/`): usan la base compartida de Aiven
 
-Necesitan `backend/.env`, `backend/prisma/ca.pem` e internet. No hace falta levantar el backend: llaman directamente a los servicios.
+Necesitan `backend/.env`, `backend/prisma/ca.pem` e internet. No hace falta levantar el backend:
+
+- las de cobro y liquidación llaman directamente a los servicios;
+- la de seguridad levanta su propia instancia de la API en un puerto libre, sin chocar con `npm run start:dev`.
 
 | Archivo | Casos | Qué protege |
 |---|---|---|
 | `integracion/pos-cobro.test.ts` | 25 | Cobro real contra la base: saldo insuficiente, cobros simultáneos, clave anti-duplicado, stock, horario, permisos, consulta previa e historial |
+| `integracion/api-seguridad.test.ts` | 73 | Seguridad por HTTP: tokens falsos, vencidos o de cuentas desactivadas; roles de cada endpoint (50 combinaciones); datos ajenos; validación (JSON mal formado, más de 1 MB, inyección SQL); cabeceras de seguridad y CORS; límite de peticiones por usuario y de intentos de login |
 | `integracion/pos-liquidacion.test.ts` | 23 | Panel de ventas del dueño (totales, días, eventos, productos, CSV), liquidación (acreditado/pendiente) y retiros (solicitud, aprobación, pago, rechazo, solicitudes simultáneas) |
 
 Para comprobar que estas pruebas detectan errores reales, se rompieron a propósito dos protecciones y las pruebas fallaron, como se esperaba:
 
 - permitir cobrar aunque el saldo no alcance (fallan las de saldo insuficiente);
-- quitar el bloqueo de las solicitudes de retiro (falla la de solicitudes simultáneas).
+- quitar el bloqueo de las solicitudes de retiro (falla la de solicitudes simultáneas);
+- quitar la restricción de roles del panel del dueño (fallan exactamente los 9 casos de roles sin permiso).
 
 `pos-liquidacion.test.ts` **no sube archivos a Cloudinary**: reemplaza el almacenamiento de comprobantes por uno simulado.
 
@@ -73,7 +78,7 @@ Para comprobar que estas pruebas detectan errores reales, se rompieron a propós
 | 1 | Unitarias de la lógica del POS | ✅ Hecha | No |
 | 2 | Integración del cobro (saldo, concurrencia, clave anti-duplicado, stock, horario, permisos) | ✅ Hecha | Sí |
 | 3 | Integración de liquidación y retiros | ✅ Hecha | Sí |
-| 4 | Seguridad de la API (roles, validación, límite de peticiones) | Pendiente | Sí |
+| 4 | Seguridad de la API (roles, validación, límite de peticiones) | ✅ Hecha | Sí |
 | 5 | Recorrido en navegador con Playwright (flujo del POS y pantallas por rol) | Pendiente | Sí |
 | 6 | Unitarias del frontend (formatos y carrito) | Pendiente | No |
 
@@ -101,6 +106,7 @@ tests/
 ├── unit/              ← pruebas unitarias (sin base de datos)
 ├── integracion/       ← pruebas de integración (base compartida)
 │   └── helpers/
+│       ├── app.ts         ← levanta la API real en un puerto libre y hace peticiones HTTP
 │       ├── entorno.js     ← carga backend/.env y la ruta del certificado SSL
 │       ├── tiempo.js      ← tiempo máximo por prueba (la base remota es lenta)
 │       ├── escenario.ts   ← crea usuarios, negocio, productos, eventos y entradas de prueba
@@ -114,4 +120,6 @@ tests/
 - **Paquetes ESM de NestJS.** `@nestjs/jwt`, `@nestjs/config`, `@nestjs/passport` y `@nestjs/mapped-types` solo se publican como módulos ESM. `jest.config.js` los convierte a CommonJS para que Jest pueda cargarlos. Si el backend agrega otro paquete ESM y aparece el error `Must use import to load ES Module`, agrégalo a `transformIgnorePatterns`.
 - **Estructura nueva de negocios.** `helpers/escenario.ts` inserta Negocio, RolNegocio, AyudanteNegocio y SolicitudNegocio con SQL, porque la base compartida es más nueva que el `schema.prisma` de la rama. Cuando se integre el schema nuevo, cámbialos a `prisma.<modelo>.create()`.
 - **Validación igual a la de producción.** Las pruebas de validación usan `backend/src/common/validation/validation-pipe.options.ts`, la misma configuración que `main.ts`.
+- **API igual a la de producción.** La prueba de seguridad usa `backend/src/app.setup.ts` (helmet, CORS, límite de 1 MB, validación), la misma función que llama `main.ts`.
+- **Cuentas de prueba con contraseña.** La prueba de seguridad inicia sesión de verdad: sus usuarios (incluido un administrador de prueba) reciben una contraseña aleatoria distinta en cada ejecución, que nunca se muestra, y se borran al terminar.
 - **Vulnerabilidad conocida en las herramientas.** `npm audit` reporta una vulnerabilidad moderada en `sprintf-js`, que es una dependencia interna de Jest. Solo afecta a las herramientas de prueba (no llega al backend ni al frontend) y corregirla exige `npm audit fix --force`, que cambia versiones de Jest. Por eso no se aplicó.
