@@ -7,7 +7,7 @@ const tabClass = ({ isActive }) =>
     isActive ? 'border-teal text-ink' : 'border-transparent text-muted hover:border-slate-300 hover:text-ink'
   }`
 
-/** Encabezado común de las tres pantallas de un evento, con sus pestañas. */
+/** Encabezado común de las pantallas de un evento, con sus pestañas. */
 export default function EventoHeader({ eventoId, titulo, estado }) {
   const isNew = !eventoId
 
@@ -15,6 +15,7 @@ export default function EventoHeader({ eventoId, titulo, estado }) {
     { to: isNew ? null : `/admin/eventos/${eventoId}`, label: 'Editar evento', end: true },
     { to: isNew ? null : `/admin/eventos/${eventoId}/categorias`, label: 'Categorías y QR' },
     { to: isNew ? null : `/admin/eventos/${eventoId}/mapa`, label: 'Mapa e historial' },
+    { to: isNew ? null : `/admin/eventos/${eventoId}/manillas`, label: 'Entrega de manillas' },
   ]
 
   return (

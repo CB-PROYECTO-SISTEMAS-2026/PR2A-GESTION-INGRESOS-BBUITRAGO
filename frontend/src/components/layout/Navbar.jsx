@@ -72,6 +72,16 @@ function UserMenu({ user, logout }) {
             </button>
             <button
               type="button"
+              className="block w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50"
+              onClick={() => {
+                setOpen(false)
+                navigate('/mis-entradas')
+              }}
+            >
+              Mis entradas
+            </button>
+            <button
+              type="button"
               className="block w-full px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
               onClick={() => {
                 setOpen(false)
@@ -103,7 +113,16 @@ export default function Navbar() {
           <NavLink to="/eventos" className={linkClass}>
             Eventos
           </NavLink>
-          {hasRole('CLIENTE') && <span className="cursor-default text-sm font-medium text-slate-500">Mis Entradas</span>}
+          {hasRole('CLIENTE') && (
+            <NavLink to="/mis-entradas" className={linkClass}>
+              Mis Entradas
+            </NavLink>
+          )}
+          {hasRole('ENCARGADO_ACCESO') && (
+            <NavLink to="/supervisor" className={linkClass}>
+              Manillas
+            </NavLink>
+          )}
           {hasRole('ADMIN') && (
             <NavLink to="/admin" className={linkClass}>
               Admin

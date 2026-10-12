@@ -10,6 +10,6 @@ export const ROLE_LABELS = {
 }
 
 /** Roles que el administrador puede asignar por invitación. */
-export const INVITABLE_ROLES = ['ORGANIZADOR', 'JEFE_NEGOCIO', 'ADMIN']
+export const INVITABLE_ROLES = ['ORGANIZADOR', 'JEFE_NEGOCIO', 'ENCARGADO_ACCESO', 'ADMIN']
 
 export const roleLabel = (role) => ROLE_LABELS[role] || role

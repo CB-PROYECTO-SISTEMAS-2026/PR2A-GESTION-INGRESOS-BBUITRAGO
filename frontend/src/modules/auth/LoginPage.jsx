@@ -30,6 +30,8 @@ export default function LoginPage() {
         navigate('/admin')
       } else if (user?.roles?.includes('JEFE_NEGOCIO')) {
         navigate('/negocio')
+      } else if (user?.roles?.includes('ENCARGADO_ACCESO')) {
+        navigate('/supervisor')
       } else {
         navigate('/')
       }

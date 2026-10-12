@@ -34,8 +34,16 @@ function quickLinksFor(roles) {
       { to: '/perfil', title: 'Mi perfil', text: 'Actualiza tus datos personales.' },
     ]
   }
+  if (roles.includes('ENCARGADO_ACCESO')) {
+    return [
+      { to: '/supervisor', title: 'Entrega de manillas', text: 'Vincula manillas en tu punto de entrega.' },
+      { to: '/supervisor/entregas', title: 'Mis entregas', text: 'Revisa las manillas que entregaste.' },
+      { to: '/perfil', title: 'Mi perfil', text: 'Actualiza tus datos personales.' },
+    ]
+  }
   return [
     { to: '/eventos', title: 'Eventos', text: 'Mira todos los eventos disponibles.' },
+    { to: '/mis-entradas', title: 'Mis entradas', text: 'Consulta tus entradas y su código QR.' },
     { to: '/perfil', title: 'Mi perfil', text: 'Actualiza tus datos personales.' },
   ]
 }

@@ -290,9 +290,15 @@ export class EventsService {
           include: { _count: { select: { entradas: true, accesos: true } } },
         },
         categorias: { select: { cupo: true } },
+        _count: { select: { entradas: true } },
       },
     });
     if (!evento) throw new NotFoundException('Evento no encontrado');
+    if (dto.tipoAcceso !== undefined && dto.tipoAcceso !== evento.tipoAcceso && evento._count.entradas > 0) {
+      throw new BadRequestException(
+        'No puedes cambiar el tipo de acceso porque el evento ya tiene entradas emitidas con el tipo actual.',
+      );
+    }
 
     const { fechaInicio, fechaFin, horaInicio, horaFin, servicios, cronograma: cronogramaDto, ...fields } = dto;
     const touchesSchedule = [fechaInicio, fechaFin, horaInicio, horaFin].some((v) => v !== undefined);

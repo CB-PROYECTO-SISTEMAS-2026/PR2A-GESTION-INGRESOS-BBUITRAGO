@@ -140,6 +140,8 @@ model Usuario {
   archivos             Archivo[]
   staffAsignaciones    StaffEvento[]
   invitacionesCreadas  InvitacionUsuario[]   @relation("InvitacionesCreadas")
+  puntosRetiroAsignados SupervisorPuntoRetiro[]
+  manillasEntregadas   Manilla[]             @relation("SupervisorManillas")
 }
 
 /// Cuenta pendiente creada por un admin; el Usuario solo existe cuando el invitado acepta.
@@ -445,12 +447,15 @@ model Manilla {
   vinculada     Boolean  @default(false)
   vinculadaAt   DateTime?
   puntoRetiroId String?
+  /// Supervisor que entregó la manilla y confirmó la vinculación (HU-015, HU-053).
+  entregadaPorId String?
   createdAt     DateTime @default(now())
 
   evento      Evento             @relation(fields: [eventoId], references: [id], onDelete: Cascade)
   entrada     Entrada?           @relation(fields: [entradaId], references: [id])
   credencial  Credencial?        @relation(fields: [credencialId], references: [id])
   puntoRetiro PuntoRetiroManilla? @relation(fields: [puntoRetiroId], references: [id])
+  entregadaPor Usuario?          @relation("SupervisorManillas", fields: [entregadaPorId], references: [id])
 
   @@unique([eventoId, codigoFisico])
 }
@@ -463,8 +468,24 @@ model PuntoRetiroManilla {
   horario   String?
   activo    Boolean @default(true)
 
-  evento   Evento    @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  manillas Manilla[]
+  evento       Evento                  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  manillas     Manilla[]
+  supervisores SupervisorPuntoRetiro[]
+}
+
+/// Supervisores (rol ENCARGADO_ACCESO) que entregan manillas en un punto. Quitar a alguien
+/// lo desactiva y conserva la fila, porque sus entregas pasadas siguen apuntando a él.
+model SupervisorPuntoRetiro {
+  id            String   @id @default(cuid())
+  puntoRetiroId String
+  usuarioId     String
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  puntoRetiro PuntoRetiroManilla @relation(fields: [puntoRetiroId], references: [id], onDelete: Cascade)
+  usuario     Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([puntoRetiroId, usuarioId])
 }
 
 model AccesoEvento {

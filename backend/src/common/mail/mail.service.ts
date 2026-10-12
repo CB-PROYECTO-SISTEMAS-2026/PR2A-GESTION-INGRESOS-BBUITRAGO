@@ -6,6 +6,7 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
   ORGANIZADOR: 'Organizador de eventos',
   JEFE_NEGOCIO: 'Jefe de negocio',
+  ENCARGADO_ACCESO: 'Encargado de acceso (supervisor)',
 };
 
 function escapeHtml(value: string) {

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { getMisEntradas } from '../../api/entradas.api'
 import { getMyProfile, removeMyFoto, updateMe, uploadMyFoto } from '../../api/users.api'
 import { toast } from '../../components/Toast'
 import Field, { Section } from '../../components/form/Field'
@@ -10,6 +12,7 @@ import { roleLabel } from '../../utils/roles'
 import { todayLocal } from '../../utils/schedule'
 
 const MIN_BIRTH_DAY = '1900-01-01'
+const ENTRADAS_EN_PERFIL = 3
 const emptyForm = { nombre: '', apellido: '', telefono: '', documento: '', email: '', fechaNac: '' }
 
 function toForm(data) {
@@ -33,6 +36,7 @@ export default function ProfilePage() {
   const [fotoBusy, setFotoBusy] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+  const [entradas, setEntradas] = useState([])
   const hoy = todayLocal()
 
   useEffect(() => {
@@ -50,6 +54,18 @@ export default function ProfilePage() {
       alive = false
     }
   }, [user?.id])
+
+  useEffect(() => {
+    let alive = true
+    getMisEntradas()
+      .then(({ data }) => alive && setEntradas(data.entradas ?? []))
+      .catch(() => alive && setEntradas([]))
+    return () => {
+      alive = false
+    }
+  }, [user?.id])
+
+  const entradasConQr = entradas.filter((e) => e.qr)
 
   const set = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -216,6 +232,32 @@ export default function ProfilePage() {
           </div>
         </Section>
       </form>
+
+      <Section title="Mis entradas">
+        {entradasConQr.length > 0 && (
+          <ul className="mb-5 grid gap-4 sm:grid-cols-3">
+            {entradasConQr.slice(0, ENTRADAS_EN_PERFIL).map((e) => (
+              <li key={e.id} className="flex flex-col items-center gap-2 rounded-md border border-border p-3 text-center">
+                <img src={e.qr} alt={`QR de la entrada ${e.codigo}`} className="h-32 w-32" />
+                <p className="line-clamp-2 text-sm font-semibold text-ink">{e.evento.titulo}</p>
+                <p className="text-xs text-muted">
+                  {e.qrUso === 'ACCESO' ? 'QR digital del evento' : 'QR para recoger tu manilla'} · {e.categoria}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="max-w-lg text-sm text-muted">
+            {entradasConQr.length
+              ? 'Usa el QR digital para moverte en el evento o el QR de retiro en un punto de entrega de manillas.'
+              : 'Tus entradas aprobadas aparecen aquí con su código QR: el QR digital para moverte en el evento o el QR para recoger tu manilla.'}
+          </p>
+          <Link to="/mis-entradas" className="btn-primary">
+            Ver mis entradas
+          </Link>
+        </div>
+      </Section>
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import 'dotenv/config';
-import { PrismaClient, Role, EventoEstado, TipoAcceso, SolicitudEstado } from '@prisma/client';
+import { PrismaClient, Role, EventoEstado, TipoAcceso, SolicitudEstado, CompraEstado } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { v2 as cloudinary } from 'cloudinary';
 import { buildPoolRows } from '../src/modules/tickets/ticket-codes';
+import { emitirEntradasDeCompra } from '../src/modules/entradas/entradas-emision';
 
 if (process.env.NODE_ENV === 'production' && process.env.SEED_ALLOW_PRODUCTION !== 'true') {
   console.error('El seed borra contenido y resetea contraseñas de demo: no se ejecuta en producción.');
@@ -164,6 +165,7 @@ async function wipeDemoContent() {
   await prisma.categoriaEntrada.deleteMany();
   await prisma.fechaEvento.deleteMany();
   await prisma.mapaHistorial.deleteMany();
+  await prisma.supervisorPuntoRetiro.deleteMany();
   await prisma.puntoRetiroManilla.deleteMany();
   await prisma.staffEvento.deleteMany();
   await prisma.saldoEvento.deleteMany();
@@ -183,6 +185,34 @@ async function crearPool(categoriaId: string, cupo: number) {
   for (let i = 0; i < cupo; i += 1000) {
     await prisma.ticketPool.createMany({ data: buildPoolRows(categoriaId, Math.min(1000, cupo - i)) });
   }
+}
+
+/** Compra ya aprobada con sus entradas emitidas como lo hará la aprobación del Módulo A (HU-014). */
+async function compraAprobada(
+  usuarioId: string,
+  revisadoPorId: string,
+  eventoId: string,
+  items: Array<{ categoriaId: string; precio: number; cantidad: number; fechaId?: string }>,
+) {
+  const compra = await prisma.compraEntrada.create({
+    data: {
+      usuarioId,
+      eventoId,
+      estado: CompraEstado.APROBADA,
+      montoTotal: items.reduce((sum, i) => sum + i.precio * i.cantidad, 0),
+      revisadoPorId,
+      revisadoAt: new Date(),
+      items: {
+        create: items.map((i) => ({
+          categoriaId: i.categoriaId,
+          fechaId: i.fechaId ?? null,
+          cantidad: i.cantidad,
+          precioUnit: i.precio,
+        })),
+      },
+    },
+  });
+  await prisma.$transaction((tx) => emitirEntradasDeCompra(tx, compra.id));
 }
 
 async function main() {
@@ -532,6 +562,25 @@ async function main() {
       activo: true,
     },
   });
+
+  // Puntos de entrega de manillas atendidos por el supervisor demo (HU-053)
+  const supervisorId = byEmail['acceso@eventix.com'].id;
+  const puntos = [
+    { eventoId: eventoLibro.id, nombre: 'Puerta principal Alalay', ubicacion: 'Ingreso principal del Campo Ferial', horario: '09:30 - 20:00' },
+    { eventoId: eventoLibro.id, nombre: 'Puerta norte', ubicacion: 'Ingreso por la Av. Siles', horario: '10:00 - 18:00' },
+    { eventoId: eventoChila.id, nombre: 'Boletería Teatro Achá', ubicacion: 'Calle España, frente a la plaza', horario: '18:00 - 21:00' },
+  ];
+  for (const punto of puntos) {
+    await prisma.puntoRetiroManilla.create({ data: { ...punto, supervisores: { create: { usuarioId: supervisorId } } } });
+  }
+
+  // Entradas aprobadas del cliente demo: QR digital (Kjarkas), manilla por día (Feria) y ambos (Chila)
+  const adminId = byEmail['admin@eventix.com'].id;
+  await compraAprobada(clienteId, adminId, eventoKjarkas.id, [{ categoriaId: catVipK.id, precio: 180, cantidad: 1 }]);
+  await compraAprobada(clienteId, adminId, eventoLibro.id, [
+    { categoriaId: catDiario.id, precio: 15, cantidad: 1, fechaId: eventoLibro.fechas[1].id },
+  ]);
+  await compraAprobada(clienteId, adminId, eventoChila.id, [{ categoriaId: catPlatea.id, precio: 120, cantidad: 1 }]);
 
   // Saldos por evento en 0 para cliente demo (HU-052)
   for (const eventoId of [eventoKjarkas.id, eventoLibro.id, eventoChila.id]) {
