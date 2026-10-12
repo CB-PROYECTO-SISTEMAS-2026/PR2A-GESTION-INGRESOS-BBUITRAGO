@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { EntradaEstado, Prisma } from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ACCESO_CON_MANILLA, emitirEntradasDeCompra, ENTRADA_INVALIDA } from './entradas-emision';
+import { ACCESO_CON_MANILLA, emitirEntradasDeCompra, EMISION_TX_OPTIONS, ENTRADA_INVALIDA } from './entradas-emision';
 
 type Tx = Prisma.TransactionClient;
 
@@ -52,10 +52,12 @@ export class EntradasService {
   /**
    * HU-014 / HU-055. Punto de integración para el Módulo A: llamarlo al aprobar la compra,
    * pasando el `tx` de la aprobación para que ambas cosas se guarden o se reviertan juntas.
+   * Esa transacción debe abrirse con `EMISION_TX_OPTIONS`: el límite por defecto de Prisma (5 s)
+   * no alcanza con la base remota.
    */
   emitirParaCompra(compraId: string, tx?: Tx) {
     if (tx) return emitirEntradasDeCompra(tx, compraId);
-    return this.prisma.$transaction((t) => emitirEntradasDeCompra(t, compraId));
+    return this.prisma.$transaction((t) => emitirEntradasDeCompra(t, compraId), EMISION_TX_OPTIONS);
   }
 
   /**

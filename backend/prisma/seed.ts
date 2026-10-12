@@ -3,7 +3,7 @@ import { PrismaClient, Role, EventoEstado, TipoAcceso, SolicitudEstado, CompraEs
 import * as bcrypt from 'bcryptjs';
 import { v2 as cloudinary } from 'cloudinary';
 import { buildPoolRows } from '../src/modules/tickets/ticket-codes';
-import { emitirEntradasDeCompra } from '../src/modules/entradas/entradas-emision';
+import { emitirEntradasDeCompra, EMISION_TX_OPTIONS } from '../src/modules/entradas/entradas-emision';
 
 if (process.env.NODE_ENV === 'production' && process.env.SEED_ALLOW_PRODUCTION !== 'true') {
   console.error('El seed borra contenido y resetea contraseñas de demo: no se ejecuta en producción.');
@@ -212,7 +212,7 @@ async function compraAprobada(
       },
     },
   });
-  await prisma.$transaction((tx) => emitirEntradasDeCompra(tx, compra.id));
+  await prisma.$transaction((tx) => emitirEntradasDeCompra(tx, compra.id), EMISION_TX_OPTIONS);
 }
 
 async function main() {

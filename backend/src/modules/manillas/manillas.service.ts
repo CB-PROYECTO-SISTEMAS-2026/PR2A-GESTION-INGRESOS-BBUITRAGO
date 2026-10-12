@@ -16,6 +16,8 @@ type AuthUser = { id: string; roles: Role[] };
 
 const MAX_RESULTADOS = 20;
 const MAX_ENTREGAS = 100;
+/** Con la base remota, las 4-5 consultas de la vinculación pueden superar el límite por defecto de 5 s. */
+const VINCULACION_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
 
 const entradaClienteSelect = {
   id: true,
@@ -163,7 +165,7 @@ export class ManillasService {
           await tx.entrada.update({ where: { id: entrada.id }, data: { estado: EntradaEstado.ASIGNADA } });
         }
         return manilla.id;
-      });
+      }, VINCULACION_TX_OPTIONS);
 
       const entrega = await this.prisma.manilla.findUniqueOrThrow({ where: { id: manillaId }, select: entregaSelect });
       return presentarEntrega(entrega);

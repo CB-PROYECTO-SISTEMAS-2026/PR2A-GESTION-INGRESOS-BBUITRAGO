@@ -10,6 +10,8 @@ export const ACCESO_CON_QR_DIGITAL: TipoAcceso[] = [TipoAcceso.QR_DIGITAL, TipoA
 /** El titular recoge una manilla física en un punto de entrega (HU-015, HU-053). */
 export const ACCESO_CON_MANILLA: TipoAcceso[] = [TipoAcceso.MANILLA, TipoAcceso.AMBOS];
 export const ENTRADA_INVALIDA: EntradaEstado[] = [EntradaEstado.ANULADA, EntradaEstado.REEMBOLSADA];
+/** La emisión hace varias consultas por entrada; con la base remota supera el límite por defecto de 5 s. */
+export const EMISION_TX_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
 
 const entradaEmitidaSelect = {
   id: true,
