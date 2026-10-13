@@ -103,7 +103,10 @@ export class EventsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @UseInterceptors(FileInterceptor('foto', memoryUpload))
-  updateFoto(@Param('id') id: string, @UploadedFile() file?: Express.Multer.File) {
+  updateFoto(
+    @Param('id') id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
     return this.eventsService.updateFoto(id, file);
   }
 

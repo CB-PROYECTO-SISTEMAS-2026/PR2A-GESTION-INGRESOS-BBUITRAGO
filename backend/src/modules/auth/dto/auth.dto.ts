@@ -1,7 +1,16 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,72}$/;
-export const PASSWORD_MESSAGE = 'La contraseña debe tener entre 8 y 72 caracteres, con al menos una letra y un número.';
+export const PASSWORD_MESSAGE =
+  'La contraseña debe tener entre 8 y 72 caracteres, con al menos una letra y un número.';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Correo inválido' })

@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
 
@@ -6,6 +10,7 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
   ORGANIZADOR: 'Organizador de eventos',
   JEFE_NEGOCIO: 'Jefe de negocio',
+  ENCARGADO_ACCESO: 'Encargado de acceso (supervisor)',
 };
 
 function escapeHtml(value: string) {
@@ -68,14 +73,21 @@ export class MailService {
       },
     });
     this.from = config.getOrThrow<string>('MAIL_FROM');
-    this.frontendUrl = config.getOrThrow<string>('FRONTEND_URL').replace(/\/+$/, '');
+    this.frontendUrl = config
+      .getOrThrow<string>('FRONTEND_URL')
+      .replace(/\/+$/, '');
   }
 
   buildUrl(path: string, token: string) {
     return `${this.frontendUrl}${path}?token=${encodeURIComponent(token)}`;
   }
 
-  async sendPasswordReset(to: string, nombre: string, token: string, expiresInMinutes: number) {
+  async sendPasswordReset(
+    to: string,
+    nombre: string,
+    token: string,
+    expiresInMinutes: number,
+  ) {
     const url = this.buildUrl('/reset-password', token);
     const html = layout(
       'Restablece tu contraseña',
@@ -95,7 +107,13 @@ export class MailService {
     await this.send(to, 'Restablece tu contraseña de EvenTix', html, text);
   }
 
-  async sendInvitation(to: string, nombre: string, role: string, token: string, expiresInHours: number) {
+  async sendInvitation(
+    to: string,
+    nombre: string,
+    role: string,
+    token: string,
+    expiresInHours: number,
+  ) {
     const url = this.buildUrl('/activar-cuenta', token);
     const roleLabel = ROLE_LABELS[role] ?? role;
     const html = layout(
@@ -120,7 +138,11 @@ export class MailService {
   async sendSolicitudRevisada(
     to: string,
     nombre: string,
-    evento: { nombre: string; aprobada: boolean; observaciones?: string | null },
+    evento: {
+      nombre: string;
+      aprobada: boolean;
+      observaciones?: string | null;
+    },
   ) {
     const url = `${this.frontendUrl}/organizador/solicitudes`;
     const estado = evento.aprobada ? 'aprobada' : 'rechazada';
@@ -146,7 +168,11 @@ export class MailService {
     await this.send(to, `Solicitud ${estado}: ${evento.nombre}`, html, text);
   }
 
-  async sendAyudanteBienvenida(to: string, nombre: string, datos: { negocio: string; jefe: string }) {
+  async sendAyudanteBienvenida(
+    to: string,
+    nombre: string,
+    datos: { negocio: string; jefe: string },
+  ) {
     const url = `${this.frontendUrl}/login`;
     const html = layout(
       'Ya formas parte de un negocio',
@@ -164,7 +190,11 @@ export class MailService {
     await this.send(to, `Te agregaron a ${datos.negocio}`, html, text);
   }
 
-  async sendEventoPublicado(to: string, nombre: string, evento: { id: string; titulo: string }) {
+  async sendEventoPublicado(
+    to: string,
+    nombre: string,
+    evento: { id: string; titulo: string },
+  ) {
     const url = `${this.frontendUrl}/eventos/${evento.id}`;
     const html = layout(
       'Tu evento ya está publicado',
@@ -182,11 +212,23 @@ export class MailService {
 
   private async send(to: string, subject: string, html: string, text: string) {
     try {
-      const info = await this.transporter.sendMail({ from: this.from, to, subject, html, text });
-      this.logger.log(`Correo "${subject}" enviado a ${to} (${info.messageId})`);
+      const info = await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject,
+        html,
+        text,
+      });
+      this.logger.log(
+        `Correo "${subject}" enviado a ${to} (${info.messageId})`,
+      );
     } catch (err) {
-      this.logger.error(`No se pudo enviar el correo "${subject}" a ${to}: ${(err as Error).message}`);
-      throw new ServiceUnavailableException('No se pudo enviar el correo. Intenta nuevamente en unos minutos.');
+      this.logger.error(
+        `No se pudo enviar el correo "${subject}" a ${to}: ${(err as Error).message}`,
+      );
+      throw new ServiceUnavailableException(
+        'No se pudo enviar el correo. Intenta nuevamente en unos minutos.',
+      );
     }
   }
 }

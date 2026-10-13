@@ -8,44 +8,46 @@ datasource db {
 }
 
 model Usuario {
-  id                      String               @id @default(cuid())
-  email                   String               @unique
+  id                      String                  @id @default(cuid())
+  email                   String                  @unique
   passwordHash            String
   nombre                  String
   apellido                String?
   /// Forma canónica (ver normalizePhone); único para evitar cuentas duplicadas.
-  telefono                String?              @unique
+  telefono                String?                 @unique
   /// Forma canónica (ver normalizeDocument); único para evitar cuentas duplicadas.
-  documento               String?              @unique
+  documento               String?                 @unique
   fechaNac                DateTime?
   fotoUrl                 String?
   fotoPublicId            String?
   preferencias            Json?
-  activo                  Boolean              @default(true)
+  activo                  Boolean                 @default(true)
   /// Baja realizada por un administrador; la fila se conserva por el historial de eventos y compras.
   eliminadoAt             DateTime?
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  accesosRegistrados      AccesoEvento[]       @relation("EncargadoAccesos")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  accesosRegistrados      AccesoEvento[]          @relation("EncargadoAccesos")
   archivos                Archivo[]
-  ayudantesCreados        AyudanteNegocio[]    @relation("JefeAyudantes")
+  ayudantesCreados        AyudanteNegocio[]       @relation("JefeAyudantes")
   ayudanteDe              AyudanteNegocio?
   compras                 CompraEntrada[]
-  entradas                Entrada[]            @relation("TitularEntrada")
-  eventosOrganizados      Evento[]             @relation("OrganizadorEventos")
-  invitacionesCreadas     InvitacionUsuario[]  @relation("InvitacionesCreadas")
-  liquidacionesAprobadas  LiquidacionEvento[]  @relation("AdminLiquidaciones")
-  liquidacionesEntregadas LiquidacionEvento[]  @relation("EntregaLiquidaciones")
+  entradas                Entrada[]               @relation("TitularEntrada")
+  eventosOrganizados      Evento[]                @relation("OrganizadorEventos")
+  invitacionesCreadas     InvitacionUsuario[]     @relation("InvitacionesCreadas")
+  liquidacionesAprobadas  LiquidacionEvento[]     @relation("AdminLiquidaciones")
+  liquidacionesEntregadas LiquidacionEvento[]     @relation("EntregaLiquidaciones")
+  manillasEntregadas      Manilla[]               @relation("SupervisorManillas")
   negocios                Negocio[]
+  puntosRetiroAsignados   SupervisorPuntoRetiro[]
   resetTokens             PasswordResetToken[]
   reembolsos              ReembolsoEntrada[]
   saldosEvento            SaldoEvento[]
-  solicitudes             SolicitudEvento[]    @relation("OrganizadorSolicitudes")
+  solicitudes             SolicitudEvento[]       @relation("OrganizadorSolicitudes")
   staffAsignaciones       StaffEvento[]
-  transaccionesOperadas   TransaccionSaldo[]   @relation("OperadorTransacciones")
-  transaccionesSaldo      TransaccionSaldo[]   @relation("UsuarioTransacciones")
+  transaccionesOperadas   TransaccionSaldo[]      @relation("OperadorTransacciones")
+  transaccionesSaldo      TransaccionSaldo[]      @relation("UsuarioTransacciones")
   roles                   UsuarioRol[]
-  ventasRealizadas        Venta[]              @relation("AyudanteVentas")
+  ventasRealizadas        Venta[]                 @relation("AyudanteVentas")
 }
 
 /// Cuenta pendiente creada por un admin; el Usuario solo existe cuando el invitado acepta.
@@ -355,35 +357,55 @@ model Credencial {
 }
 
 model Manilla {
-  id            String              @id @default(cuid())
-  eventoId      String
-  entradaId     String?             @unique
-  credencialId  String?             @unique
-  codigoFisico  String
-  vinculada     Boolean             @default(false)
-  vinculadaAt   DateTime?
-  puntoRetiroId String?
-  createdAt     DateTime            @default(now())
-  credencial    Credencial?         @relation(fields: [credencialId], references: [id])
-  entrada       Entrada?            @relation(fields: [entradaId], references: [id])
-  evento        Evento              @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  puntoRetiro   PuntoRetiroManilla? @relation(fields: [puntoRetiroId], references: [id])
+  id             String              @id @default(cuid())
+  eventoId       String
+  entradaId      String?             @unique
+  credencialId   String?             @unique
+  codigoFisico   String
+  vinculada      Boolean             @default(false)
+  vinculadaAt    DateTime?
+  puntoRetiroId  String?
+  /// Supervisor que entregó la manilla y confirmó la vinculación (HU-015, HU-053).
+  entregadaPorId String?
+  createdAt      DateTime            @default(now())
+  credencial     Credencial?         @relation(fields: [credencialId], references: [id])
+  entrada        Entrada?            @relation(fields: [entradaId], references: [id])
+  entregadaPor   Usuario?            @relation("SupervisorManillas", fields: [entregadaPorId], references: [id])
+  evento         Evento              @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  puntoRetiro    PuntoRetiroManilla? @relation(fields: [puntoRetiroId], references: [id])
 
   @@unique([eventoId, codigoFisico])
+  @@index([entregadaPorId], map: "Manilla_entregadaPorId_fkey")
   @@index([puntoRetiroId], map: "Manilla_puntoRetiroId_fkey")
 }
 
 model PuntoRetiroManilla {
-  id        String    @id @default(cuid())
-  eventoId  String
-  nombre    String
-  ubicacion String?
-  horario   String?
-  activo    Boolean   @default(true)
-  manillas  Manilla[]
-  evento    Evento    @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  id           String                  @id @default(cuid())
+  eventoId     String
+  nombre       String
+  ubicacion    String?
+  horario      String?
+  activo       Boolean                 @default(true)
+  manillas     Manilla[]
+  evento       Evento                  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  supervisores SupervisorPuntoRetiro[]
 
   @@index([eventoId], map: "PuntoRetiroManilla_eventoId_fkey")
+}
+
+/// Supervisores (rol ENCARGADO_ACCESO) que entregan manillas en un punto. Quitar a alguien
+/// lo desactiva y conserva la fila, porque sus entregas pasadas siguen apuntando a él.
+model SupervisorPuntoRetiro {
+  id            String             @id @default(cuid())
+  puntoRetiroId String
+  usuarioId     String
+  activo        Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  puntoRetiro   PuntoRetiroManilla @relation(fields: [puntoRetiroId], references: [id], onDelete: Cascade)
+  usuario       Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([puntoRetiroId, usuarioId])
+  @@index([usuarioId], map: "SupervisorPuntoRetiro_usuarioId_fkey")
 }
 
 model AccesoEvento {

@@ -54,5 +54,9 @@ export function buildCronograma(
 export function isCronograma(value: unknown): value is Cronograma {
   if (!value || typeof value !== 'object') return false;
   const c = value as Partial<Cronograma>;
-  return typeof c.apertura === 'string' && typeof c.cierre === 'string' && Array.isArray(c.actividades);
+  return (
+    typeof c.apertura === 'string' &&
+    typeof c.cierre === 'string' &&
+    Array.isArray(c.actividades)
+  );
 }

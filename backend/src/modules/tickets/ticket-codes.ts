@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 const ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 export const TICKET_ESTADO_DISPONIBLE = 'GENERADO';
+export const TICKET_ESTADO_ASIGNADO = 'ASIGNADO';
 
 /** Código único de entrada, p. ej. "EVX-7K2M-Q9TD-4HXR" (~58 bits aleatorios). Es también el contenido del QR. */
 export function newTicketCode() {
@@ -16,6 +17,11 @@ export function newTicketCode() {
 export function buildPoolRows(categoriaId: string, cantidad: number) {
   return Array.from({ length: cantidad }, () => {
     const codigo = newTicketCode();
-    return { categoriaId, codigo, codigoQr: codigo, estado: TICKET_ESTADO_DISPONIBLE };
+    return {
+      categoriaId,
+      codigo,
+      codigoQr: codigo,
+      estado: TICKET_ESTADO_DISPONIBLE,
+    };
   });
 }

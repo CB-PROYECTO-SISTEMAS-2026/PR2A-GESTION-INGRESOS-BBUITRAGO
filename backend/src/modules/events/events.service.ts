@@ -24,12 +24,29 @@ import {
   UpdateEventoDto,
   UpdateMapaDto,
 } from './dto/events.dto';
-import { buildSchedule, dateToDay, dayToDate, Schedule, todayIn } from './event-schedule';
-import { buildCronograma, Cronograma, isCronograma, normalizeList } from './event-content';
+import {
+  buildSchedule,
+  dateToDay,
+  dayToDate,
+  Schedule,
+  todayIn,
+} from './event-schedule';
+import {
+  buildCronograma,
+  Cronograma,
+  isCronograma,
+  normalizeList,
+} from './event-content';
 
 type AuthUser = { id: string; roles: Role[] };
 
-const organizadorSelect = { id: true, nombre: true, apellido: true, email: true, telefono: true };
+const organizadorSelect = {
+  id: true,
+  nombre: true,
+  apellido: true,
+  email: true,
+  telefono: true,
+};
 
 @Injectable()
 export class EventsService {
@@ -51,8 +68,15 @@ export class EventsService {
 
   // Solicitudes
 
-  async createSolicitud(organizadorId: string, dto: CreateSolicitudDto, mapa?: Express.Multer.File) {
-    if (!mapa) throw new BadRequestException('Adjunta el mapa de la zona del evento (imagen o PDF).');
+  async createSolicitud(
+    organizadorId: string,
+    dto: CreateSolicitudDto,
+    mapa?: Express.Multer.File,
+  ) {
+    if (!mapa)
+      throw new BadRequestException(
+        'Adjunta el mapa de la zona del evento (imagen o PDF).',
+      );
     const schedule = buildSchedule(dto, { today: this.today() });
     const stored = await this.storage.upload(mapa, 'mapas', 'imageOrPdf');
 
@@ -121,29 +145,41 @@ export class EventsService {
       },
     });
     if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
-    if (!user.roles.includes(Role.ADMIN) && solicitud.organizadorId !== user.id) {
+    if (
+      !user.roles.includes(Role.ADMIN) &&
+      solicitud.organizadorId !== user.id
+    ) {
       throw new ForbiddenException('No autorizado');
     }
     return solicitud;
   }
 
   async revisarSolicitud(id: string, dto: RevisarSolicitudDto) {
-    const solicitud = await this.prisma.solicitudEvento.findUnique({ where: { id } });
+    const solicitud = await this.prisma.solicitudEvento.findUnique({
+      where: { id },
+    });
     if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
     if (solicitud.estado !== SolicitudEstado.PENDIENTE) {
       throw new BadRequestException('La solicitud ya fue revisada');
     }
     const updated = await this.prisma.solicitudEvento.update({
       where: { id },
-      data: { estado: dto.estado, observaciones: dto.observaciones?.trim() || null },
+      data: {
+        estado: dto.estado,
+        observaciones: dto.observaciones?.trim() || null,
+      },
       include: { organizador: { select: organizadorSelect } },
     });
     const correoEnviado = await this.notify(() =>
-      this.mail.sendSolicitudRevisada(updated.organizador.email, updated.organizador.nombre, {
-        nombre: updated.nombreEvento,
-        aprobada: updated.estado === SolicitudEstado.APROBADA,
-        observaciones: updated.observaciones,
-      }),
+      this.mail.sendSolicitudRevisada(
+        updated.organizador.email,
+        updated.organizador.nombre,
+        {
+          nombre: updated.nombreEvento,
+          aprobada: updated.estado === SolicitudEstado.APROBADA,
+          observaciones: updated.observaciones,
+        },
+      ),
     );
     return { ...updated, correoEnviado };
   }
@@ -160,15 +196,23 @@ export class EventsService {
   }
 
   /** El organizador sube una nueva versión del mapa; queda en el historial (HU-043). */
-  async updateMapaSolicitud(id: string, user: AuthUser, mapa: Express.Multer.File | undefined, dto: UpdateMapaDto) {
+  async updateMapaSolicitud(
+    id: string,
+    user: AuthUser,
+    mapa: Express.Multer.File | undefined,
+    dto: UpdateMapaDto,
+  ) {
     const solicitud = await this.prisma.solicitudEvento.findUnique({
       where: { id },
       include: { evento: { select: { id: true } } },
     });
     if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
-    if (solicitud.organizadorId !== user.id) throw new ForbiddenException('No autorizado');
+    if (solicitud.organizadorId !== user.id)
+      throw new ForbiddenException('No autorizado');
     if (solicitud.estado === SolicitudEstado.RECHAZADA) {
-      throw new BadRequestException('No se puede actualizar el mapa de una solicitud rechazada.');
+      throw new BadRequestException(
+        'No se puede actualizar el mapa de una solicitud rechazada.',
+      );
     }
 
     const stored = await this.storage.upload(mapa, 'mapas', 'imageOrPdf');
@@ -179,7 +223,12 @@ export class EventsService {
           data: { mapaUrl: stored.url, mapaNombre: stored.nombre },
         }),
         ...(solicitud.evento
-          ? [this.prisma.evento.update({ where: { id: solicitud.evento.id }, data: { mapaUrl: stored.url } })]
+          ? [
+              this.prisma.evento.update({
+                where: { id: solicitud.evento.id },
+                data: { mapaUrl: stored.url },
+              }),
+            ]
           : []),
         this.prisma.mapaHistorial.create({
           data: {
@@ -205,7 +254,9 @@ export class EventsService {
     const schedule = buildSchedule(dto, { today: this.today() });
     const cronograma = buildCronograma(dto.cronograma, schedule);
     if (dto.estado && dto.estado !== EventoEstado.BORRADOR) {
-      throw new BadRequestException('El evento se crea como borrador. Podrás publicarlo después de subir su imagen y crear sus categorías.');
+      throw new BadRequestException(
+        'El evento se crea como borrador. Podrás publicarlo después de subir su imagen y crear sus categorías.',
+      );
     }
     let organizadorId = dto.organizadorId;
     let mapaUrl: string | null = null;
@@ -218,9 +269,14 @@ export class EventsService {
         include: { evento: { select: { id: true } } },
       });
       if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
-      if (solicitud.evento) throw new BadRequestException('Ya existe un evento para esta solicitud');
+      if (solicitud.evento)
+        throw new BadRequestException(
+          'Ya existe un evento para esta solicitud',
+        );
       if (solicitud.estado !== SolicitudEstado.APROBADA) {
-        throw new BadRequestException('La solicitud debe estar APROBADA para crear el evento');
+        throw new BadRequestException(
+          'La solicitud debe estar APROBADA para crear el evento',
+        );
       }
       organizadorId = solicitud.organizadorId;
       mapaUrl = solicitud.mapaUrl;
@@ -276,7 +332,11 @@ export class EventsService {
 
       return tx.evento.findUniqueOrThrow({
         where: { id: evento.id },
-        include: { fechas: { orderBy: { fecha: 'asc' } }, categorias: true, solicitud: true },
+        include: {
+          fechas: { orderBy: { fecha: 'asc' } },
+          categorias: true,
+          solicitud: true,
+        },
       });
     });
   }
@@ -290,25 +350,52 @@ export class EventsService {
           include: { _count: { select: { entradas: true, accesos: true } } },
         },
         categorias: { select: { cupo: true } },
+        _count: { select: { entradas: true } },
       },
     });
     if (!evento) throw new NotFoundException('Evento no encontrado');
+    if (dto.tipoAcceso !== undefined && dto.tipoAcceso !== evento.tipoAcceso && evento._count.entradas > 0) {
+      throw new BadRequestException(
+        'No puedes cambiar el tipo de acceso porque el evento ya tiene entradas emitidas con el tipo actual.',
+      );
+    }
 
-    const { fechaInicio, fechaFin, horaInicio, horaFin, servicios, cronograma: cronogramaDto, ...fields } = dto;
-    const touchesSchedule = [fechaInicio, fechaFin, horaInicio, horaFin].some((v) => v !== undefined);
+    const {
+      fechaInicio,
+      fechaFin,
+      horaInicio,
+      horaFin,
+      servicios,
+      cronograma: cronogramaDto,
+      ...fields
+    } = dto;
+    const touchesSchedule = [fechaInicio, fechaFin, horaInicio, horaFin].some(
+      (v) => v !== undefined,
+    );
 
     let schedule: Schedule | null = null;
     if (touchesSchedule) {
       if (!fechaInicio || !horaInicio || !horaFin) {
-        throw new BadRequestException('Envía la fecha de inicio, hora de inicio y hora de fin juntas.');
+        throw new BadRequestException(
+          'Envía la fecha de inicio, hora de inicio y hora de fin juntas.',
+        );
       }
       // Los días ya existentes pueden estar en el pasado; solo los días nuevos deben ser desde hoy.
-      schedule = buildSchedule({ fechaInicio, fechaFin, horaInicio, horaFin }, { today: this.today(), allowPast: true });
-      const existingDays = new Set(evento.fechas.map((f) => dateToDay(f.fecha)));
+      schedule = buildSchedule(
+        { fechaInicio, fechaFin, horaInicio, horaFin },
+        { today: this.today(), allowPast: true },
+      );
+      const existingDays = new Set(
+        evento.fechas.map((f) => dateToDay(f.fecha)),
+      );
       const today = this.today();
-      const newPastDay = schedule.days.find((d) => !existingDays.has(d) && d < today);
+      const newPastDay = schedule.days.find(
+        (d) => !existingDays.has(d) && d < today,
+      );
       if (newPastDay) {
-        throw new BadRequestException('No puedes agregar días anteriores a hoy al evento.');
+        throw new BadRequestException(
+          'No puedes agregar días anteriores a hoy al evento.',
+        );
       }
     }
 
@@ -323,27 +410,40 @@ export class EventsService {
       horaInicio: evento.fechas[0]?.horaInicio ?? '',
       horaFin: evento.fechas[0]?.horaFin ?? '',
     };
-    const storedCronograma = isCronograma(evento.cronograma) ? evento.cronograma : null;
+    const storedCronograma = isCronograma(evento.cronograma)
+      ? evento.cronograma
+      : null;
     let cronograma: Cronograma | null = null;
-    if (cronogramaDto || schedule) cronograma = buildCronograma(cronogramaDto ?? storedCronograma, horario);
+    if (cronogramaDto || schedule)
+      cronograma = buildCronograma(cronogramaDto ?? storedCronograma, horario);
 
     const estadoFinal = fields.estado ?? evento.estado;
     if (estadoFinal === EventoEstado.PUBLICADO) {
       if (!evento.fotoUrl) {
-        throw new BadRequestException('Sube la imagen del evento antes de publicarlo.');
+        throw new BadRequestException(
+          'Sube la imagen del evento antes de publicarlo.',
+        );
       }
       if (!evento.categorias.length) {
-        throw new BadRequestException('Crea al menos una categoría de entrada antes de publicar el evento.');
+        throw new BadRequestException(
+          'Crea al menos una categoría de entrada antes de publicar el evento.',
+        );
       }
       if (!(fields.ubicacionUrl ?? evento.ubicacionUrl)) {
-        throw new BadRequestException('Agrega el enlace de Google Maps de la ubicación antes de publicar el evento.');
+        throw new BadRequestException(
+          'Agrega el enlace de Google Maps de la ubicación antes de publicar el evento.',
+        );
       }
     }
 
     const data: Prisma.EventoUpdateInput = {
       ...fields,
-      ...(servicios !== undefined ? { servicios: normalizeList(servicios) } : {}),
-      ...(cronograma ? { cronograma: cronograma as unknown as Prisma.InputJsonObject } : {}),
+      ...(servicios !== undefined
+        ? { servicios: normalizeList(servicios) }
+        : {}),
+      ...(cronograma
+        ? { cronograma: cronograma as unknown as Prisma.InputJsonObject }
+        : {}),
     };
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -359,12 +459,19 @@ export class EventsService {
       });
     });
 
-    if (evento.estado !== EventoEstado.PUBLICADO && result.estado === EventoEstado.PUBLICADO) {
+    if (
+      evento.estado !== EventoEstado.PUBLICADO &&
+      result.estado === EventoEstado.PUBLICADO
+    ) {
       await this.notify(() =>
-        this.mail.sendEventoPublicado(result.organizador.email, result.organizador.nombre, {
-          id: result.id,
-          titulo: result.titulo,
-        }),
+        this.mail.sendEventoPublicado(
+          result.organizador.email,
+          result.organizador.nombre,
+          {
+            id: result.id,
+            titulo: result.titulo,
+          },
+        ),
       );
     }
     return result;
@@ -377,23 +484,36 @@ export class EventsService {
   private async syncFechas(
     tx: Prisma.TransactionClient,
     eventoId: string,
-    current: Array<{ id: string; fecha: Date; horaInicio: string; horaFin: string; _count: { entradas: number; accesos: number } }>,
+    current: Array<{
+      id: string;
+      fecha: Date;
+      horaInicio: string;
+      horaFin: string;
+      _count: { entradas: number; accesos: number };
+    }>,
     schedule: Schedule,
   ) {
     const wanted = new Set(schedule.days);
     const toRemove = current.filter((f) => !wanted.has(dateToDay(f.fecha)));
-    const blocked = toRemove.find((f) => f._count.entradas > 0 || f._count.accesos > 0);
+    const blocked = toRemove.find(
+      (f) => f._count.entradas > 0 || f._count.accesos > 0,
+    );
     if (blocked) {
       throw new BadRequestException(
         `No puedes quitar el día ${dateToDay(blocked.fecha)} porque ya tiene entradas o accesos registrados.`,
       );
     }
     if (toRemove.length) {
-      await tx.fechaEvento.deleteMany({ where: { id: { in: toRemove.map((f) => f.id) } } });
+      await tx.fechaEvento.deleteMany({
+        where: { id: { in: toRemove.map((f) => f.id) } },
+      });
     }
 
     const keep = current.filter((f) => wanted.has(dateToDay(f.fecha)));
-    const toRetime = keep.filter((f) => f.horaInicio !== schedule.horaInicio || f.horaFin !== schedule.horaFin);
+    const toRetime = keep.filter(
+      (f) =>
+        f.horaInicio !== schedule.horaInicio || f.horaFin !== schedule.horaFin,
+    );
     if (toRetime.length) {
       await tx.fechaEvento.updateMany({
         where: { id: { in: toRetime.map((f) => f.id) } },
@@ -418,11 +538,20 @@ export class EventsService {
         where: { eventoId, fecha: { in: newDays.map(dayToDate) } },
         select: { id: true },
       }),
-      tx.categoriaEntrada.findMany({ where: { eventoId }, select: { id: true } }),
+      tx.categoriaEntrada.findMany({
+        where: { eventoId },
+        select: { id: true },
+      }),
     ]);
     if (categorias.length) {
       await tx.categoriaFecha.createMany({
-        data: categorias.flatMap((c) => created.map((f) => ({ categoriaId: c.id, fechaId: f.id, disponible: true }))),
+        data: categorias.flatMap((c) =>
+          created.map((f) => ({
+            categoriaId: c.id,
+            fechaId: f.id,
+            disponible: true,
+          })),
+        ),
         skipDuplicates: true,
       });
     }
@@ -449,9 +578,14 @@ export class EventsService {
     return this.prisma.evento.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        organizador: { select: { id: true, nombre: true, apellido: true, email: true } },
+        organizador: {
+          select: { id: true, nombre: true, apellido: true, email: true },
+        },
         fechas: { orderBy: { fecha: 'asc' } },
-        categorias: { select: { id: true, nombre: true, precio: true, cupo: true }, orderBy: { precio: 'asc' } },
+        categorias: {
+          select: { id: true, nombre: true, precio: true, cupo: true },
+          orderBy: { precio: 'asc' },
+        },
         solicitud: { select: { id: true, estado: true } },
       },
     });
@@ -509,10 +643,15 @@ export class EventsService {
         fechas: { orderBy: { fecha: 'asc' } },
         categorias: {
           orderBy: { precio: 'asc' },
-          include: { fechasDisponibles: true, _count: { select: { ticketsPool: true } } },
+          include: {
+            fechasDisponibles: true,
+            _count: { select: { ticketsPool: true } },
+          },
         },
         organizador: { select: organizadorSelect },
-        solicitud: { include: { mapHistory: { orderBy: { createdAt: 'desc' } } } },
+        solicitud: {
+          include: { mapHistory: { orderBy: { createdAt: 'desc' } } },
+        },
         mapHistory: { orderBy: { createdAt: 'desc' } },
       },
     });
@@ -520,12 +659,19 @@ export class EventsService {
     return evento;
   }
 
-  async updateMapa(eventoId: string, mapa: Express.Multer.File | undefined, dto: UpdateMapaDto) {
+  async updateMapa(
+    eventoId: string,
+    mapa: Express.Multer.File | undefined,
+    dto: UpdateMapaDto,
+  ) {
     const evento = await this.ensureEvento(eventoId);
     const stored = await this.storage.upload(mapa, 'mapas', 'imageOrPdf');
     try {
       const [updated] = await this.prisma.$transaction([
-        this.prisma.evento.update({ where: { id: eventoId }, data: { mapaUrl: stored.url } }),
+        this.prisma.evento.update({
+          where: { id: eventoId },
+          data: { mapaUrl: stored.url },
+        }),
         this.prisma.mapaHistorial.create({
           data: {
             eventoId,
@@ -546,7 +692,9 @@ export class EventsService {
 
   mapaHistorial(eventoId: string) {
     return this.prisma.mapaHistorial.findMany({
-      where: { OR: [{ eventoId }, { solicitud: { evento: { id: eventoId } } }] },
+      where: {
+        OR: [{ eventoId }, { solicitud: { evento: { id: eventoId } } }],
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -560,11 +708,19 @@ export class EventsService {
   }
 
   private async ensureOrganizador(organizadorId?: string) {
-    if (!organizadorId) throw new BadRequestException('Selecciona el organizador del evento');
+    if (!organizadorId)
+      throw new BadRequestException('Selecciona el organizador del evento');
     const organizador = await this.prisma.usuario.findFirst({
-      where: { id: organizadorId, activo: true, roles: { some: { role: Role.ORGANIZADOR } } },
+      where: {
+        id: organizadorId,
+        activo: true,
+        roles: { some: { role: Role.ORGANIZADOR } },
+      },
     });
-    if (!organizador) throw new BadRequestException('El usuario seleccionado no es un organizador activo');
+    if (!organizador)
+      throw new BadRequestException(
+        'El usuario seleccionado no es un organizador activo',
+      );
   }
 
   private async ensureEvento(id: string) {

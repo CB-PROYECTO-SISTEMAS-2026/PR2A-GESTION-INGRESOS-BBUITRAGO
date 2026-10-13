@@ -43,13 +43,17 @@ function isValidDay(day: string) {
 }
 
 function daysBetween(start: string, end: string) {
-  return Math.round((dayToDate(end).getTime() - dayToDate(start).getTime()) / DAY_MS);
+  return Math.round(
+    (dayToDate(end).getTime() - dayToDate(start).getTime()) / DAY_MS,
+  );
 }
 
 export function expandDays(start: string, end: string | null) {
   if (!end) return [start];
   const total = daysBetween(start, end);
-  return Array.from({ length: total + 1 }, (_, i) => dateToDay(new Date(dayToDate(start).getTime() + i * DAY_MS)));
+  return Array.from({ length: total + 1 }, (_, i) =>
+    dateToDay(new Date(dayToDate(start).getTime() + i * DAY_MS)),
+  );
 }
 
 /**
@@ -60,22 +64,37 @@ export function expandDays(start: string, end: string | null) {
  * - Máximo 1 año entre inicio y fin.
  * - Mismo horario para todos los días; la hora de fin debe ser posterior a la de inicio.
  */
-export function buildSchedule(input: ScheduleInput, opts: { today: string; allowPast?: boolean }): Schedule {
+export function buildSchedule(
+  input: ScheduleInput,
+  opts: { today: string; allowPast?: boolean },
+): Schedule {
   const fechaInicio = input.fechaInicio?.trim();
   const fechaFin = input.fechaFin?.trim() || null;
   const { horaInicio, horaFin } = input;
 
-  if (!fechaInicio || !isValidDay(fechaInicio)) throw new BadRequestException('Selecciona una fecha de inicio válida.');
-  if (fechaFin && !isValidDay(fechaFin)) throw new BadRequestException('Selecciona una fecha de fin válida.');
+  if (!fechaInicio || !isValidDay(fechaInicio))
+    throw new BadRequestException('Selecciona una fecha de inicio válida.');
+  if (fechaFin && !isValidDay(fechaFin))
+    throw new BadRequestException('Selecciona una fecha de fin válida.');
   if (!opts.allowPast && fechaInicio < opts.today) {
-    throw new BadRequestException('La fecha de inicio no puede ser anterior a hoy.');
+    throw new BadRequestException(
+      'La fecha de inicio no puede ser anterior a hoy.',
+    );
   }
-  if (!horaInicio || !horaFin) throw new BadRequestException('Indica la hora de inicio y la hora de fin del evento.');
-  if (horaFin <= horaInicio) throw new BadRequestException('La hora de fin debe ser posterior a la hora de inicio.');
+  if (!horaInicio || !horaFin)
+    throw new BadRequestException(
+      'Indica la hora de inicio y la hora de fin del evento.',
+    );
+  if (horaFin <= horaInicio)
+    throw new BadRequestException(
+      'La hora de fin debe ser posterior a la hora de inicio.',
+    );
 
   if (fechaFin) {
     if (!opts.allowPast && fechaFin < opts.today) {
-      throw new BadRequestException('La fecha de fin no puede ser anterior a hoy.');
+      throw new BadRequestException(
+        'La fecha de fin no puede ser anterior a hoy.',
+      );
     }
     if (fechaFin === fechaInicio) {
       throw new BadRequestException(
@@ -83,7 +102,9 @@ export function buildSchedule(input: ScheduleInput, opts: { today: string; allow
       );
     }
     if (fechaInicio > fechaFin) {
-      throw new BadRequestException('La fecha de inicio no puede ser posterior a la fecha de fin.');
+      throw new BadRequestException(
+        'La fecha de inicio no puede ser posterior a la fecha de fin.',
+      );
     }
     if (daysBetween(fechaInicio, fechaFin) > MAX_EVENT_SPAN_DAYS) {
       throw new BadRequestException(
@@ -92,5 +113,11 @@ export function buildSchedule(input: ScheduleInput, opts: { today: string; allow
     }
   }
 
-  return { fechaInicio, fechaFin, horaInicio, horaFin, days: expandDays(fechaInicio, fechaFin) };
+  return {
+    fechaInicio,
+    fechaFin,
+    horaInicio,
+    horaFin,
+    days: expandDays(fechaInicio, fechaFin),
+  };
 }

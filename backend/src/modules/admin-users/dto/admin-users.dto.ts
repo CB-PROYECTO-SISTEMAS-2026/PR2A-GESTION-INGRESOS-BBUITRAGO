@@ -16,7 +16,13 @@ import {
 import { PASSWORD_MESSAGE, PASSWORD_RULE } from '../../auth/dto/auth.dto';
 import { toStrictInt } from '../../../common/validation/validators';
 
-export const INVITABLE_ROLES = [Role.ADMIN, Role.ORGANIZADOR, Role.JEFE_NEGOCIO] as const;
+export const INVITABLE_ROLES = [
+  Role.ADMIN,
+  Role.ORGANIZADOR,
+  Role.JEFE_NEGOCIO,
+  Role.ENCARGADO_ACCESO,
+  Role.RECARGADOR,
+] as const;
 
 export class CreateInvitacionDto {
   @IsEmail({}, { message: 'Correo inválido' })

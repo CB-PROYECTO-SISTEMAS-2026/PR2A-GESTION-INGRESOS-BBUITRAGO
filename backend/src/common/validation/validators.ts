@@ -11,10 +11,11 @@ function rawValue({ obj, key, value }: TransformFnParams): unknown {
   return obj && key in obj ? (obj as Record<string, unknown>)[key] : value;
 }
 
-export const emptyToUndefined = ({ value }: TransformFnParams) =>
+export const emptyToUndefined = ({ value }: TransformFnParams): unknown =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
 
-export const trimString = ({ value }: TransformFnParams) => (typeof value === 'string' ? value.trim() : value);
+export const trimString = ({ value }: TransformFnParams): unknown =>
+  typeof value === 'string' ? value.trim() : value;
 
 /**
  * Solo acepta enteros escritos con dígitos ("120" o 120). Valores como "12.5", "1e3", "-4" o "12abc"
@@ -58,7 +59,8 @@ export function isGoogleMapsUrl(value: unknown): boolean {
   if (host === 'maps.app.goo.gl') return url.pathname.length > 1;
   if (host === 'goo.gl') return url.pathname.startsWith('/maps');
   if (/^maps\.google\.[a-z.]+$/.test(host)) return true;
-  if (/^(www\.)?google\.[a-z.]+$/.test(host)) return url.pathname.startsWith('/maps');
+  if (/^(www\.)?google\.[a-z.]+$/.test(host))
+    return url.pathname.startsWith('/maps');
   return false;
 }
 

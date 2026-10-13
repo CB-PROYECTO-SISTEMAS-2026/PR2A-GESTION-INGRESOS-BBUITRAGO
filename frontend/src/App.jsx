@@ -5,6 +5,7 @@ import { ConfirmHost } from './components/ui/ConfirmDialog'
 import PublicLayout from './components/layout/PublicLayout'
 import AdminLayout from './components/layout/AdminLayout'
 import BusinessLayout from './components/layout/BusinessLayout'
+import SupervisorLayout from './components/layout/SupervisorLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 
 import HomePage from './modules/public/HomePage'
@@ -18,6 +19,7 @@ import ResetPasswordPage from './modules/auth/ResetPasswordPage'
 import AceptarInvitacionPage from './modules/auth/AceptarInvitacionPage'
 
 import ProfilePage from './modules/profile/ProfilePage'
+import MisEntradasPage from './modules/entradas/MisEntradasPage'
 
 import SolicitudFormPage from './modules/organizer/SolicitudFormPage'
 import MisSolicitudesPage from './modules/organizer/MisSolicitudesPage'
@@ -29,11 +31,33 @@ import EventosAdminPage from './modules/admin/EventosAdminPage'
 import EventoEditPage from './modules/admin/EventoEditPage'
 import CategoriasPage from './modules/admin/CategoriasPage'
 import MapaHistorialPage from './modules/admin/MapaHistorialPage'
+import PuntosRetiroPage from './modules/admin/PuntosRetiroPage'
 import UsuariosPage from './modules/admin/UsuariosPage'
+import RetirosPage from './modules/admin/RetirosPage'
+import RecargasAdminPage from './modules/admin/RecargasAdminPage'
+import PersonalEventoPage from './modules/admin/PersonalEventoPage'
+import MovimientosEventoPage from './modules/admin/MovimientosEventoPage'
+
+import EntregaManillasPage from './modules/supervisor/EntregaManillasPage'
+import MisEntregasPage from './modules/supervisor/MisEntregasPage'
 
 import NegociosPage from './modules/business/NegociosPage'
 import ProductosPage from './modules/business/ProductosPage'
 import AyudantesPage from './modules/business/AyudantesPage'
+import DashboardPage from './modules/business/DashboardPage'
+import VentasPage from './modules/business/VentasPage'
+import LiquidacionPage from './modules/business/LiquidacionPage'
+
+import PosLayout from './modules/pos/PosLayout'
+import PosPage from './modules/pos/PosPage'
+import PosHistorialPage from './modules/pos/PosHistorialPage'
+
+import RecargasLayout from './modules/recargas/RecargasLayout'
+import RecargaPage from './modules/recargas/RecargaPage'
+import RecargasHistorialPage from './modules/recargas/RecargasHistorialPage'
+
+import MiManillaPage from './modules/billetera/MiManillaPage'
+import MovimientosPage from './modules/billetera/MovimientosPage'
 
 function RootLayout() {
   return (
@@ -63,7 +87,17 @@ const router = createBrowserRouter([
           { path: 'activar-cuenta', element: <AceptarInvitacionPage /> },
           {
             element: <ProtectedRoute />,
-            children: [{ path: 'perfil', element: <ProfilePage /> }],
+            children: [
+              { path: 'perfil', element: <ProfilePage /> },
+              { path: 'mis-entradas', element: <MisEntradasPage /> },
+            ],
+          },
+          {
+            element: <ProtectedRoute roles={['CLIENTE']} />,
+            children: [
+              { path: 'mi-manilla', element: <MiManillaPage /> },
+              { path: 'mi-manilla/movimientos', element: <MovimientosPage /> },
+            ],
           },
           {
             element: <ProtectedRoute roles={['ORGANIZADOR', 'ADMIN']} />,
@@ -88,8 +122,13 @@ const router = createBrowserRouter([
               { path: 'eventos/:id', element: <EventoEditPage /> },
               { path: 'eventos/:id/categorias', element: <CategoriasPage /> },
               { path: 'eventos/:id/mapa', element: <MapaHistorialPage /> },
+              { path: 'eventos/:id/manillas', element: <PuntosRetiroPage /> },
+              { path: 'eventos/:id/personal', element: <PersonalEventoPage /> },
+              { path: 'eventos/:id/movimientos', element: <MovimientosEventoPage /> },
               { path: 'mapa/:solicitudId', element: <MapaHistorialPage /> },
               { path: 'usuarios', element: <UsuariosPage /> },
+              { path: 'retiros', element: <RetirosPage /> },
+              { path: 'recargas', element: <RecargasAdminPage /> },
             ],
           },
         ],
@@ -104,6 +143,48 @@ const router = createBrowserRouter([
               { index: true, element: <NegociosPage /> },
               { path: 'productos', element: <ProductosPage /> },
               { path: 'ayudantes', element: <AyudantesPage /> },
+              { path: 'dashboard', element: <DashboardPage /> },
+              { path: 'ventas', element: <VentasPage /> },
+              { path: 'liquidacion', element: <LiquidacionPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        path: 'pos',
+        element: <ProtectedRoute roles={['AYUDANTE']} />,
+        children: [
+          {
+            element: <PosLayout />,
+            children: [
+              { index: true, element: <PosPage /> },
+              { path: 'historial', element: <PosHistorialPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        path: 'recargas',
+        element: <ProtectedRoute roles={['RECARGADOR']} />,
+        children: [
+          {
+            element: <RecargasLayout />,
+            children: [
+              { index: true, element: <RecargaPage /> },
+              { path: 'historial', element: <RecargasHistorialPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        path: 'supervisor',
+        element: <ProtectedRoute roles={['ENCARGADO_ACCESO', 'ADMIN']} />,
+        children: [
+          {
+            element: <SupervisorLayout />,
+            children: [
+              { index: true, element: <EntregaManillasPage /> },
+              { path: 'entregas', element: <MisEntregasPage /> },
             ],
           },
         ],

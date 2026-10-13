@@ -48,7 +48,10 @@ export class UsersController {
 
   @Post('me/foto')
   @UseInterceptors(FileInterceptor('foto', memoryUpload))
-  updateFoto(@CurrentUser('id') userId: string, @UploadedFile() file?: Express.Multer.File) {
+  updateFoto(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
     return this.usersService.updateFoto(userId, file);
   }
 
