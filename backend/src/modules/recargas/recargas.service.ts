@@ -3,9 +3,11 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  EstadoIncidencia,
   EstadoTransaccion,
   EventoEstado,
   Prisma,
@@ -22,11 +24,14 @@ import {
   nombreCompleto,
 } from '../pos/pos-helpers';
 import { CodigoClienteService } from '../saldo/codigo-cliente.service';
+import { montoConSigno } from '../saldo/saldo-helpers';
 import {
   ConsultaClienteRecargaDto,
   CreateRecargaDto,
   HistorialRecargasDto,
+  ReportarIncidenciaDto,
 } from './dto/recargas.dto';
+import { incidenciaDto, ULTIMA_INCIDENCIA } from './incidencias';
 import {
   METODOS_PAGO,
   MONTOS_RAPIDOS,
@@ -38,6 +43,9 @@ import {
 
 /** Máximo de recargas que se devuelven en el historial del recargador (los totales cubren todo el rango). */
 const HISTORIAL_LIMIT = 500;
+
+/** Movimientos del cliente que ve el recargador al escanearlo (HU-020). */
+const ACTIVIDAD_LIMIT = 30;
 
 /** La base es remota: se da margen a la transacción de la recarga antes de abortarla. */
 const RECARGA_TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
@@ -127,13 +135,16 @@ export class RecargasService {
     };
   }
 
-  /** Datos del cliente y su saldo en el evento, antes de elegir el monto. */
+  /** Datos del cliente, su saldo y su actividad en el evento, antes de elegir el monto. */
   async consultarCliente(usuarioId: string, dto: ConsultaClienteRecargaDto) {
     const [, cliente] = await Promise.all([
       this.requireEventoAsignado(usuarioId, dto.eventoId),
       this.codigoCliente.resolver(dto.eventoId, dto.codigo),
     ]);
-    const saldoActual = await this.saldoDe(cliente.usuarioId, dto.eventoId);
+    const [saldoActual, actividad] = await Promise.all([
+      this.saldoDe(cliente.usuarioId, dto.eventoId),
+      this.actividadCliente(usuarioId, cliente.usuarioId, dto.eventoId),
+    ]);
     const disponible = new Prisma.Decimal(SALDO_MAX_EVENTO).sub(saldoActual);
     const maxRecargable = Prisma.Decimal.max(
       0,
@@ -149,7 +160,54 @@ export class RecargasService {
       saldo: money(saldoActual),
       /** Lo máximo que se le puede recargar ahora sin pasar el saldo máximo del evento. */
       maxRecargable: money(maxRecargable),
+      actividad,
     };
+  }
+
+  /**
+   * HU-020: actividad de puntos del cliente en el evento asignado: las recargas que le hizo este
+   * recargador y sus compras en los puntos de venta. Nada de otros eventos ni de otros recargadores.
+   */
+  private async actividadCliente(
+    recargadorId: string,
+    clienteId: string,
+    eventoId: string,
+  ) {
+    const movimientos = await this.prisma.transaccionSaldo.findMany({
+      where: {
+        usuarioId: clienteId,
+        eventoId,
+        OR: [
+          { tipo: TipoTransaccionSaldo.RECARGA, operadorId: recargadorId },
+          { tipo: TipoTransaccionSaldo.COMPRA_PRODUCTO },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: ACTIVIDAD_LIMIT,
+      select: {
+        id: true,
+        tipo: true,
+        monto: true,
+        estado: true,
+        createdAt: true,
+        evento: { select: { titulo: true } },
+        venta: { select: { negocio: { select: { nombre: true } } } },
+      },
+    });
+    return movimientos.map((m) => ({
+      id: m.id,
+      codigo: codigoTransaccion(m.id),
+      fecha: m.createdAt,
+      tipo: m.tipo,
+      detalle:
+        m.tipo === TipoTransaccionSaldo.RECARGA
+          ? 'Recarga (hecha por ti)'
+          : `Compra en ${m.venta?.negocio.nombre ?? 'punto de venta'}`,
+      evento: m.evento.titulo,
+      /** Con signo, desde el punto de vista del cliente: + recarga, − compra. */
+      monto: money(montoConSigno(m.tipo, m.monto)),
+      estado: m.estado,
+    }));
   }
 
   /**
@@ -294,6 +352,7 @@ export class RecargasService {
           estado: true,
           usuarioId: true,
           eventoId: true,
+          incidencias: ULTIMA_INCIDENCIA,
         },
       }),
       this.prisma.transaccionSaldo.aggregate({
@@ -335,7 +394,67 @@ export class RecargasService {
         monto: money(r.monto),
         saldoResultante: money(r.saldoResultante),
         estado: r.estado,
+        incidencia: incidenciaDto(r.incidencias[0]),
       })),
+    };
+  }
+
+  /**
+   * HU-047: el recargador reporta un problema con una recarga suya (monto o cliente equivocado,
+   * duplicada...). No toca el saldo: el administrador la revisa y, si corresponde, anula la recarga.
+   */
+  async reportarIncidencia(
+    recargadorId: string,
+    transaccionId: string,
+    dto: ReportarIncidenciaDto,
+  ) {
+    const recarga = await this.prisma.transaccionSaldo.findUnique({
+      where: { id: transaccionId },
+      select: {
+        id: true,
+        tipo: true,
+        estado: true,
+        operadorId: true,
+        eventoId: true,
+        incidencias: {
+          where: { estado: EstadoIncidencia.ABIERTA },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (
+      !recarga ||
+      recarga.tipo !== TipoTransaccionSaldo.RECARGA ||
+      recarga.operadorId !== recargadorId
+    ) {
+      throw new NotFoundException('Recarga no encontrada');
+    }
+    if (recarga.estado === EstadoTransaccion.ANULADA) {
+      throw new BadRequestException(
+        'Esta recarga ya fue anulada por el administrador.',
+      );
+    }
+    if (recarga.incidencias.length) {
+      throw new ConflictException(
+        'Ya reportaste un problema con esta recarga; el administrador lo está revisando.',
+      );
+    }
+
+    const incidencia = await this.prisma.incidenciaRecarga.create({
+      data: {
+        transaccionId: recarga.id,
+        eventoId: recarga.eventoId,
+        recargadorId,
+        tipo: dto.tipo,
+        descripcion: dto.descripcion,
+      },
+      select: ULTIMA_INCIDENCIA.select,
+    });
+    return {
+      recargaId: recarga.id,
+      codigo: codigoTransaccion(recarga.id),
+      incidencia: incidenciaDto(incidencia),
     };
   }
 

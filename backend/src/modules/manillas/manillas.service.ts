@@ -147,8 +147,15 @@ export class ManillasService {
           throw new ConflictException(`La manilla ${codigoManilla} ya fue entregada a otra persona. Usa otra manilla.`);
         }
 
+        // HU-015: desde la entrega solo vale el QR físico, así que el QR digital (eventos AMBOS) se desactiva.
+        const credencial = await tx.credencial.findUnique({ where: { entradaId: entrada.id }, select: { id: true } });
+        if (credencial) {
+          await tx.credencial.update({ where: { id: credencial.id }, data: { activa: false } });
+        }
+
         const data = {
           entradaId: entrada.id,
+          credencialId: credencial?.id ?? null,
           vinculada: true,
           vinculadaAt: new Date(),
           puntoRetiroId: punto.id,

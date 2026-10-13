@@ -20,6 +20,8 @@ import AceptarInvitacionPage from './modules/auth/AceptarInvitacionPage'
 
 import ProfilePage from './modules/profile/ProfilePage'
 import MisEntradasPage from './modules/entradas/MisEntradasPage'
+import CompraEntradasPage from './modules/compras/CompraEntradasPage'
+import MisComprasPage from './modules/compras/MisComprasPage'
 
 import SolicitudFormPage from './modules/organizer/SolicitudFormPage'
 import MisSolicitudesPage from './modules/organizer/MisSolicitudesPage'
@@ -32,6 +34,10 @@ import EventoEditPage from './modules/admin/EventoEditPage'
 import CategoriasPage from './modules/admin/CategoriasPage'
 import MapaHistorialPage from './modules/admin/MapaHistorialPage'
 import PuntosRetiroPage from './modules/admin/PuntosRetiroPage'
+import PagoEventoPage from './modules/admin/PagoEventoPage'
+import AccesoEventoPage from './modules/admin/AccesoEventoPage'
+import ComprasAdminPage from './modules/admin/ComprasAdminPage'
+import AccesosAdminPage from './modules/admin/AccesosAdminPage'
 import UsuariosPage from './modules/admin/UsuariosPage'
 import RetirosPage from './modules/admin/RetirosPage'
 import RecargasAdminPage from './modules/admin/RecargasAdminPage'
@@ -40,6 +46,7 @@ import MovimientosEventoPage from './modules/admin/MovimientosEventoPage'
 
 import EntregaManillasPage from './modules/supervisor/EntregaManillasPage'
 import MisEntregasPage from './modules/supervisor/MisEntregasPage'
+import ControlAccesoPage from './modules/supervisor/ControlAccesoPage'
 
 import NegociosPage from './modules/business/NegociosPage'
 import ProductosPage from './modules/business/ProductosPage'
@@ -95,6 +102,13 @@ const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={['CLIENTE']} />,
             children: [
+              { path: 'eventos/:id/comprar', element: <CompraEntradasPage /> },
+              { path: 'mis-compras', element: <MisComprasPage /> },
+            ],
+          },
+          {
+            element: <ProtectedRoute roles={['CLIENTE']} />,
+            children: [
               { path: 'mi-manilla', element: <MiManillaPage /> },
               { path: 'mi-manilla/movimientos', element: <MovimientosPage /> },
             ],
@@ -123,9 +137,13 @@ const router = createBrowserRouter([
               { path: 'eventos/:id/categorias', element: <CategoriasPage /> },
               { path: 'eventos/:id/mapa', element: <MapaHistorialPage /> },
               { path: 'eventos/:id/manillas', element: <PuntosRetiroPage /> },
+              { path: 'eventos/:id/pagos', element: <PagoEventoPage /> },
+              { path: 'eventos/:id/acceso', element: <AccesoEventoPage /> },
               { path: 'eventos/:id/personal', element: <PersonalEventoPage /> },
               { path: 'eventos/:id/movimientos', element: <MovimientosEventoPage /> },
               { path: 'mapa/:solicitudId', element: <MapaHistorialPage /> },
+              { path: 'compras', element: <ComprasAdminPage /> },
+              { path: 'accesos', element: <AccesosAdminPage /> },
               { path: 'usuarios', element: <UsuariosPage /> },
               { path: 'retiros', element: <RetirosPage /> },
               { path: 'recargas', element: <RecargasAdminPage /> },
@@ -185,6 +203,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <EntregaManillasPage /> },
               { path: 'entregas', element: <MisEntregasPage /> },
+              { path: 'acceso', element: <ControlAccesoPage /> },
             ],
           },
         ],

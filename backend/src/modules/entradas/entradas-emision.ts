@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { CompraEstado, EntradaEstado, Prisma, TipoAcceso } from '@prisma/client';
 import { normalizeEmail } from '../../common/security/user-identity';
+import { claveDia, completarPool } from '../tickets/cupos';
 import { TICKET_ESTADO_ASIGNADO, TICKET_ESTADO_DISPONIBLE } from '../tickets/ticket-codes';
 
 type Tx = Prisma.TransactionClient;
@@ -70,6 +71,7 @@ export async function emitirEntradasDeCompra(tx: Tx, compraId: string): Promise<
             select: {
               nombre: true,
               eventoId: true,
+              cupo: true,
               fechasDisponibles: { where: { disponible: true }, select: { fechaId: true } },
             },
           },
@@ -105,6 +107,7 @@ export async function emitirEntradasDeCompra(tx: Tx, compraId: string): Promise<
     return { ...item, fechaId: resolverFecha(item, fechasEvento) };
   });
 
+  await verificarCupoPorDia(tx, unidades);
   const titulares = await resolverTitulares(tx, unidades);
   const porCategoria = new Map<string, { nombre: string; cantidad: number }>();
   for (const u of unidades) {
@@ -172,6 +175,54 @@ function resolverFecha(
   return fechasEvento.length === 1 ? fechasEvento[0] : null;
 }
 
+/** El cupo de la categoría es por día: lo ya emitido para ese día más lo de esta compra no puede pasarlo. */
+async function verificarCupoPorDia(
+  tx: Tx,
+  unidades: Array<{
+    categoriaId: string;
+    fechaId: string | null;
+    cantidad: number;
+    categoria: { nombre: string; cupo: number };
+  }>,
+) {
+  const pedidas = new Map<
+    string,
+    { categoriaId: string; fechaId: string; nombre: string; cupo: number; cantidad: number }
+  >();
+  for (const u of unidades) {
+    if (!u.fechaId) continue;
+    const k = claveDia(u.categoriaId, u.fechaId);
+    const acc = pedidas.get(k) ?? {
+      categoriaId: u.categoriaId,
+      fechaId: u.fechaId,
+      nombre: u.categoria.nombre,
+      cupo: u.categoria.cupo,
+      cantidad: 0,
+    };
+    acc.cantidad += u.cantidad;
+    pedidas.set(k, acc);
+  }
+  if (!pedidas.size) return;
+  const lista = [...pedidas.values()];
+  const emitidas = await tx.entrada.groupBy({
+    by: ['categoriaId', 'fechaId'],
+    where: {
+      categoriaId: { in: [...new Set(lista.map((p) => p.categoriaId))] },
+      fechaId: { in: [...new Set(lista.map((p) => p.fechaId))] },
+    },
+    _count: { _all: true },
+  });
+  const ya = new Map(emitidas.map((e) => [claveDia(e.categoriaId, e.fechaId), e._count._all]));
+  for (const [k, p] of pedidas) {
+    const quedan = Math.max(0, p.cupo - (ya.get(k) ?? 0));
+    if (p.cantidad > quedan) {
+      throw new ConflictException(
+        `No quedan suficientes entradas "${p.nombre}" para ese día: se pidieron ${p.cantidad} y quedan ${quedan}.`,
+      );
+    }
+  }
+}
+
 /**
  * Las entradas para terceros (HU-011) quedan a nombre de la cuenta con ese correo, si existe.
  * Si la persona aún no tiene cuenta, la entrada se emite sin titular y no se asigna a ningún perfil.
@@ -190,12 +241,17 @@ async function resolverTitulares(tx: Tx, unidades: Array<{ paraEmail: string | n
 
 /** Toma `cantidad` códigos libres del pool de la categoría y los marca como asignados en el mismo paso. */
 async function reservarCodigos(tx: Tx, categoriaId: string, cantidad: number, nombre: string) {
-  const libres = await tx.ticketPool.findMany({
-    where: { categoriaId, estado: TICKET_ESTADO_DISPONIBLE, entrada: { is: null } },
-    orderBy: [{ createdAt: 'asc' }, { codigo: 'asc' }],
-    take: cantidad,
-    select: { id: true, codigo: true, codigoQr: true },
-  });
+  const buscarLibres = () =>
+    tx.ticketPool.findMany({
+      where: { categoriaId, estado: TICKET_ESTADO_DISPONIBLE, entrada: { is: null } },
+      orderBy: [{ createdAt: 'asc' }, { codigo: 'asc' }],
+      take: cantidad,
+      select: { id: true, codigo: true, codigoQr: true },
+    });
+  let libres = await buscarLibres();
+  if (libres.length < cantidad && (await completarPool(tx, categoriaId, cantidad - libres.length)) > 0) {
+    libres = await buscarLibres();
+  }
   if (libres.length < cantidad) {
     throw new ConflictException(
       `No quedan suficientes entradas "${nombre}": se pidieron ${cantidad} y hay ${libres.length} disponibles.`,

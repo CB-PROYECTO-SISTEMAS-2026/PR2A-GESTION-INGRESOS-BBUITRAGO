@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAllEventsAdmin } from '../../api/events.api'
-import { anularRecarga, getRecargasAdmin } from '../../api/recargas.api'
+import { anularRecarga, getRecargasAdmin, resolverIncidenciaRecarga } from '../../api/recargas.api'
 import { toast } from '../../components/Toast'
 import Modal from '../../components/ui/Modal'
 import { formatBs, formatDateTime, getErrorMessage } from '../../utils/format'
 import { estadoMovimientoBadge, estadoMovimientoLabel } from '../../utils/movimientos'
+import { INCIDENCIA_TEXTO_MAX, tipoIncidenciaLabel } from '../recargas/incidencias'
 
 const ESTADOS = [
   { value: '', label: 'Todas' },
@@ -16,14 +17,16 @@ const MOTIVO_MAX = 120
 /**
  * HU-047: el administrador general revisa las recargas de todos los eventos y anula las que se
  * hicieron por error. Solo él puede anular: el saldo vuelve a como estaba y queda el rastro.
+ * Los recargadores reportan incidencias desde su historial y aquí se resuelven.
  */
 export default function RecargasAdminPage() {
   const [eventos, setEventos] = useState([])
-  const [filtro, setFiltro] = useState({ eventoId: '', estado: '', desde: '', hasta: '' })
+  const [filtro, setFiltro] = useState({ eventoId: '', estado: '', incidencia: '', desde: '', hasta: '' })
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [anulando, setAnulando] = useState(null)
+  const [resolviendo, setResolviendo] = useState(null)
   const ultimaPeticion = useRef(0)
 
   useEffect(() => {
@@ -59,8 +62,21 @@ export default function RecargasAdminPage() {
       <h1 className="font-display text-3xl font-bold">Recargas de saldo</h1>
       <p className="mt-1 max-w-2xl text-sm text-muted">
         Recargas en efectivo hechas por los recargadores en los eventos. Si una recarga se hizo por error (monto o cliente
-        equivocado), anúlala: el monto se descuenta del saldo del cliente y queda registrado el motivo.
+        equivocado), anúlala: el monto se descuenta del saldo del cliente y queda registrado el motivo. Los problemas que
+        reportan los recargadores aparecen como incidencias.
       </p>
+
+      {data?.incidenciasAbiertas > 0 && filtro.incidencia !== 'ABIERTA' && (
+        <button
+          type="button"
+          className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+          onClick={() => cambiarFiltro({ incidencia: 'ABIERTA', estado: '' })}
+        >
+          {data.incidenciasAbiertas === 1
+            ? 'Hay 1 incidencia sin resolver · Ver'
+            : `Hay ${data.incidenciasAbiertas} incidencias sin resolver · Ver`}
+        </button>
+      )}
 
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <div className="flex gap-2" role="tablist" aria-label="Estado">
@@ -78,6 +94,19 @@ export default function RecargasAdminPage() {
               {e.label}
             </button>
           ))}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filtro.incidencia === 'ABIERTA'}
+            onClick={() => cambiarFiltro({ incidencia: filtro.incidencia === 'ABIERTA' ? '' : 'ABIERTA' })}
+            className={`rounded-md border px-3 py-2 text-sm font-semibold ${
+              filtro.incidencia === 'ABIERTA'
+                ? 'border-amber-400 bg-amber-50 text-ink'
+                : 'border-border bg-white text-muted hover:text-ink'
+            }`}
+          >
+            Con incidencia abierta
+          </button>
         </div>
         <label className="text-xs text-muted">
           Evento
@@ -158,13 +187,34 @@ export default function RecargasAdminPage() {
                     <td className="px-4 py-3">
                       <span className={`badge ${estadoMovimientoBadge(r.estado)}`}>{estadoMovimientoLabel(r.estado)}</span>
                       {r.estado === 'ANULADA' && r.nota && <p className="mt-1 max-w-xs text-xs text-muted">{r.nota}</p>}
+                      {r.incidencia && (
+                        <div
+                          className={`mt-2 max-w-xs rounded-md px-2 py-1.5 text-xs ${
+                            r.incidencia.abierta ? 'bg-amber-50 text-amber-900' : 'bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <p className="font-semibold">
+                            {r.incidencia.abierta ? 'Incidencia abierta' : 'Incidencia resuelta'} ·{' '}
+                            {tipoIncidenciaLabel(r.incidencia.tipo)}
+                          </p>
+                          <p className="mt-0.5">{r.incidencia.descripcion}</p>
+                          {r.incidencia.resolucion && <p className="mt-1">Resolución: {r.incidencia.resolucion}</p>}
+                        </div>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
-                      {r.estado === 'COMPLETADA' && (
-                        <button type="button" className="btn-secondary btn-sm text-red-700" onClick={() => setAnulando(r)}>
-                          Anular
-                        </button>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        {r.incidencia?.abierta && (
+                          <button type="button" className="btn-secondary btn-sm" onClick={() => setResolviendo(r)}>
+                            Resolver
+                          </button>
+                        )}
+                        {r.estado === 'COMPLETADA' && (
+                          <button type="button" className="btn-secondary btn-sm text-red-700" onClick={() => setAnulando(r)}>
+                            Anular
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -208,7 +258,107 @@ export default function RecargasAdminPage() {
           await cargar()
         }}
       />
+
+      <ResolverIncidenciaModal
+        recarga={resolviendo}
+        onClose={() => setResolviendo(null)}
+        onResuelta={async () => {
+          setResolviendo(null)
+          toast('Incidencia resuelta.', 'success')
+          await cargar()
+        }}
+      />
     </div>
+  )
+}
+
+function ResolverIncidenciaModal({ recarga, onClose, onResuelta }) {
+  const [resolucion, setResolucion] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  const cerrar = () => {
+    if (enviando) return
+    setResolucion('')
+    setError('')
+    onClose()
+  }
+
+  const enviar = async (e) => {
+    e.preventDefault()
+    if (resolucion.trim().length < 5) {
+      setError('Escribe cómo se resolvió (mínimo 5 caracteres).')
+      return
+    }
+    setEnviando(true)
+    setError('')
+    try {
+      await resolverIncidenciaRecarga(recarga.incidencia.id, resolucion.trim())
+      setResolucion('')
+      await onResuelta()
+    } catch (err) {
+      setError(getErrorMessage(err, 'No se pudo resolver la incidencia.'))
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={Boolean(recarga)}
+      onClose={cerrar}
+      title="Resolver incidencia"
+      size="sm"
+      labelledBy="resolver-incidencia-title"
+      footer={
+        <>
+          <button type="button" className="btn-secondary" onClick={cerrar} disabled={enviando}>
+            Cancelar
+          </button>
+          <button type="submit" form="form-resolver-incidencia" className="btn-primary" disabled={enviando}>
+            {enviando ? 'Guardando…' : 'Marcar como resuelta'}
+          </button>
+        </>
+      }
+    >
+      {recarga?.incidencia && (
+        <form id="form-resolver-incidencia" onSubmit={enviar} className="grid gap-4 px-6 py-5">
+          <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">
+              {tipoIncidenciaLabel(recarga.incidencia.tipo)} · reportada por {recarga.recargador}
+            </p>
+            <p className="mt-1">{recarga.incidencia.descripcion}</p>
+          </div>
+          <p className="text-sm text-muted">
+            Recarga <span className="font-mono">{recarga.codigo}</span> de{' '}
+            <strong className="text-ink">{formatBs(recarga.monto)}</strong> a {recarga.cliente}. Si hay que devolver el
+            saldo, usa <strong className="text-ink">Anular</strong>: la incidencia se cierra sola.
+          </p>
+          <div>
+            <label className="label" htmlFor="resolucion-incidencia">
+              Resolución *
+            </label>
+            <textarea
+              id="resolucion-incidencia"
+              className="input"
+              rows={3}
+              maxLength={INCIDENCIA_TEXTO_MAX}
+              placeholder="Ej.: se verificó con el cliente y la recarga es correcta"
+              value={resolucion}
+              onChange={(e) => setResolucion(e.target.value)}
+            />
+            <p className="mt-1 text-right text-xs text-muted">
+              {resolucion.length}/{INCIDENCIA_TEXTO_MAX}
+            </p>
+          </div>
+          {error && (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          )}
+        </form>
+      )}
+    </Modal>
   )
 }
 

@@ -20,7 +20,11 @@ import { formatNumber, validateInteger, validateMoney } from '../../utils/valida
 
 const MAX_BENEFICIOS = 20
 
-const emptyForm = { nombre: '', precio: '', cupo: '', beneficios: [] }
+const MAX_DESCUENTO = 100
+
+const emptyForm = { nombre: '', precio: '', descuento: '', cupo: '', beneficios: [] }
+
+const precioConDescuento = (precio, descuento) => (Number(precio) * (100 - (descuento || 0))) / 100
 
 export default function CategoriasPage() {
   const { id } = useParams()
@@ -56,10 +60,25 @@ export default function CategoriasPage() {
     }
   }, [load])
 
+  // El cupo de una categoría es por día y la capacidad también: en cada día, las categorías válidas
+  // ese día no pueden sumar más que la capacidad.
   const capacidad = evento?.capacidad ?? 0
-  const asignadas = items.reduce((sum, c) => sum + c.cupo, 0)
   const editing = items.find((c) => c.id === editingId) || null
-  const disponiblesParaForm = capacidad - asignadas + (editing?.cupo ?? 0)
+  const diasDe = (c) => (c.fechasDisponibles || []).filter((f) => f.disponible !== false).map((f) => f.fechaId)
+  const cuposPorDia = (excluirId) => {
+    const m = new Map(fechas.map((f) => [f.id, 0]))
+    for (const c of items) {
+      if (c.id === excluirId) continue
+      for (const f of diasDe(c)) m.set(f, (m.get(f) || 0) + c.cupo)
+    }
+    return m
+  }
+  const ocupacion = cuposPorDia()
+  const asignadas = Math.max(0, ...ocupacion.values())
+  const diasForm = multiDia ? (fechaIds.length ? fechaIds : fechas.map((f) => f.id)) : fechas.map((f) => f.id)
+  const ocupacionForm = cuposPorDia(editing?.id)
+  const disponiblesParaForm = capacidad - Math.max(0, ...diasForm.map((f) => ocupacionForm.get(f) || 0))
+  const diasCodigos = multiDia ? Math.max(1, fechaIds.length) : 1
 
   const setField = (name, value) => {
     setForm((f) => ({ ...f, [name]: value }))
@@ -79,6 +98,7 @@ export default function CategoriasPage() {
     setForm({
       nombre: c.nombre || '',
       precio: String(Number(c.precio)),
+      descuento: c.descuento ? String(c.descuento) : '',
       cupo: String(c.cupo),
       beneficios: asList(c.beneficios),
     })
@@ -93,14 +113,17 @@ export default function CategoriasPage() {
     if (form.nombre.trim().length < 2) next.nombre = 'El nombre debe tener al menos 2 caracteres.'
     const precioError = validateMoney(form.precio)
     if (precioError) next.precio = precioError
+    if (form.descuento !== '' && Number(form.descuento) > MAX_DESCUENTO) {
+      next.descuento = `El descuento debe ser un porcentaje entre 0 y ${MAX_DESCUENTO}.`
+    }
     const cupoError = validateInteger(form.cupo, { label: 'la cantidad de entradas' })
     if (cupoError) next.cupo = cupoError
     else if (Number(form.cupo) > disponiblesParaForm) {
       next.cupo =
         disponiblesParaForm > 0
-          ? `Solo quedan ${formatNumber(disponiblesParaForm)} entradas por asignar según la capacidad del evento.`
+          ? `Solo quedan ${formatNumber(disponiblesParaForm)} entradas por asignar${multiDia ? ' por día en los días elegidos' : ''} según la capacidad del evento.`
           : 'Ya se asignó toda la capacidad del evento. Aumenta la capacidad máxima o reduce otra categoría.'
-    } else if (editing && Number(form.cupo) < editing.codigosAsignados) {
+    } else if (!multiDia && editing && Number(form.cupo) < editing.codigosAsignados) {
       next.cupo = `Ya se vendieron ${formatNumber(editing.codigosAsignados)} entradas de esta categoría. La cantidad no puede ser menor.`
     }
     if (multiDia && !fechaIds.length) next.fechas = 'Selecciona al menos un día.'
@@ -117,11 +140,12 @@ export default function CategoriasPage() {
     if (Object.values(errs).some(Boolean)) return
 
     const cupo = Number(form.cupo)
-    if (editing && cupo < editing.cupo) {
-      const diferencia = editing.cupo - cupo
+    const codigosNuevos = cupo * diasCodigos
+    if (editing && codigosNuevos < editing.codigosTotal) {
+      const diferencia = editing.codigosTotal - codigosNuevos
       const ok = await confirmDialog({
         title: 'Reducir entradas',
-        message: `La categoría pasará de ${formatNumber(editing.cupo)} a ${formatNumber(cupo)} entradas. Se eliminarán ${formatNumber(diferencia)} códigos QR que aún no se vendieron.`,
+        message: `La categoría pasará de ${formatNumber(editing.codigosTotal)} a ${formatNumber(codigosNuevos)} códigos QR. Se eliminarán ${formatNumber(diferencia)} códigos que aún no se vendieron.`,
         confirmText: 'Guardar cambios',
         cancelText: 'Cancelar',
       })
@@ -131,6 +155,7 @@ export default function CategoriasPage() {
     const payload = {
       nombre: form.nombre.trim(),
       precio: form.precio,
+      descuento: form.descuento === '' ? 0 : Number(form.descuento),
       cupo,
       beneficios: form.beneficios,
       ...(multiDia ? { fechaIds } : {}),
@@ -142,7 +167,7 @@ export default function CategoriasPage() {
         toast('Categoría actualizada', 'success')
       } else {
         await createCategoria(id, payload)
-        toast(`Categoría creada con ${formatNumber(cupo)} códigos QR`, 'success')
+        toast(`Categoría creada con ${formatNumber(codigosNuevos)} códigos QR`, 'success')
       }
       resetForm()
       await load()
@@ -212,11 +237,15 @@ export default function CategoriasPage() {
         <section className="card-surface flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-8">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Capacidad máxima</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Capacidad máxima{multiDia ? ' por día' : ''}
+              </p>
               <p className="mt-1 font-display text-2xl font-bold text-ink">{formatNumber(capacidad)}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">En categorías</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                {multiDia ? 'Día con más entradas' : 'En categorías'}
+              </p>
               <p className="mt-1 font-display text-2xl font-bold text-ink">{formatNumber(asignadas)}</p>
             </div>
             <div>
@@ -265,7 +294,7 @@ export default function CategoriasPage() {
                   aria-invalid={Boolean(errors.precio)}
                 />
               </Field>
-              <Field label="Cantidad de entradas" htmlFor="cat-cupo" required error={errors.cupo}>
+              <Field label={multiDia ? 'Entradas por día' : 'Cantidad de entradas'} htmlFor="cat-cupo" required error={errors.cupo}>
                 <IntegerInput
                   id="cat-cupo"
                   value={form.cupo}
@@ -275,6 +304,28 @@ export default function CategoriasPage() {
                 />
               </Field>
             </div>
+            {multiDia && Number(form.cupo) > 0 && (
+              <p className="-mt-2 text-xs text-muted">
+                Se venden {formatNumber(Number(form.cupo))} entradas en cada día elegido
+                {fechaIds.length > 1 ? `: ${formatNumber(Number(form.cupo) * diasCodigos)} códigos QR en total.` : '.'}
+              </p>
+            )}
+
+            <Field label="Descuento (%)" htmlFor="cat-descuento" error={errors.descuento}>
+              <IntegerInput
+                id="cat-descuento"
+                value={form.descuento}
+                max={MAX_DESCUENTO}
+                placeholder="0"
+                onChange={(v) => setField('descuento', v)}
+                aria-invalid={Boolean(errors.descuento)}
+              />
+              {Number(form.descuento) > 0 && form.precio !== '' && (
+                <p className="mt-1 text-xs text-muted">
+                  El comprador pagará {formatBs(precioConDescuento(form.precio, Number(form.descuento)))} por entrada.
+                </p>
+              )}
+            </Field>
 
             <Field label="Beneficios" htmlFor="cat-beneficios" error={errors.beneficios}>
               <ListEditor
@@ -346,12 +397,23 @@ export default function CategoriasPage() {
                         <h3 className="font-display text-xl font-bold text-ink">{c.nombre}</h3>
                         {isEditing && <span className="text-xs font-semibold text-teal-dark">En edición</span>}
                       </div>
-                      <p className="mt-0.5 text-lg font-bold text-teal-dark">{formatBs(c.precio)}</p>
+                      {c.descuento > 0 ? (
+                        <p className="mt-0.5 flex flex-wrap items-baseline gap-2">
+                          <span className="text-lg font-bold text-teal-dark">
+                            {formatBs(precioConDescuento(c.precio, c.descuento))}
+                          </span>
+                          <span className="text-sm text-muted line-through">{formatBs(c.precio)}</span>
+                          <span className="badge bg-amber-100 text-amber-800">-{c.descuento}%</span>
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-lg font-bold text-teal-dark">{formatBs(c.precio)}</p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="font-display text-xl font-bold text-ink">{formatNumber(c.cupo)}</p>
                       <p className="text-xs font-semibold text-muted">
-                        entradas{c.codigosAsignados > 0 ? ` · ${formatNumber(c.codigosAsignados)} vendidas` : ''}
+                        {multiDia ? 'entradas por día' : 'entradas'}
+                        {c.codigosAsignados > 0 ? ` · ${formatNumber(c.codigosAsignados)} vendidas` : ''}
                       </p>
                     </div>
                   </div>

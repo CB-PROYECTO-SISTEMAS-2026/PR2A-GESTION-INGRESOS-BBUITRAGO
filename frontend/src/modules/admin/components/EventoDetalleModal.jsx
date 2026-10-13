@@ -147,10 +147,13 @@ export default function EventoDetalleModal({ eventoId, onClose }) {
                         <p className="font-semibold text-ink">{c.nombre}</p>
                         <p className="font-bold text-teal-dark">{formatBs(c.precio)}</p>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted">{formatNumber(c.cupo)} entradas</p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {formatNumber(c.cupo)} {fechas.length > 1 ? 'entradas por día' : 'entradas'}
+                      </p>
                       {fechas.length > 1 && (
                         <p className="mt-1 text-xs text-muted">
                           {(c.fechasDisponibles || [])
+                            .filter((fd) => fd.disponible !== false)
                             .map((fd) => formatDay(fechas.find((f) => f.id === fd.fechaId)?.fecha, { day: 'numeric', month: 'short' }))
                             .join(' · ')}
                         </p>

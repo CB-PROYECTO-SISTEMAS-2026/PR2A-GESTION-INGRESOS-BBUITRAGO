@@ -1,5 +1,7 @@
+import { EstadoIncidencia, TipoIncidenciaRecarga } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
+  IsEnum,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -20,6 +22,7 @@ import {
 } from '../../../common/validation/validators';
 import { IDEMPOTENCY_KEY_RE, RangoFechasDto } from '../../pos/dto/pos.dto';
 import {
+  INCIDENCIA_TEXTO_MAX,
   METODOS_PAGO,
   MOTIVO_ANULACION_MAX,
   RECARGA_MAX,
@@ -88,6 +91,12 @@ export class FiltroRecargasAdminDto extends HistorialRecargasDto {
   @IsIn(ESTADOS_RECARGA)
   estado?: (typeof ESTADOS_RECARGA)[number];
 
+  /** Solo recargas con una incidencia en ese estado. */
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsEnum(EstadoIncidencia)
+  incidencia?: EstadoIncidencia;
+
   @IsOptional()
   @Transform(toStrictInt)
   @IsInt()
@@ -105,4 +114,33 @@ export class AnularRecargaDto {
     message: `El motivo no puede superar ${MOTIVO_ANULACION_MAX} caracteres.`,
   })
   motivo: string;
+}
+
+export class ReportarIncidenciaDto {
+  @IsEnum(TipoIncidenciaRecarga, {
+    message: 'Elige qué tipo de problema tuvo la recarga.',
+  })
+  tipo: TipoIncidenciaRecarga;
+
+  @Transform(trimString)
+  @IsString()
+  @MinLength(5, {
+    message: 'Describe lo que pasó (mínimo 5 caracteres).',
+  })
+  @MaxLength(INCIDENCIA_TEXTO_MAX, {
+    message: `La descripción no puede superar ${INCIDENCIA_TEXTO_MAX} caracteres.`,
+  })
+  descripcion: string;
+}
+
+export class ResolverIncidenciaDto {
+  @Transform(trimString)
+  @IsString()
+  @MinLength(5, {
+    message: 'Escribe cómo se resolvió (mínimo 5 caracteres).',
+  })
+  @MaxLength(INCIDENCIA_TEXTO_MAX, {
+    message: `La resolución no puede superar ${INCIDENCIA_TEXTO_MAX} caracteres.`,
+  })
+  resolucion: string;
 }

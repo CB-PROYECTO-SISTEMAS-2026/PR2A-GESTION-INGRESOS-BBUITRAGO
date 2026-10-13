@@ -27,7 +27,7 @@ function Info({ icon: Icon, children }) {
 
 export default function EventDetailPage() {
   const { id } = useParams()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, hasRole } = useAuth()
   const [evento, setEvento] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -96,12 +96,17 @@ export default function EventDetailPage() {
               </Info>
               {evento.tipoAcceso && <Info icon={IconTicket}>Acceso: {tipoAccesoLabel(evento.tipoAcceso)}</Info>}
             </div>
-            {isAuthenticated ? (
+            {isAuthenticated && hasRole('CLIENTE') && categorias.length > 0 ? (
+              <Link to={`/eventos/${id}/comprar`} className="btn-primary">
+                <IconTicket />
+                Comprar entradas
+              </Link>
+            ) : isAuthenticated ? (
               <a href="#entradas" className="btn-primary">
                 Ver entradas
               </a>
             ) : (
-              <Link to={`/login?redirect=/eventos/${id}`} className="btn-primary">
+              <Link to={`/login?redirect=/eventos/${id}/comprar`} className="btn-primary">
                 Inicia sesión para comprar
               </Link>
             )}
@@ -142,6 +147,7 @@ export default function EventDetailPage() {
               const beneficios = asList(c.beneficios)
               const dias = multiDia
                 ? (c.fechasDisponibles || [])
+                    .filter((fd) => fd.disponible !== false)
                     .map((fd) => fechas.find((f) => f.id === fd.fechaId))
                     .filter(Boolean)
                 : []
@@ -149,7 +155,15 @@ export default function EventDetailPage() {
                 <div key={c.id} className="rounded-md border border-border p-4">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="font-semibold text-ink">{c.nombre}</p>
-                    <p className="font-bold text-teal-dark">{formatBs(c.precio)}</p>
+                    {c.descuento > 0 ? (
+                      <p className="flex flex-wrap items-baseline justify-end gap-x-2">
+                        <span className="text-xs text-muted line-through">{formatBs(c.precio)}</span>
+                        <span className="font-bold text-teal-dark">{formatBs((Number(c.precio) * (100 - c.descuento)) / 100)}</span>
+                        <span className="badge bg-amber-100 text-amber-800">-{c.descuento}%</span>
+                      </p>
+                    ) : (
+                      <p className="font-bold text-teal-dark">{formatBs(c.precio)}</p>
+                    )}
                   </div>
                   {dias.length > 0 && dias.length < fechas.length && (
                     <p className="mt-1 text-xs font-medium text-muted">

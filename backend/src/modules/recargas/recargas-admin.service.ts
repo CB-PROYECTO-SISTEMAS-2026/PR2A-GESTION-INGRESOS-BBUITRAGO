@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  EstadoIncidencia,
   EstadoTransaccion,
   Prisma,
   TipoTransaccionSaldo,
@@ -19,6 +20,7 @@ import {
   nombreCompleto,
 } from '../pos/pos-helpers';
 import { FiltroRecargasAdminDto } from './dto/recargas.dto';
+import { incidenciaDto, ULTIMA_INCIDENCIA } from './incidencias';
 
 const PAGE_SIZE = 50;
 const NOTA_MAX = 191;
@@ -47,6 +49,9 @@ export class RecargasAdminService {
       tipo: TipoTransaccionSaldo.RECARGA,
       ...(dto.eventoId ? { eventoId: dto.eventoId } : {}),
       ...(dto.estado ? { estado: dto.estado } : {}),
+      ...(dto.incidencia
+        ? { incidencias: { some: { estado: dto.incidencia } } }
+        : {}),
     };
     if (dto.desde || dto.hasta) {
       const range = resolveDayRange(this.timeZone, dto.desde, dto.hasta);
@@ -57,32 +62,37 @@ export class RecargasAdminService {
     // anuladas, no hay nada vigente que sumar.
     const soloAnuladas = dto.estado === EstadoTransaccion.ANULADA;
 
-    const [recargas, totalItems, completadas] = await Promise.all([
-      this.prisma.transaccionSaldo.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
-        select: {
-          id: true,
-          createdAt: true,
-          monto: true,
-          saldoResultante: true,
-          estado: true,
-          nota: true,
-          usuarioId: true,
-          operadorId: true,
-          eventoId: true,
-        },
-      }),
-      this.prisma.transaccionSaldo.count({ where }),
-      soloAnuladas
-        ? null
-        : this.prisma.transaccionSaldo.aggregate({
-            where: { ...where, estado: EstadoTransaccion.COMPLETADA },
-            _sum: { monto: true },
-          }),
-    ]);
+    const [recargas, totalItems, completadas, incidenciasAbiertas] =
+      await Promise.all([
+        this.prisma.transaccionSaldo.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * PAGE_SIZE,
+          take: PAGE_SIZE,
+          select: {
+            id: true,
+            createdAt: true,
+            monto: true,
+            saldoResultante: true,
+            estado: true,
+            nota: true,
+            usuarioId: true,
+            operadorId: true,
+            eventoId: true,
+            incidencias: ULTIMA_INCIDENCIA,
+          },
+        }),
+        this.prisma.transaccionSaldo.count({ where }),
+        soloAnuladas
+          ? null
+          : this.prisma.transaccionSaldo.aggregate({
+              where: { ...where, estado: EstadoTransaccion.COMPLETADA },
+              _sum: { monto: true },
+            }),
+        this.prisma.incidenciaRecarga.count({
+          where: { estado: EstadoIncidencia.ABIERTA },
+        }),
+      ]);
 
     const usuarioIds = [
       ...new Set(
@@ -109,6 +119,8 @@ export class RecargasAdminService {
       totalPages: Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
       /** Suma de las recargas vigentes que cumplen el filtro (todas las páginas). */
       totalRecargado: money(completadas?._sum.monto),
+      /** Incidencias reportadas por los recargadores que aún no se resolvieron (todas las recargas). */
+      incidenciasAbiertas,
       recargas: recargas.map((r) => ({
         id: r.id,
         codigo: codigoTransaccion(r.id),
@@ -120,8 +132,35 @@ export class RecargasAdminService {
         saldoResultante: money(r.saldoResultante),
         estado: r.estado,
         nota: r.nota,
+        incidencia: incidenciaDto(r.incidencias[0]),
       })),
     };
+  }
+
+  /** Cierra una incidencia reportada por un recargador indicando qué se hizo. */
+  async resolverIncidencia(adminId: string, id: string, resolucion: string) {
+    const cerrada = await this.prisma.incidenciaRecarga.updateMany({
+      where: { id, estado: EstadoIncidencia.ABIERTA },
+      data: {
+        estado: EstadoIncidencia.RESUELTA,
+        resolucion,
+        resueltaPorId: adminId,
+        resueltaAt: new Date(),
+      },
+    });
+    if (!cerrada.count) {
+      const existe = await this.prisma.incidenciaRecarga.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!existe) throw new NotFoundException('Incidencia no encontrada');
+      throw new ConflictException('Esta incidencia ya fue resuelta.');
+    }
+    const incidencia = await this.prisma.incidenciaRecarga.findUniqueOrThrow({
+      where: { id },
+      select: ULTIMA_INCIDENCIA.select,
+    });
+    return incidenciaDto(incidencia);
   }
 
   /**
@@ -214,6 +253,15 @@ export class RecargasAdminService {
             createdAt: fecha,
           },
         ],
+      });
+      await tx.incidenciaRecarga.updateMany({
+        where: { transaccionId: id, estado: EstadoIncidencia.ABIERTA },
+        data: {
+          estado: EstadoIncidencia.RESUELTA,
+          resolucion: `Recarga anulada: ${motivo}`,
+          resueltaPorId: adminId,
+          resueltaAt: fecha,
+        },
       });
       return saldo.saldo;
     }, ANULACION_TX_OPTIONS);

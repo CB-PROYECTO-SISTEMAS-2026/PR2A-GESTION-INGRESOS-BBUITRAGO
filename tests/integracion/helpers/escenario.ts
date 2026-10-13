@@ -68,9 +68,9 @@ export interface Escenario {
     noHabilitado: string;
   };
   codigos: {
-    /** QR digital de la entrada del cliente en el evento abierto. */
+    /** QR digital de una entrada del cliente en el evento abierto. */
     qr: string;
-    /** Manilla vinculada a esa misma entrada. */
+    /** Manilla vinculada a otra entrada del mismo cliente en el evento abierto. */
     manilla: string;
     /** Manilla del evento abierto que todavía no se vinculó a ninguna entrada. */
     manillaSinVincular: string;
@@ -164,9 +164,19 @@ async function crearEntrada(
   titularId: string,
   codigo: string,
   estado: EntradaEstado = EntradaEstado.ASIGNADA,
+  conQrDigital = true,
 ) {
   return prisma.entrada.create({
-    data: { eventoId, categoriaId, titularId, codigo, codigoQr: codigo, estado },
+    data: {
+      eventoId,
+      categoriaId,
+      titularId,
+      codigo,
+      codigoQr: codigo,
+      estado,
+      // Como en la emisión real (HU-055): el QR digital es una credencial con el mismo código.
+      ...(conQrDigital ? { credencial: { create: { codigoQr: codigo } } } : {}),
+    },
     select: { id: true },
   });
 }
@@ -255,7 +265,18 @@ export async function crearEscenario(prisma: PrismaService, sufijo: string): Pro
     qrCliente2: `PRUEBA-AUTO-${S}-QR-CLIENTE2`,
   };
   const categoria = abierto.categorias[0].id;
-  const entrada = await crearEntrada(prisma, abierto.id, categoria, cliente, codigos.qr);
+  // HU-015: una entrada con manilla vinculada ya no acepta su QR digital, así que el QR y la
+  // manilla del cliente son de dos entradas distintas (el saldo es el mismo: es por evento).
+  await crearEntrada(prisma, abierto.id, categoria, cliente, codigos.qr);
+  const entrada = await crearEntrada(
+    prisma,
+    abierto.id,
+    categoria,
+    cliente,
+    `PRUEBA-AUTO-${S}-ENTRADA-MANILLA`,
+    EntradaEstado.ASIGNADA,
+    false,
+  );
   await Promise.all([
     crearEntrada(prisma, abierto.id, categoria, cliente, codigos.entradaAnulada, EntradaEstado.ANULADA),
     crearEntrada(prisma, cerrado.id, cerrado.categorias[0].id, cliente, codigos.entradaOtroEvento),

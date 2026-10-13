@@ -3,6 +3,7 @@ import { EntradaEstado, Prisma } from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ACCESO_CON_MANILLA, emitirEntradasDeCompra, EMISION_TX_OPTIONS, ENTRADA_INVALIDA } from './entradas-emision';
+import { asignarEntradasDeTerceros } from '../compras/entradas-terceros';
 
 type Tx = Prisma.TransactionClient;
 
@@ -82,9 +83,16 @@ export class EntradasService {
 
     const credencial = await this.prisma.credencial.findUnique({
       where: { codigoQr: valor },
-      select: { activa: true, entradaId: true, entrada: { select: { eventoId: true } } },
+      select: {
+        activa: true,
+        entradaId: true,
+        entrada: { select: { eventoId: true, manilla: { select: { vinculada: true } } } },
+      },
     });
     if (credencial && credencial.entrada.eventoId === eventoId) {
+      if (credencial.entrada.manilla?.vinculada) {
+        throw new BadRequestException('Esta entrada ya tiene su manilla: escanea el QR de la manilla.');
+      }
       if (!credencial.activa) throw new BadRequestException('Este QR digital fue desactivado.');
       return this.entradaEscaneada(eventoId, credencial.entradaId, 'QR_DIGITAL');
     }
@@ -123,6 +131,7 @@ export class EntradasService {
 
   /** HU-055: entradas a nombre del usuario, con el QR que debe mostrar según el tipo de acceso. */
   async misEntradas(usuarioId: string) {
+    await asignarEntradasDeTerceros(this.prisma, usuarioId);
     const entradas = await this.prisma.entrada.findMany({
       where: { titularId: usuarioId },
       orderBy: { createdAt: 'desc' },
@@ -134,7 +143,7 @@ export class EntradasService {
   private async presentar(e: MiEntrada) {
     const vigente = !ENTRADA_INVALIDA.includes(e.estado);
     const manillaVinculada = Boolean(e.manilla?.vinculada);
-    const qrDigital = vigente && e.credencial?.activa ? e.credencial.codigoQr : null;
+    const qrDigital = vigente && !manillaVinculada && e.credencial?.activa ? e.credencial.codigoQr : null;
     const pendienteManilla = vigente && ACCESO_CON_MANILLA.includes(e.evento.tipoAcceso) && !manillaVinculada;
 
     // El QR digital sirve para moverse en el evento; sin él, el QR de la entrada solo identifica al
