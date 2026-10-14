@@ -12,10 +12,6 @@
  *
  * Lo usan las pruebas de integración (al empezar y al terminar) y scripts/limpiar-datos-prueba.js.
  */
-const path = require('path');
-
-const { Prisma } = require(path.resolve(__dirname, '../../../backend/node_modules/@prisma/client'));
-
 const MARCA = '[PRUEBA-AUTO]';
 const DOMINIO = '@pruebas.eventix.test';
 
@@ -48,13 +44,12 @@ async function buscarDatosPrueba(prisma, { sufijo, creadosAntesDe } = {}) {
   const E = eventos.map((e) => e.id);
   const U = usuarios.map((u) => u.id);
 
-  // SQL directo: la tabla Negocio de la base compartida es más nueva que el schema de esta rama.
   // Solo negocios cuyo dueño es un usuario de prueba Y cuyo nombre lleva la marca.
   const negocios = U.length
-    ? await prisma.$queryRaw(Prisma.sql`
-        SELECT id, nombre FROM Negocio
-        WHERE duenoId IN (${Prisma.join(U)}) AND nombre LIKE ${`${MARCA}%`}
-      `)
+    ? await prisma.negocio.findMany({
+        where: { duenoId: { in: U }, nombre: { startsWith: MARCA } },
+        select: { id: true, nombre: true },
+      })
     : [];
   const N = negocios.map((n) => n.id);
 
@@ -116,27 +111,16 @@ async function limpiarDatosPrueba(prisma, opciones = {}) {
       await tx.retiroGanancias.deleteMany({ where: f.retiros });
       await tx.manilla.deleteMany({ where: f.manillas });
       await tx.entrada.deleteMany({ where: f.entradas });
-      if (E.length || N.length) {
-        const condiciones = [];
-        if (E.length) condiciones.push(Prisma.sql`eventoId IN (${Prisma.join(E)})`);
-        if (N.length) condiciones.push(Prisma.sql`negocioId IN (${Prisma.join(N)})`);
-        await tx.$executeRaw(
-          Prisma.sql`DELETE FROM SolicitudNegocio WHERE ${Prisma.join(condiciones, ' OR ')}`,
-        );
-      }
+      await tx.solicitudNegocio.deleteMany({
+        where: { OR: [{ eventoId: { in: E } }, { negocioId: { in: N } }] },
+      });
       await tx.saldoEvento.deleteMany({ where: f.saldos });
       // Fechas, categorías y demás datos del evento se borran en cascada.
       await tx.evento.deleteMany({ where: { id: { in: E } } });
       // Productos, ayudantes y roles del negocio se borran en cascada.
-      if (N.length) {
-        await tx.$executeRaw(Prisma.sql`DELETE FROM Negocio WHERE id IN (${Prisma.join(N)})`);
-      }
+      await tx.negocio.deleteMany({ where: { id: { in: N } } });
       // Los ayudantes de prueba podrían estar en un negocio sin marca (no debería pasar).
-      if (U.length) {
-        await tx.$executeRaw(
-          Prisma.sql`DELETE FROM AyudanteNegocio WHERE usuarioId IN (${Prisma.join(U)})`,
-        );
-      }
+      await tx.ayudanteNegocio.deleteMany({ where: { usuarioId: { in: U } } });
       await tx.usuario.deleteMany({ where: { id: { in: U } } }); // roles en cascada
     },
     { maxWait: 20_000, timeout: 120_000 },

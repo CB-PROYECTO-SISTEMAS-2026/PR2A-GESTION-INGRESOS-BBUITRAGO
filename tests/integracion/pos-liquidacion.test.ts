@@ -68,7 +68,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventoEstado, Prisma, Role } from '@prisma/client';
+import { EventoEstado, Role } from '@prisma/client';
 import { PrismaService } from '../../backend/src/prisma/prisma.service';
 import { StorageService } from '../../backend/src/common/storage/storage.service';
 import { NegocioVentasService } from '../../backend/src/modules/pos/negocio-ventas.service';
@@ -420,9 +420,7 @@ describe('Rechazos y solicitudes simultáneas', () => {
     storage.remove.mockClear();
     storage.upload.mockImplementationOnce(async () => {
       // Mientras "sube" el archivo, otro administrador rechaza el retiro.
-      await prisma.$executeRaw(
-        Prisma.sql`UPDATE RetiroGanancias SET estado = 'RECHAZADO' WHERE id = ${pendiente.id}`,
-      );
+      await prisma.retiroGanancias.update({ where: { id: pendiente.id }, data: { estado: 'RECHAZADO' } });
       return { url: 'https://comprobantes.prueba.test/tarde.png', publicId: 'eventix/retiros/tarde', nombre: 'tarde.png' };
     });
 

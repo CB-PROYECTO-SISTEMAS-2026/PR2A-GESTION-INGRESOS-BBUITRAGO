@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InvitacionEstado, Prisma, Role } from '@prisma/client';
+import {
+  InvitacionEstado,
+  Prisma,
+  Role,
+  SolicitudNegocio_estado,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
@@ -171,14 +176,17 @@ export class AdminUsersService {
             },
           },
         },
-        negocios: {
-          orderBy: { createdAt: 'desc' },
-          take: RECIENTES,
+        negocio: {
           select: {
             id: true,
             nombre: true,
             activo: true,
-            evento: { select: { titulo: true } },
+            solicitudes: {
+              where: { estado: SolicitudNegocio_estado.ACEPTADA },
+              orderBy: { createdAt: 'desc' },
+              take: RECIENTES,
+              select: { evento: { select: { titulo: true } } },
+            },
             _count: { select: { productos: true, ayudantes: true } },
           },
         },
@@ -186,7 +194,6 @@ export class AdminUsersService {
           select: {
             solicitudes: true,
             eventosOrganizados: true,
-            negocios: true,
             compras: true,
             entradas: true,
           },
@@ -194,7 +201,31 @@ export class AdminUsersService {
       },
     });
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    return { ...user, roles: user.roles.map((r) => r.role) };
+    const { negocio, _count, ...rest } = user;
+    // El dueño tiene a lo sumo un negocio; se responde como lista para conservar el contrato.
+    const negocios = negocio
+      ? [
+          {
+            id: negocio.id,
+            nombre: negocio.nombre,
+            activo: negocio.activo,
+            evento: negocio.solicitudes.length
+              ? {
+                  titulo: negocio.solicitudes
+                    .map((s) => s.evento.titulo)
+                    .join(', '),
+                }
+              : null,
+            _count: negocio._count,
+          },
+        ]
+      : [];
+    return {
+      ...rest,
+      negocios,
+      _count: { ..._count, negocios: negocios.length },
+      roles: user.roles.map((r) => r.role),
+    };
   }
 
   /**

@@ -25,7 +25,7 @@
  *
  *  CÓDIGO PROBADO
  *    backend/src/modules/pos/pos.service.ts      (cobrar, consultarCliente, misVentas)
- *    backend/src/modules/pos/negocio-compat.ts   (stock y validaciones del negocio)
+ *    backend/src/modules/pos/negocio-consultas.ts (stock y validaciones del negocio)
  *    backend/src/modules/saldo/codigo-cliente.service.ts (identificación por QR o manilla)
  *
  *  CÓMO EJECUTARLA
@@ -52,8 +52,8 @@
  *
  *  SI FALLA
  *    - "Can't reach database server": revisa internet, backend/.env y backend/prisma/ca.pem.
- *    - "Unknown column": la base compartida cambió de estructura; revisa negocio-compat.ts y
- *      helpers/escenario.ts.
+ *    - "Unknown column" / "does not exist": la base compartida cambió de estructura; actualiza
+ *      backend/prisma/schema.prisma (npm run db:sync) y revisa helpers/escenario.ts.
  *    - Una regla de negocio: revisa pos.service.ts. Si el cambio fue intencional, actualiza la
  *      prueba.
  * ═══════════════════════════════════════════════════════════════════════════════════════════

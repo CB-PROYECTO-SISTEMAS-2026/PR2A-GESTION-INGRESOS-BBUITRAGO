@@ -7,11 +7,21 @@ import {
 } from '../../api/businesses.api'
 import { toast } from '../../components/Toast'
 import { confirmDelete } from '../../components/ui/ConfirmDialog'
-import { MoneyInput } from '../../components/form/NumberInputs'
+import { IntegerInput, MoneyInput } from '../../components/form/NumberInputs'
 import { formatBs, getErrorMessage } from '../../utils/format'
 import { validateMoney } from '../../utils/validation'
 
-const empty = { nombre: '', precio: '', descripcion: '' }
+const CATEGORIAS = [
+  ['COMIDA', 'Comida'],
+  ['BEBIDA', 'Bebida'],
+  ['SNACK', 'Snack'],
+  ['POSTRE', 'Postre'],
+  ['MERCHANDISING', 'Merchandising'],
+  ['OTRO', 'Otro'],
+]
+const MAX_STOCK = 100000
+
+const empty = { nombre: '', precio: '', descripcion: '', categoria: 'OTRO', stock: '' }
 
 export default function ProductosPage() {
   const [negocios, setNegocios] = useState([])
@@ -55,6 +65,8 @@ export default function ProductosPage() {
       nombre: p.nombre || '',
       precio: String(p.precio ?? ''),
       descripcion: p.descripcion || '',
+      categoria: p.categoria || 'OTRO',
+      stock: p.stock == null ? '' : String(p.stock),
     })
     setFormError('')
   }
@@ -76,6 +88,9 @@ export default function ProductosPage() {
       nombre: form.nombre.trim(),
       precio: form.precio,
       descripcion: form.descripcion.trim() || undefined,
+      categoria: form.categoria,
+      // Vacío = el producto no controla stock.
+      stock: form.stock === '' ? null : Number(form.stock),
     }
     try {
       if (editingId) {
@@ -161,6 +176,37 @@ export default function ProductosPage() {
             <MoneyInput id="producto-precio" value={form.precio} onChange={(v) => setForm({ ...form, precio: v })} />
           </div>
         </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="producto-categoria">
+              Categoría
+            </label>
+            <select
+              id="producto-categoria"
+              className="input"
+              value={form.categoria}
+              onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+            >
+              {CATEGORIAS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="producto-stock">
+              Stock
+            </label>
+            <IntegerInput
+              id="producto-stock"
+              value={form.stock}
+              max={MAX_STOCK}
+              placeholder="Sin control de stock"
+              onChange={(v) => setForm({ ...form, stock: v })}
+            />
+          </div>
+        </div>
         <div>
           <label className="label">Descripción</label>
           <input
@@ -181,6 +227,7 @@ export default function ProductosPage() {
             <tr>
               <th className="px-4 py-3">Producto</th>
               <th className="px-4 py-3">Precio</th>
+              <th className="px-4 py-3">Stock</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -192,6 +239,9 @@ export default function ProductosPage() {
                   {p.descripcion && <p className="text-xs text-muted">{p.descripcion}</p>}
                 </td>
                 <td className="px-4 py-3">{formatBs(p.precio)}</td>
+                <td className="px-4 py-3">
+                  {p.stock == null ? <span className="text-muted">—</span> : p.stock === 0 ? 'Agotado' : p.stock}
+                </td>
                 <td className="px-4 py-3 text-right space-x-3">
                   <button type="button" className="text-sm font-semibold text-teal" onClick={() => startEdit(p)}>
                     Editar
@@ -204,7 +254,7 @@ export default function ProductosPage() {
             ))}
             {!productos.length && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-muted">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted">
                   Sin productos en este negocio.
                 </td>
               </tr>

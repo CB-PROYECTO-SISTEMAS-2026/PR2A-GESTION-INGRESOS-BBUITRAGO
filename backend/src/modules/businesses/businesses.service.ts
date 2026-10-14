@@ -5,7 +5,12 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { InvitacionEstado, Role } from '@prisma/client';
+import {
+  AyudanteNegocio_estado,
+  InvitacionEstado,
+  Role,
+  SolicitudNegocio_estado,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
@@ -35,15 +40,20 @@ export class BusinessesService {
 
   async createNegocio(duenoId: string, dto: CreateNegocioDto) {
     await this.ensureEventoExiste(dto.eventoId);
-    return this.prisma.negocio.create({
-      data: {
-        duenoId,
-        nombre: dto.nombre.trim(),
-        descripcion: dto.descripcion?.trim() || null,
-        eventoId: dto.eventoId || null,
-      },
-      include: { productos: true, ayudantes: true },
-    });
+    return this.prisma.negocio
+      .create({
+        data: {
+          duenoId,
+          nombre: dto.nombre.trim(),
+          descripcion: dto.descripcion?.trim() || null,
+          eventoId: dto.eventoId || null,
+        },
+        include: { productos: true, ayudantes: true },
+      })
+      .catch((err) =>
+        // Negocio.duenoId es único: cada jefe de negocio tiene un solo negocio.
+        rethrowUniqueViolation(err, 'Ya tienes un negocio registrado.'),
+      );
   }
 
   private async ensureEventoExiste(eventoId?: string) {
@@ -60,7 +70,8 @@ export class BusinessesService {
     return this.prisma.negocio.findMany({
       where: { duenoId },
       include: {
-        productos: true,
+        // Los productos con ventas no se borran, se desactivan (ver deleteProducto).
+        productos: { where: { activo: true }, orderBy: { nombre: 'asc' } },
         ayudantes: {
           include: {
             usuario: {
@@ -69,6 +80,10 @@ export class BusinessesService {
           },
         },
         evento: { select: { id: true, titulo: true } },
+        solicitudes: {
+          where: { estado: SolicitudNegocio_estado.ACEPTADA },
+          select: { evento: { select: { id: true, titulo: true } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -103,6 +118,8 @@ export class BusinessesService {
         nombre: dto.nombre,
         precio: dto.precio,
         descripcion: dto.descripcion,
+        stock: dto.stock ?? null,
+        categoria: dto.categoria,
       },
     });
   }
@@ -124,7 +141,18 @@ export class BusinessesService {
     });
     if (!producto) throw new NotFoundException('Producto no encontrado');
     if (producto.negocio.duenoId !== duenoId) throw new ForbiddenException();
-    await this.prisma.producto.delete({ where: { id } });
+    // Un producto ya vendido sigue referenciado por el detalle de las ventas: se desactiva.
+    const vendido = await this.prisma.detalleVenta.count({
+      where: { productoId: id },
+    });
+    if (vendido) {
+      await this.prisma.producto.update({
+        where: { id },
+        data: { activo: false },
+      });
+    } else {
+      await this.prisma.producto.delete({ where: { id } });
+    }
     return { message: 'Producto eliminado' };
   }
 
@@ -169,6 +197,8 @@ export class BusinessesService {
             usuarioId: usuario.id,
             jefeId,
             rolFuncion: dto.rolFuncion?.trim() || 'cajero',
+            // El jefe crea la cuenta con contraseña: no hay invitación pendiente.
+            estado: AyudanteNegocio_estado.ACTIVO,
           },
           include: {
             usuario: {

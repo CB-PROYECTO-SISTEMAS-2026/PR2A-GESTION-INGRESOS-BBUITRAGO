@@ -109,13 +109,12 @@ Abren la aplicación real en **Microsoft Edge** (ya instalado en Windows; no se 
 | `e2e/01-pos.spec.ts` | 7 | Login del ayudante y punto de venta en el celular: cobro con manilla, comprobante, historial, saldo insuficiente, stock y código inexistente |
 | `e2e/02-panel-negocio.spec.ts` | 4 | Panel del dueño: dashboard, registro de ventas, CSV, solicitud de retiro y menú lateral en el celular |
 | `e2e/03-admin-retiros.spec.ts` | 3 | El administrador aprueba el retiro, el pago exige comprobante y el rechazo |
-| `e2e/04-navegacion.spec.ts` | 55 | Las pantallas de cada rol (incluido el recargador) en escritorio y celular, sin errores ni desbordes; rutas protegidas; menú móvil |
+| `e2e/04-navegacion.spec.ts` | 61 | Las pantallas de cada rol (incluido el recargador) en escritorio y celular, sin errores ni desbordes; rutas protegidas; menú móvil |
 | `e2e/05-recargas.spec.ts` | 9 | Módulo D: login del recargador, recarga en efectivo con la manilla, "Mis recargas", monto mínimo, "Mi Manilla" y movimientos del cliente (también en el celular), anulación por el admin, personal del evento y movimientos del evento |
 
 - Los archivos corren **en orden y de a uno** (01 → 05) porque comparten un escenario `[PRUEBA-AUTO]`: la venta de 01 aparece en el panel de 02, el retiro que pide 02 lo revisa el administrador en 03, y la recarga de 05 es la que el administrador anula después.
 - El escenario se crea al inicio (`e2e/setup/global-setup.ts`) y se borra al final, aunque las pruebas fallen. Las sesiones de cada rol se guardan en `e2e/.auth/` (ignorada por git), así las pruebas no repiten el login.
 - **No suben archivos a Cloudinary.**
-- Las 3 pantallas rotas conocidas (Mis Negocios, Productos y Ayudantes del jefe, pendientes del schema nuevo de negocios) aparecen como **"skipped"** (`test.fixme`). Cuando se arreglen, cámbialas a `test` en `04-navegacion.spec.ts`.
 - Si una prueba falla: `npm run test:e2e:reporte` muestra cada paso con capturas y peticiones de red, y `e2e-resultados/` guarda la captura del fallo.
 - Para usar Chromium en vez de Edge: `npx playwright install chromium` y la variable `PW_CHANNEL=chromium`.
 
@@ -178,7 +177,6 @@ tests/
 ## Notas técnicas
 
 - **Paquetes ESM de NestJS.** `@nestjs/jwt`, `@nestjs/config`, `@nestjs/passport` y `@nestjs/mapped-types` solo se publican como módulos ESM. `jest.config.js` los convierte a CommonJS para que Jest pueda cargarlos. Si el backend agrega otro paquete ESM y aparece el error `Must use import to load ES Module`, agrégalo a `transformIgnorePatterns`.
-- **Estructura nueva de negocios.** `helpers/escenario.ts` inserta Negocio, RolNegocio, AyudanteNegocio y SolicitudNegocio con SQL, porque la base compartida es más nueva que el `schema.prisma` de la rama. Cuando se integre el schema nuevo, cámbialos a `prisma.<modelo>.create()`.
 - **Validación igual a la de producción.** Las pruebas de validación usan `backend/src/common/validation/validation-pipe.options.ts`, la misma configuración que `main.ts`.
 - **API igual a la de producción.** La prueba de seguridad usa `backend/src/app.setup.ts` (helmet, CORS, límite de 1 MB, validación), la misma función que llama `main.ts`.
 - **Cuentas de prueba con contraseña.** La prueba de seguridad inicia sesión de verdad: sus usuarios (incluido un administrador de prueba) reciben una contraseña aleatoria distinta en cada ejecución, que nunca se muestra, y se borran al terminar.

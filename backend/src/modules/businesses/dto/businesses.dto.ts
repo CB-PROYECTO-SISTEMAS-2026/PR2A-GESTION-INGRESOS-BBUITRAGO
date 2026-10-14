@@ -1,6 +1,9 @@
 import { Transform } from 'class-transformer';
+import { Producto_categoria } from '@prisma/client';
 import {
   IsEmail,
+  IsEnum,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -14,9 +17,14 @@ import {
 import { PASSWORD_MESSAGE, PASSWORD_RULE } from '../../auth/dto/auth.dto';
 import {
   MAX_PRECIO,
+  toStrictInt,
   toStrictMoney,
 } from '../../../common/validation/validators';
 
+/** Tope de unidades en stock por producto. */
+export const MAX_STOCK = 100_000;
+
+const STOCK_MESSAGE = `El stock debe ser un número entero entre 0 y ${MAX_STOCK.toLocaleString('es-BO')}.`;
 const PRECIO_MESSAGE = `El precio debe ser un monto entre 0 y ${MAX_PRECIO.toLocaleString('es-BO')} Bs, con hasta 2 decimales.`;
 
 export class CreateNegocioDto {
@@ -71,6 +79,20 @@ export class CreateProductoDto {
   @IsString()
   @MaxLength(191)
   descripcion?: string;
+
+  /** Unidades disponibles; null o vacío = el producto no controla stock. */
+  @IsOptional()
+  @Transform(toStrictInt)
+  @IsInt({ message: STOCK_MESSAGE })
+  @Min(0, { message: STOCK_MESSAGE })
+  @Max(MAX_STOCK, { message: STOCK_MESSAGE })
+  stock?: number | null;
+
+  @IsOptional()
+  @IsEnum(Producto_categoria, {
+    message: 'La categoría del producto no es válida.',
+  })
+  categoria?: Producto_categoria;
 }
 
 export class UpdateProductoDto {
@@ -94,6 +116,20 @@ export class UpdateProductoDto {
   @IsString()
   @MaxLength(191)
   descripcion?: string;
+
+  /** Unidades disponibles; null o vacío = el producto no controla stock. */
+  @IsOptional()
+  @Transform(toStrictInt)
+  @IsInt({ message: STOCK_MESSAGE })
+  @Min(0, { message: STOCK_MESSAGE })
+  @Max(MAX_STOCK, { message: STOCK_MESSAGE })
+  stock?: number | null;
+
+  @IsOptional()
+  @IsEnum(Producto_categoria, {
+    message: 'La categoría del producto no es válida.',
+  })
+  categoria?: Producto_categoria;
 }
 
 export class CreateAyudanteDto {

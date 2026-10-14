@@ -40,12 +40,13 @@ model Usuario {
   liquidacionesAprobadas  LiquidacionEvento[]     @relation("AdminLiquidaciones")
   liquidacionesEntregadas LiquidacionEvento[]     @relation("EntregaLiquidaciones")
   manillasEntregadas      Manilla[]               @relation("SupervisorManillas")
-  negocios                Negocio[]
+  negocio                 Negocio?
   puntosRetiroAsignados   SupervisorPuntoRetiro[]
   resetTokens             PasswordResetToken[]
   reembolsos              ReembolsoEntrada[]
   saldosEvento            SaldoEvento[]
   solicitudes             SolicitudEvento[]       @relation("OrganizadorSolicitudes")
+  solicitudesNegocioResp  SolicitudNegocio[]
   staffAsignaciones       StaffEvento[]
   transaccionesOperadas   TransaccionSaldo[]      @relation("OperadorTransacciones")
   transaccionesSaldo      TransaccionSaldo[]      @relation("UsuarioTransacciones")
@@ -179,6 +180,7 @@ model Evento {
   negocios             Negocio[]
   puntosRetiro         PuntoRetiroManilla[]
   saldos               SaldoEvento[]
+  solicitudesNegocio   SolicitudNegocio[]
   staff                StaffEvento[]
   transacciones        TransaccionSaldo[]
   ventas               Venta[]
@@ -466,6 +468,7 @@ model AccesoRechazo {
   @@index([eventoId, fechaId])
   @@index([entradaId])
   @@index([encargadoId])
+  @@index([fechaId], map: "AccesoRechazo_fechaId_fkey")
 }
 
 model SaldoEvento {
@@ -536,54 +539,128 @@ model IncidenciaRecarga {
 }
 
 model Negocio {
-  id          String            @id @default(cuid())
-  duenoId     String
-  eventoId    String?
-  nombre      String
-  descripcion String?           @db.Text
-  activo      Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  ayudantes   AyudanteNegocio[]
-  dueno       Usuario           @relation(fields: [duenoId], references: [id])
-  evento      Evento?           @relation(fields: [eventoId], references: [id])
-  productos   Producto[]
-  retiros     RetiroGanancias[]
-  ventas      Venta[]
+  id                     String                @id @default(cuid())
+  duenoId                String                @unique
+  nombre                 String
+  descripcion            String?               @db.Text
+  activo                 Boolean               @default(true)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  ciudad                 String?
+  direccion              String?
+  emailContacto          String?
+  logoPublicId           String?
+  logoUrl                String?
+  matriculaComercio      String?
+  nit                    String?               @unique
+  razonSocial            String?
+  representanteDocumento String?
+  representanteNombre    String?
+  rubro                  Negocio_rubro?
+  telefono               String?
+  tipoSociedad           Negocio_tipoSociedad?
+  /// Columna anterior a SolicitudNegocio; la participación en eventos se lee de las solicitudes ACEPTADAS.
+  eventoId               String?
+  ayudantes              AyudanteNegocio[]
+  dueno                  Usuario               @relation(fields: [duenoId], references: [id])
+  evento                 Evento?               @relation(fields: [eventoId], references: [id])
+  productos              Producto[]
+  retiros                RetiroGanancias[]
+  roles                  RolNegocio[]
+  solicitudes            SolicitudNegocio[]
+  ventas                 Venta[]
 
-  @@index([duenoId], map: "Negocio_duenoId_fkey")
   @@index([eventoId], map: "Negocio_eventoId_fkey")
 }
 
+/// Participación de un negocio en un evento; el administrador la acepta o rechaza.
+model SolicitudNegocio {
+  id              String                  @id @default(cuid())
+  negocioId       String
+  eventoId        String
+  estado          SolicitudNegocio_estado @default(PENDIENTE)
+  mensaje         String?                 @db.Text
+  respuesta       String?                 @db.Text
+  respondidoPorId String?
+  respondidoAt    DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  evento          Evento                  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  negocio         Negocio                 @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  respondidoPor   Usuario?                @relation(fields: [respondidoPorId], references: [id])
+
+  @@index([eventoId, estado])
+  @@index([negocioId, eventoId])
+  @@index([respondidoPorId])
+}
+
 model Producto {
-  id          String         @id @default(cuid())
-  negocioId   String
-  nombre      String
-  precio      Decimal        @db.Decimal(10, 2)
-  descripcion String?
-  activo      Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  detalles    DetalleVenta[]
-  negocio     Negocio        @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  id           String             @id @default(cuid())
+  negocioId    String
+  nombre       String
+  precio       Decimal            @db.Decimal(10, 2)
+  descripcion  String?            @db.VarChar(500)
+  activo       Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  categoria    Producto_categoria @default(OTRO)
+  fotoPublicId String?
+  fotoUrl      String?
+  /// Unidades disponibles; null = el producto no controla stock.
+  stock        Int?
+  detalles     DetalleVenta[]
+  negocio      Negocio            @relation(fields: [negocioId], references: [id], onDelete: Cascade)
 
   @@index([negocioId], map: "Producto_negocioId_fkey")
 }
 
+/// Rol que el jefe de negocio define para sus ayudantes (p. ej. "Cajero").
+model RolNegocio {
+  id          String            @id @default(cuid())
+  negocioId   String
+  nombre      String            @db.VarChar(50)
+  descripcion String            @db.VarChar(255)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  ayudantes   AyudanteNegocio[]
+  negocio     Negocio           @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+
+  @@unique([negocioId, nombre])
+}
+
 model AyudanteNegocio {
-  id         String   @id @default(cuid())
-  negocioId  String
-  usuarioId  String   @unique
-  jefeId     String
-  rolFuncion String   @default("cajero")
-  activo     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  jefe       Usuario  @relation("JefeAyudantes", fields: [jefeId], references: [id])
-  negocio    Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id           String                 @id @default(cuid())
+  negocioId    String
+  usuarioId    String                 @unique
+  jefeId       String
+  createdAt    DateTime               @default(now())
+  /// Solo un ayudante ACTIVO puede cobrar en el POS.
+  estado       AyudanteNegocio_estado @default(PENDIENTE_INVITACION)
+  rolId        String?
+  activo       Boolean                @default(true)
+  rolFuncion   String                 @default("cajero")
+  jefe         Usuario                @relation("JefeAyudantes", fields: [jefeId], references: [id])
+  negocio      Negocio                @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  rol          RolNegocio?            @relation(fields: [rolId], references: [id], onDelete: Restrict)
+  usuario      Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  invitaciones InvitacionAyudante[]
 
   @@index([jefeId], map: "AyudanteNegocio_jefeId_fkey")
   @@index([negocioId], map: "AyudanteNegocio_negocioId_fkey")
+  @@index([rolId])
+}
+
+model InvitacionAyudante {
+  id         String                    @id @default(cuid())
+  ayudanteId String
+  tokenHash  String                    @unique
+  expiraAt   DateTime
+  aceptadaAt DateTime?
+  estado     InvitacionAyudante_estado @default(PENDIENTE)
+  createdAt  DateTime                  @default(now())
+  ayudante   AyudanteNegocio           @relation(fields: [ayudanteId], references: [id], onDelete: Cascade)
+
+  @@index([ayudanteId, estado])
 }
 
 model Venta {
@@ -769,4 +846,53 @@ enum ReembolsoEstado {
   APROBADO
   RECHAZADO
   PAGADO
+}
+
+// Los enums de negocios conservan el nombre que MySQL les da (Tabla_columna): así `npm run db:sync`
+// no los renombra y el código no se rompe.
+enum SolicitudNegocio_estado {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  CANCELADA
+}
+
+enum AyudanteNegocio_estado {
+  PENDIENTE_INVITACION
+  ACTIVO
+  INACTIVO
+}
+
+enum InvitacionAyudante_estado {
+  PENDIENTE
+  ACEPTADA
+  CANCELADA
+}
+
+enum Producto_categoria {
+  COMIDA
+  BEBIDA
+  SNACK
+  POSTRE
+  MERCHANDISING
+  OTRO
+}
+
+enum Negocio_rubro {
+  COMIDA
+  BEBIDAS
+  POSTRES_SNACKS
+  MERCHANDISING
+  ARTESANIA
+  SERVICIOS
+  OTRO
+}
+
+enum Negocio_tipoSociedad {
+  PERSONA_NATURAL
+  UNIPERSONAL
+  SRL
+  SA
+  COOPERATIVA
+  OTRO
 }

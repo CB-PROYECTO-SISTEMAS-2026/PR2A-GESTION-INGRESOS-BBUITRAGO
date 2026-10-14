@@ -13,12 +13,6 @@
  *    Es el "barrido" que se hizo a mano en el QA, ahora automático: detecta pantallas rotas
  *    (p. ej. por cambios en la base compartida) antes de que las vea el usuario.
  *
- *  PANTALLAS CONOCIDAS COMO ROTAS
- *    Mis Negocios, Productos y Ayudantes del jefe de negocio fallan (error 500) hasta que se
- *    integre el schema nuevo de negocios (código de Julio). Están marcadas con `test.fixme`:
- *    Playwright las muestra como pendientes, sin hacer fallar la ejecución. Cuando se arreglen,
- *    cambia `test.fixme` por `test` en PANTALLAS_ROTAS (más abajo).
- *
  *  CÓMO EJECUTARLA
  *    cd tests
  *    npm run test:e2e                         (todas las e2e, en orden)
@@ -41,17 +35,17 @@ const PANTALLAS: Record<RolE2E, string[]> = {
   cliente: ['/', '/eventos', '/perfil', '/mi-manilla'],
   organizador: ['/organizador/solicitudes', '/organizador/nueva-solicitud'],
   admin: ['/admin', '/admin/eventos', '/admin/solicitudes', '/admin/usuarios', '/admin/retiros', '/admin/recargas'],
-  jefe: ['/negocio/dashboard', '/negocio/ventas', '/negocio/liquidacion'],
+  jefe: [
+    '/negocio',
+    '/negocio/productos',
+    '/negocio/ayudantes',
+    '/negocio/dashboard',
+    '/negocio/ventas',
+    '/negocio/liquidacion',
+  ],
   ayudante: ['/pos', '/pos/historial'],
   recargador: ['/recargas', '/recargas/historial'],
 };
-
-/** Rotas hasta integrar el schema nuevo de negocios (ver el encabezado). */
-const PANTALLAS_ROTAS: [RolE2E, string][] = [
-  ['jefe', '/negocio'],
-  ['jefe', '/negocio/productos'],
-  ['jefe', '/negocio/ayudantes'],
-];
 
 for (const [nombreTamano, viewport] of Object.entries(TAMANOS)) {
   for (const [rol, rutas] of Object.entries(PANTALLAS) as [RolE2E, string[]][]) {
@@ -73,18 +67,6 @@ for (const [nombreTamano, viewport] of Object.entries(TAMANOS)) {
     });
   }
 }
-
-test.describe('Pantallas pendientes (schema nuevo de negocios)', () => {
-  test.use({ storageState: sesion('jefe') });
-  for (const [, ruta] of PANTALLAS_ROTAS) {
-    test.fixme(`${ruta} carga sin errores`, async ({ page }) => {
-      const errores = vigilarErrores(page);
-      await page.goto(ruta);
-      await page.waitForLoadState('networkidle');
-      expect(errores).toEqual([]);
-    });
-  }
-});
 
 test.describe('Rutas protegidas', () => {
   test.describe('sin sesión', () => {
