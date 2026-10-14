@@ -44,6 +44,11 @@ const ESTADO_BADGES = {
   ACEPTADA: 'bg-emerald-100 text-emerald-800',
   CANCELADA: 'bg-red-100 text-red-700',
   EXPIRADA: 'bg-slate-200 text-slate-600',
+  GENERADA: 'bg-amber-100 text-amber-800',
+  ASIGNADA: 'bg-emerald-100 text-emerald-800',
+  USADA: 'bg-indigo-100 text-indigo-800',
+  REEMBOLSADA: 'bg-slate-200 text-slate-600',
+  ANULADA: 'bg-red-100 text-red-700',
 }
 
 const MAPA_CAMBIO_LABELS = {

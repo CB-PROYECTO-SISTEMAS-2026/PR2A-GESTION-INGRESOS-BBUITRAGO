@@ -18,6 +18,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import { MailService } from '../../common/mail/mail.service';
 import {
+  cuposPorDia,
+  POOL_TX_TIMEOUT_MS,
+  sincronizarPool,
+} from '../tickets/cupos';
+import {
   CreateEventoDto,
   CreateSolicitudDto,
   RevisarSolicitudDto,
@@ -349,10 +354,28 @@ export class EventsService {
           orderBy: { fecha: 'asc' },
           include: { _count: { select: { entradas: true, accesos: true } } },
         },
-        categorias: { select: { cupo: true } },
+        categorias: {
+          select: {
+            cupo: true,
+            fechasDisponibles: {
+              where: { disponible: true },
+              select: { fechaId: true },
+            },
+          },
+        },
+        _count: { select: { entradas: true } },
       },
     });
     if (!evento) throw new NotFoundException('Evento no encontrado');
+    if (
+      dto.tipoAcceso !== undefined &&
+      dto.tipoAcceso !== evento.tipoAcceso &&
+      evento._count.entradas > 0
+    ) {
+      throw new BadRequestException(
+        'No puedes cambiar el tipo de acceso porque el evento ya tiene entradas emitidas con el tipo actual.',
+      );
+    }
 
     const {
       fechaInicio,
@@ -393,10 +416,10 @@ export class EventsService {
       }
     }
 
-    const totalCupos = evento.categorias.reduce((sum, c) => sum + c.cupo, 0);
-    if (fields.capacidad !== undefined && fields.capacidad < totalCupos) {
+    const maxPorDia = Math.max(0, ...cuposPorDia(evento.categorias).values());
+    if (fields.capacidad !== undefined && fields.capacidad < maxPorDia) {
       throw new BadRequestException(
-        `Las categorías ya suman ${totalCupos.toLocaleString('es-BO')} entradas. La capacidad máxima no puede ser menor.`,
+        `Las categorías ya suman ${maxPorDia.toLocaleString('es-BO')} entradas${evento.fechas.length > 1 ? ' en un mismo día' : ''}. La capacidad máxima no puede ser menor.`,
       );
     }
 
@@ -440,18 +463,30 @@ export class EventsService {
         : {}),
     };
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      await tx.evento.update({ where: { id }, data });
-      if (schedule) await this.syncFechas(tx, id, evento.fechas, schedule);
-      return tx.evento.findUniqueOrThrow({
-        where: { id },
-        include: {
-          fechas: { orderBy: { fecha: 'asc' } },
-          categorias: true,
-          organizador: { select: organizadorSelect },
-        },
-      });
-    });
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.evento.update({ where: { id }, data });
+        if (
+          schedule &&
+          (await this.syncFechas(tx, id, evento.fechas, schedule))
+        ) {
+          await this.ajustarCuposPorDia(
+            tx,
+            id,
+            fields.capacidad ?? evento.capacidad,
+          );
+        }
+        return tx.evento.findUniqueOrThrow({
+          where: { id },
+          include: {
+            fechas: { orderBy: { fecha: 'asc' } },
+            categorias: true,
+            organizador: { select: organizadorSelect },
+          },
+        });
+      },
+      { timeout: POOL_TX_TIMEOUT_MS },
+    );
 
     if (
       evento.estado !== EventoEstado.PUBLICADO &&
@@ -472,8 +507,38 @@ export class EventsService {
   }
 
   /**
+   * El cupo de cada categoría es por día: al agregar o quitar días del evento, cada pool de códigos
+   * se ajusta y ningún día puede superar la capacidad del evento.
+   */
+  private async ajustarCuposPorDia(
+    tx: Prisma.TransactionClient,
+    eventoId: string,
+    capacidad: number | null,
+  ) {
+    const categorias = await tx.categoriaEntrada.findMany({
+      where: { eventoId },
+      select: {
+        id: true,
+        cupo: true,
+        fechasDisponibles: {
+          where: { disponible: true },
+          select: { fechaId: true },
+        },
+      },
+    });
+    const maxPorDia = Math.max(0, ...cuposPorDia(categorias).values());
+    if (capacidad && maxPorDia > capacidad) {
+      throw new BadRequestException(
+        `Los días nuevos quedan a la venta en todas las categorías y sumarían ${maxPorDia.toLocaleString('es-BO')} entradas en un mismo día, más que la capacidad (${capacidad.toLocaleString('es-BO')}). Aumenta la capacidad o ajusta las categorías.`,
+      );
+    }
+    for (const c of categorias) await sincronizarPool(tx, c.id);
+  }
+
+  /**
    * Deja en FechaEvento exactamente los días del rango: actualiza horarios,
    * crea los días nuevos (disponibles para todas las categorías) y elimina los que salen del rango.
+   * Devuelve true si se agregaron o quitaron días.
    */
   private async syncFechas(
     tx: Prisma.TransactionClient,
@@ -517,7 +582,7 @@ export class EventsService {
 
     const existing = new Set(keep.map((f) => dateToDay(f.fecha)));
     const newDays = schedule.days.filter((d) => !existing.has(d));
-    if (!newDays.length) return;
+    if (!newDays.length) return toRemove.length > 0;
 
     await tx.fechaEvento.createMany({
       data: newDays.map((day) => ({
@@ -549,6 +614,7 @@ export class EventsService {
         skipDuplicates: true,
       });
     }
+    return true;
   }
 
   async updateFoto(id: string, foto: Express.Multer.File | undefined) {
@@ -622,9 +688,17 @@ export class EventsService {
           id: true,
           nombre: true,
           precio: true,
+          descuento: true,
           beneficios: true,
           cupo: true,
-          ...(withAvailability ? { fechasDisponibles: true } : {}),
+          ...(withAvailability
+            ? {
+                fechasDisponibles: {
+                  where: { disponible: true },
+                  select: { fechaId: true },
+                },
+              }
+            : {}),
         },
       },
     } satisfies Prisma.EventoSelect;

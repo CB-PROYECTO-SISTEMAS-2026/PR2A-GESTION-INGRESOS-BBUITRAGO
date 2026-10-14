@@ -16,6 +16,10 @@ import { EventsModule } from './modules/events/events.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { BusinessesModule } from './modules/businesses/businesses.module';
 import { AdminUsersModule } from './modules/admin-users/admin-users.module';
+import { EntradasModule } from './modules/entradas/entradas.module';
+import { ManillasModule } from './modules/manillas/manillas.module';
+import { ComprasModule } from './modules/compras/compras.module';
+import { AccesoModule } from './modules/acceso/acceso.module';
 import { PosModule } from './modules/pos/pos.module';
 import { SaldoModule } from './modules/saldo/saldo.module';
 import { RecargasModule } from './modules/recargas/recargas.module';
@@ -44,6 +48,10 @@ import { PersonalEventoModule } from './modules/personal-evento/personal-evento.
     TicketsModule,
     BusinessesModule,
     AdminUsersModule,
+    EntradasModule,
+    ManillasModule,
+    ComprasModule,
+    AccesoModule,
     PosModule,
     SaldoModule,
     RecargasModule,

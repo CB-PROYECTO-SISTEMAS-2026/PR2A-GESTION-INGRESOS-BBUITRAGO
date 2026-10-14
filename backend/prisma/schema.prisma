@@ -8,44 +8,49 @@ datasource db {
 }
 
 model Usuario {
-  id                      String               @id @default(cuid())
-  email                   String               @unique
+  id                      String                  @id @default(cuid())
+  email                   String                  @unique
   passwordHash            String
   nombre                  String
   apellido                String?
   /// Forma canónica (ver normalizePhone); único para evitar cuentas duplicadas.
-  telefono                String?              @unique
+  telefono                String?                 @unique
   /// Forma canónica (ver normalizeDocument); único para evitar cuentas duplicadas.
-  documento               String?              @unique
+  documento               String?                 @unique
   fechaNac                DateTime?
   fotoUrl                 String?
   fotoPublicId            String?
   preferencias            Json?
-  activo                  Boolean              @default(true)
+  activo                  Boolean                 @default(true)
   /// Baja realizada por un administrador; la fila se conserva por el historial de eventos y compras.
   eliminadoAt             DateTime?
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  accesosRegistrados      AccesoEvento[]       @relation("EncargadoAccesos")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  accesosRegistrados      AccesoEvento[]          @relation("EncargadoAccesos")
+  accesosRechazados       AccesoRechazo[]         @relation("EncargadoRechazos")
   archivos                Archivo[]
-  ayudantesCreados        AyudanteNegocio[]    @relation("JefeAyudantes")
+  ayudantesCreados        AyudanteNegocio[]       @relation("JefeAyudantes")
   ayudanteDe              AyudanteNegocio?
   compras                 CompraEntrada[]
-  entradas                Entrada[]            @relation("TitularEntrada")
-  eventosOrganizados      Evento[]             @relation("OrganizadorEventos")
-  invitacionesCreadas     InvitacionUsuario[]  @relation("InvitacionesCreadas")
-  liquidacionesAprobadas  LiquidacionEvento[]  @relation("AdminLiquidaciones")
-  liquidacionesEntregadas LiquidacionEvento[]  @relation("EntregaLiquidaciones")
+  entradas                Entrada[]               @relation("TitularEntrada")
+  eventosOrganizados      Evento[]                @relation("OrganizadorEventos")
+  incidenciasReportadas   IncidenciaRecarga[]     @relation("RecargadorIncidencias")
+  incidenciasResueltas    IncidenciaRecarga[]     @relation("IncidenciasResueltas")
+  invitacionesCreadas     InvitacionUsuario[]     @relation("InvitacionesCreadas")
+  liquidacionesAprobadas  LiquidacionEvento[]     @relation("AdminLiquidaciones")
+  liquidacionesEntregadas LiquidacionEvento[]     @relation("EntregaLiquidaciones")
+  manillasEntregadas      Manilla[]               @relation("SupervisorManillas")
   negocios                Negocio[]
+  puntosRetiroAsignados   SupervisorPuntoRetiro[]
   resetTokens             PasswordResetToken[]
   reembolsos              ReembolsoEntrada[]
   saldosEvento            SaldoEvento[]
-  solicitudes             SolicitudEvento[]    @relation("OrganizadorSolicitudes")
+  solicitudes             SolicitudEvento[]       @relation("OrganizadorSolicitudes")
   staffAsignaciones       StaffEvento[]
-  transaccionesOperadas   TransaccionSaldo[]   @relation("OperadorTransacciones")
-  transaccionesSaldo      TransaccionSaldo[]   @relation("UsuarioTransacciones")
+  transaccionesOperadas   TransaccionSaldo[]      @relation("OperadorTransacciones")
+  transaccionesSaldo      TransaccionSaldo[]      @relation("UsuarioTransacciones")
   roles                   UsuarioRol[]
-  ventasRealizadas        Venta[]              @relation("AyudanteVentas")
+  ventasRealizadas        Venta[]                 @relation("AyudanteVentas")
 }
 
 /// Cuenta pendiente creada por un admin; el Usuario solo existe cuando el invitado acepta.
@@ -153,15 +158,21 @@ model Evento {
   capacidad            Int?
   puntoRetiroManilla   String?
   horarioRetiroManilla String?
+  /// QR al que se transfiere el pago de las entradas (HU-012).
+  qrPagoUrl            String?              @db.VarChar(500)
+  qrPagoPublicId       String?
+  instruccionesPago    String?              @db.Text
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   accesos              AccesoEvento[]
+  accesosRechazados    AccesoRechazo[]
   categorias           CategoriaEntrada[]
   compras              CompraEntrada[]
   entradas             Entrada[]
   organizador          Usuario              @relation("OrganizadorEventos", fields: [organizadorId], references: [id])
   solicitud            SolicitudEvento?     @relation(fields: [solicitudId], references: [id])
   fechas               FechaEvento[]
+  incidenciasRecarga   IncidenciaRecarga[]
   liquidacion          LiquidacionEvento?
   manillas             Manilla[]
   mapHistory           MapaHistorial[]
@@ -182,6 +193,7 @@ model FechaEvento {
   horaInicio String           @db.VarChar(5)
   horaFin    String           @db.VarChar(5)
   accesos    AccesoEvento[]
+  rechazos   AccesoRechazo[]
   categorias CategoriaFecha[]
   entradas   Entrada[]
   evento     Evento           @relation(fields: [eventoId], references: [id], onDelete: Cascade)
@@ -194,6 +206,8 @@ model CategoriaEntrada {
   eventoId          String
   nombre            String
   precio            Decimal             @db.Decimal(10, 2)
+  /// Porcentaje de descuento sobre el precio (0 = sin descuento).
+  descuento         Int                 @default(0)
   /// Lista de beneficios: ["Acceso preferencial", ...]
   beneficios        Json?
   /// Entradas disponibles; el pool de códigos QR se mantiene con este mismo tamaño.
@@ -273,16 +287,21 @@ model CompraEntrada {
 }
 
 model CompraEntradaItem {
-  id          String           @id @default(cuid())
-  compraId    String
-  categoriaId String
-  fechaId     String?
-  cantidad    Int              @default(1)
-  precioUnit  Decimal          @db.Decimal(10, 2)
-  paraNombre  String?
-  paraEmail   String?
-  categoria   CategoriaEntrada @relation(fields: [categoriaId], references: [id])
-  compra      CompraEntrada    @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  id           String           @id @default(cuid())
+  compraId     String
+  categoriaId  String
+  fechaId      String?
+  cantidad     Int              @default(1)
+  precioUnit   Decimal          @db.Decimal(10, 2)
+  /// Entrada para un tercero (HU-011): siempre de una unidad, con sus datos de contacto.
+  paraNombre   String?
+  paraEmail    String?
+  paraTelefono String?
+  /// Entrada emitida para el tercero al aprobar la compra; permite asignársela cuando cree su cuenta.
+  entradaId    String?          @unique
+  categoria    CategoriaEntrada @relation(fields: [categoriaId], references: [id])
+  compra       CompraEntrada    @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  entrada      Entrada?         @relation(fields: [entradaId], references: [id], onDelete: SetNull)
 
   @@index([categoriaId], map: "CompraEntradaItem_categoriaId_fkey")
   @@index([compraId], map: "CompraEntradaItem_compraId_fkey")
@@ -299,28 +318,30 @@ model PagoQR {
 }
 
 model Entrada {
-  id           String            @id @default(cuid())
+  id           String             @id @default(cuid())
   compraId     String?
   eventoId     String
   categoriaId  String
   fechaId      String?
   titularId    String?
-  ticketPoolId String?           @unique
-  codigoQr     String            @unique
-  codigo       String            @unique
-  estado       EntradaEstado     @default(GENERADA)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  ticketPoolId String?            @unique
+  codigoQr     String             @unique
+  codigo       String             @unique
+  estado       EntradaEstado      @default(GENERADA)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
   accesos      AccesoEvento[]
+  rechazos     AccesoRechazo[]
   credencial   Credencial?
-  categoria    CategoriaEntrada  @relation(fields: [categoriaId], references: [id])
-  compra       CompraEntrada?    @relation(fields: [compraId], references: [id])
-  evento       Evento            @relation(fields: [eventoId], references: [id])
-  fecha        FechaEvento?      @relation(fields: [fechaId], references: [id])
-  ticketPool   TicketPool?       @relation(fields: [ticketPoolId], references: [id])
-  titular      Usuario?          @relation("TitularEntrada", fields: [titularId], references: [id])
+  categoria    CategoriaEntrada   @relation(fields: [categoriaId], references: [id])
+  compra       CompraEntrada?     @relation(fields: [compraId], references: [id])
+  evento       Evento             @relation(fields: [eventoId], references: [id])
+  fecha        FechaEvento?       @relation(fields: [fechaId], references: [id])
+  ticketPool   TicketPool?        @relation(fields: [ticketPoolId], references: [id])
+  titular      Usuario?           @relation("TitularEntrada", fields: [titularId], references: [id])
   manilla      Manilla?
   reembolso    ReembolsoEntrada?
+  itemCompra   CompraEntradaItem?
 
   @@index([categoriaId], map: "Entrada_categoriaId_fkey")
   @@index([compraId], map: "Entrada_compraId_fkey")
@@ -355,35 +376,55 @@ model Credencial {
 }
 
 model Manilla {
-  id            String              @id @default(cuid())
-  eventoId      String
-  entradaId     String?             @unique
-  credencialId  String?             @unique
-  codigoFisico  String
-  vinculada     Boolean             @default(false)
-  vinculadaAt   DateTime?
-  puntoRetiroId String?
-  createdAt     DateTime            @default(now())
-  credencial    Credencial?         @relation(fields: [credencialId], references: [id])
-  entrada       Entrada?            @relation(fields: [entradaId], references: [id])
-  evento        Evento              @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  puntoRetiro   PuntoRetiroManilla? @relation(fields: [puntoRetiroId], references: [id])
+  id             String              @id @default(cuid())
+  eventoId       String
+  entradaId      String?             @unique
+  credencialId   String?             @unique
+  codigoFisico   String
+  vinculada      Boolean             @default(false)
+  vinculadaAt    DateTime?
+  puntoRetiroId  String?
+  /// Supervisor que entregó la manilla y confirmó la vinculación (HU-015, HU-053).
+  entregadaPorId String?
+  createdAt      DateTime            @default(now())
+  credencial     Credencial?         @relation(fields: [credencialId], references: [id])
+  entrada        Entrada?            @relation(fields: [entradaId], references: [id])
+  entregadaPor   Usuario?            @relation("SupervisorManillas", fields: [entregadaPorId], references: [id])
+  evento         Evento              @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  puntoRetiro    PuntoRetiroManilla? @relation(fields: [puntoRetiroId], references: [id])
 
   @@unique([eventoId, codigoFisico])
+  @@index([entregadaPorId], map: "Manilla_entregadaPorId_fkey")
   @@index([puntoRetiroId], map: "Manilla_puntoRetiroId_fkey")
 }
 
 model PuntoRetiroManilla {
-  id        String    @id @default(cuid())
-  eventoId  String
-  nombre    String
-  ubicacion String?
-  horario   String?
-  activo    Boolean   @default(true)
-  manillas  Manilla[]
-  evento    Evento    @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  id           String                  @id @default(cuid())
+  eventoId     String
+  nombre       String
+  ubicacion    String?
+  horario      String?
+  activo       Boolean                 @default(true)
+  manillas     Manilla[]
+  evento       Evento                  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  supervisores SupervisorPuntoRetiro[]
 
   @@index([eventoId], map: "PuntoRetiroManilla_eventoId_fkey")
+}
+
+/// Supervisores (rol ENCARGADO_ACCESO) que entregan manillas en un punto. Quitar a alguien
+/// lo desactiva y conserva la fila, porque sus entregas pasadas siguen apuntando a él.
+model SupervisorPuntoRetiro {
+  id            String             @id @default(cuid())
+  puntoRetiroId String
+  usuarioId     String
+  activo        Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  puntoRetiro   PuntoRetiroManilla @relation(fields: [puntoRetiroId], references: [id], onDelete: Cascade)
+  usuario       Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([puntoRetiroId, usuarioId])
+  @@index([usuarioId], map: "SupervisorPuntoRetiro_usuarioId_fkey")
 }
 
 model AccesoEvento {
@@ -404,6 +445,27 @@ model AccesoEvento {
   @@index([entradaId], map: "AccesoEvento_entradaId_fkey")
   @@index([eventoId], map: "AccesoEvento_eventoId_fkey")
   @@index([fechaId], map: "AccesoEvento_fechaId_fkey")
+}
+
+/// HU-046: el supervisor vio que la persona no coincide con la foto del primer ingreso y no la dejó pasar.
+model AccesoRechazo {
+  id          String       @id @default(cuid())
+  eventoId    String
+  entradaId   String
+  fechaId     String?
+  encargadoId String?
+  /// Puerta en la que se rechazó: ENTRADA o SALIDA.
+  sentido     String       @db.VarChar(10)
+  motivo      String?      @db.VarChar(300)
+  createdAt   DateTime     @default(now())
+  encargado   Usuario?     @relation("EncargadoRechazos", fields: [encargadoId], references: [id], onDelete: SetNull)
+  entrada     Entrada      @relation(fields: [entradaId], references: [id], onDelete: Cascade)
+  evento      Evento       @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  fecha       FechaEvento? @relation(fields: [fechaId], references: [id], onDelete: SetNull)
+
+  @@index([eventoId, fechaId])
+  @@index([entradaId])
+  @@index([encargadoId])
 }
 
 model SaldoEvento {
@@ -439,12 +501,38 @@ model TransaccionSaldo {
   saldoEvento     SaldoEvento          @relation(fields: [saldoEventoId], references: [id], onDelete: Cascade)
   usuario         Usuario              @relation("UsuarioTransacciones", fields: [usuarioId], references: [id])
   venta           Venta?               @relation(fields: [ventaId], references: [id])
+  incidencias     IncidenciaRecarga[]
 
   @@index([eventoId], map: "TransaccionSaldo_eventoId_fkey")
   @@index([operadorId], map: "TransaccionSaldo_operadorId_fkey")
   @@index([saldoEventoId], map: "TransaccionSaldo_saldoEventoId_fkey")
   @@index([usuarioId], map: "TransaccionSaldo_usuarioId_fkey")
   @@index([ventaId], map: "TransaccionSaldo_ventaId_fkey")
+}
+
+/// HU-047: problema con una recarga reportado por el recargador; el administrador lo revisa y lo resuelve.
+model IncidenciaRecarga {
+  id            String                @id @default(cuid())
+  transaccionId String
+  eventoId      String
+  recargadorId  String
+  tipo          TipoIncidenciaRecarga
+  descripcion   String                @db.VarChar(500)
+  estado        EstadoIncidencia      @default(ABIERTA)
+  resolucion    String?               @db.VarChar(500)
+  resueltaPorId String?
+  resueltaAt    DateTime?
+  createdAt     DateTime              @default(now())
+  evento        Evento                @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  recargador    Usuario               @relation("RecargadorIncidencias", fields: [recargadorId], references: [id], onDelete: Cascade)
+  resueltaPor   Usuario?              @relation("IncidenciasResueltas", fields: [resueltaPorId], references: [id], onDelete: SetNull)
+  transaccion   TransaccionSaldo      @relation(fields: [transaccionId], references: [id], onDelete: Cascade)
+
+  @@index([transaccionId])
+  @@index([eventoId])
+  @@index([recargadorId])
+  @@index([resueltaPorId])
+  @@index([estado])
 }
 
 model Negocio {
@@ -654,6 +742,19 @@ enum EstadoTransaccion {
   PENDIENTE
   ANULADA
   ERROR
+}
+
+enum TipoIncidenciaRecarga {
+  MONTO_INCORRECTO
+  CLIENTE_EQUIVOCADO
+  RECARGA_DUPLICADA
+  NO_SE_REFLEJA
+  OTRO
+}
+
+enum EstadoIncidencia {
+  ABIERTA
+  RESUELTA
 }
 
 enum LiquidacionEstado {

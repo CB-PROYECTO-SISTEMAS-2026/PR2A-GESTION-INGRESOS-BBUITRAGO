@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventoEstado, Prisma } from '@prisma/client';
+import { CompraEstado, EventoEstado, Prisma } from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeList } from '../events/event-content';
@@ -13,26 +13,21 @@ import {
   ListCodigosQuery,
   UpdateCategoriaDto,
 } from './dto/tickets.dto';
-import { buildPoolRows, TICKET_ESTADO_DISPONIBLE } from './ticket-codes';
+import {
+  asignadoWhere,
+  claveDia,
+  cuposPorDia,
+  POOL_TX_TIMEOUT_MS,
+  sincronizarPool,
+} from './cupos';
+import { TICKET_ESTADO_DISPONIBLE } from './ticket-codes';
 
-const INSERT_BATCH = 1000;
-const POOL_TX_TIMEOUT_MS = 120_000;
 const CODIGOS_POR_PAGINA = 24;
-
-/** Un código deja de estar disponible cuando se asigna a una entrada (compra, Sprint 2). */
-const asignadoWhere: Prisma.TicketPoolWhereInput = {
-  OR: [
-    { estado: { not: TICKET_ESTADO_DISPONIBLE } },
-    { entrada: { isNot: null } },
-  ],
-};
 
 const categoriaInclude = {
   fechasDisponibles: true,
   _count: { select: { ticketsPool: true } },
 } satisfies Prisma.CategoriaEntradaInclude;
-
-type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class TicketsService {
@@ -42,7 +37,7 @@ export class TicketsService {
     const evento = await this.loadEvento(eventoId);
     const fechaIds = this.resolveFechas(evento, dto.fechaIds);
     this.ensureNombreLibre(evento, dto.nombre);
-    this.ensureCapacidad(evento, dto.cupo);
+    this.ensureCapacidad(evento, dto.cupo, fechaIds);
 
     const created = await this.prisma.$transaction(
       async (tx) => {
@@ -51,6 +46,7 @@ export class TicketsService {
             eventoId,
             nombre: dto.nombre,
             precio: dto.precio,
+            descuento: dto.descuento ?? 0,
             beneficios: normalizeList(dto.beneficios),
             cupo: dto.cupo,
             fechasDisponibles: {
@@ -61,7 +57,7 @@ export class TicketsService {
             },
           },
         });
-        await this.addCodes(tx, categoria.id, dto.cupo);
+        await sincronizarPool(tx, categoria.id);
         return categoria;
       },
       { timeout: POOL_TX_TIMEOUT_MS },
@@ -78,7 +74,17 @@ export class TicketsService {
         : null;
     if (dto.nombre !== undefined)
       this.ensureNombreLibre(evento, dto.nombre, id);
-    if (dto.cupo !== undefined) this.ensureCapacidad(evento, dto.cupo, id);
+    const cambiaCupo = dto.cupo !== undefined || fechaIds !== null;
+    if (cambiaCupo) {
+      const cupo = dto.cupo ?? categoria.cupo;
+      const dias =
+        fechaIds ??
+        evento.categorias
+          .find((c) => c.id === id)!
+          .fechasDisponibles.map((f) => f.fechaId);
+      this.ensureCapacidad(evento, cupo, dias, id);
+      await this.ensureVendidasPorDia(id, cupo, dias);
+    }
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -87,6 +93,7 @@ export class TicketsService {
           data: {
             nombre: dto.nombre,
             precio: dto.precio,
+            descuento: dto.descuento,
             cupo: dto.cupo,
             ...(dto.beneficios !== undefined
               ? { beneficios: normalizeList(dto.beneficios) }
@@ -103,7 +110,7 @@ export class TicketsService {
             })),
           });
         }
-        if (dto.cupo !== undefined) await this.syncPool(tx, id, dto.cupo);
+        if (cambiaCupo) await sincronizarPool(tx, id);
       },
       { timeout: POOL_TX_TIMEOUT_MS },
     );
@@ -229,51 +236,43 @@ export class TicketsService {
     return this.present(categoria, asignados);
   }
 
-  /** Deja el pool con exactamente `cupo` códigos, sin tocar los que ya fueron asignados a una entrada. */
-  private async syncPool(tx: Tx, categoriaId: string, cupo: number) {
-    const total = await tx.ticketPool.count({ where: { categoriaId } });
-    if (total < cupo) {
-      await this.addCodes(tx, categoriaId, cupo - total);
-      return;
-    }
-    if (total === cupo) return;
-
-    const asignados = await tx.ticketPool.count({
-      where: { categoriaId, ...asignadoWhere },
-    });
-    if (cupo < asignados) {
-      throw new ConflictException(
-        `Ya se vendieron ${asignados.toLocaleString('es-BO')} entradas de esta categoría. La cantidad no puede ser menor.`,
-      );
-    }
-    const sobrantes = await tx.ticketPool.findMany({
-      where: {
-        categoriaId,
-        estado: TICKET_ESTADO_DISPONIBLE,
-        entrada: { is: null },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: total - cupo,
-      select: { id: true },
-    });
-    for (let i = 0; i < sobrantes.length; i += INSERT_BATCH) {
-      await tx.ticketPool.deleteMany({
+  /**
+   * El cupo es por día: no puede quedar por debajo de lo ya vendido (o esperando verificación) en
+   * ninguno de los días en que la categoría sigue siendo válida.
+   */
+  private async ensureVendidasPorDia(
+    categoriaId: string,
+    cupo: number,
+    fechaIds: string[],
+  ) {
+    const [vendidas, pendientes] = await Promise.all([
+      this.prisma.entrada.groupBy({
+        by: ['fechaId'],
+        where: { categoriaId, fechaId: { in: fechaIds } },
+        _count: { _all: true },
+      }),
+      this.prisma.compraEntradaItem.groupBy({
+        by: ['fechaId'],
         where: {
-          id: { in: sobrantes.slice(i, i + INSERT_BATCH).map((s) => s.id) },
+          categoriaId,
+          fechaId: { in: fechaIds },
+          compra: { estado: CompraEstado.PENDIENTE },
         },
-      });
+        _sum: { cantidad: true },
+      }),
+    ]);
+    const ocupadas = new Map<string, number>();
+    for (const v of vendidas)
+      ocupadas.set(claveDia(categoriaId, v.fechaId), v._count._all);
+    for (const p of pendientes) {
+      const k = claveDia(categoriaId, p.fechaId);
+      ocupadas.set(k, (ocupadas.get(k) ?? 0) + (p._sum.cantidad ?? 0));
     }
-  }
-
-  private async addCodes(tx: Tx, categoriaId: string, cantidad: number) {
-    let pendientes = cantidad;
-    while (pendientes > 0) {
-      const lote = Math.min(pendientes, INSERT_BATCH);
-      const { count } = await tx.ticketPool.createMany({
-        data: buildPoolRows(categoriaId, lote),
-        skipDuplicates: true,
-      });
-      pendientes -= count;
+    const max = Math.max(0, ...ocupadas.values());
+    if (cupo < max) {
+      throw new ConflictException(
+        `Ya se vendieron o reservaron ${max.toLocaleString('es-BO')} entradas de esta categoría para un mismo día. La cantidad por día no puede ser menor.`,
+      );
     }
   }
 
@@ -284,7 +283,17 @@ export class TicketsService {
         id: true,
         capacidad: true,
         fechas: { select: { id: true } },
-        categorias: { select: { id: true, nombre: true, cupo: true } },
+        categorias: {
+          select: {
+            id: true,
+            nombre: true,
+            cupo: true,
+            fechasDisponibles: {
+              where: { disponible: true },
+              select: { fechaId: true },
+            },
+          },
+        },
       },
     });
     if (!evento) throw new NotFoundException('Evento no encontrado');
@@ -328,12 +337,19 @@ export class TicketsService {
     }
   }
 
+  /** La capacidad es por día: en cada día, las categorías válidas no pueden sumar más que ella. */
   private ensureCapacidad(
     evento: {
       capacidad: number | null;
-      categorias: { id: string; cupo: number }[];
+      fechas: { id: string }[];
+      categorias: {
+        id: string;
+        cupo: number;
+        fechasDisponibles: { fechaId: string }[];
+      }[];
     },
     cupo: number,
+    fechaIds: string[],
     exceptId?: string,
   ) {
     if (!evento.capacidad) {
@@ -341,13 +357,15 @@ export class TicketsService {
         'Define la capacidad máxima del evento antes de crear categorías.',
       );
     }
-    const usados = evento.categorias
-      .filter((c) => c.id !== exceptId)
-      .reduce((sum, c) => sum + c.cupo, 0);
+    const porDia = cuposPorDia(
+      evento.categorias.filter((c) => c.id !== exceptId),
+    );
+    const usados = Math.max(0, ...fechaIds.map((f) => porDia.get(f) ?? 0));
     const disponibles = evento.capacidad - usados;
     if (cupo > disponibles) {
+      const porDiaTexto = evento.fechas.length > 1 ? ' por día' : '';
       throw new BadRequestException(
-        `La capacidad máxima del evento es ${evento.capacidad.toLocaleString('es-BO')} y quedan ${Math.max(0, disponibles).toLocaleString('es-BO')} entradas por asignar.`,
+        `La capacidad máxima del evento es ${evento.capacidad.toLocaleString('es-BO')}${porDiaTexto} y quedan ${Math.max(0, disponibles).toLocaleString('es-BO')} entradas por asignar${evento.fechas.length > 1 ? ' en los días elegidos' : ''}.`,
       );
     }
   }

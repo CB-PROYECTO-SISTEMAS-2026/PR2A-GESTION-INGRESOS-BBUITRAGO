@@ -15,6 +15,9 @@ export default function EventoHeader({ eventoId, titulo, estado }) {
     { to: isNew ? null : `/admin/eventos/${eventoId}`, label: 'Editar evento', end: true },
     { to: isNew ? null : `/admin/eventos/${eventoId}/categorias`, label: 'Categorías y QR' },
     { to: isNew ? null : `/admin/eventos/${eventoId}/mapa`, label: 'Mapa e historial' },
+    { to: isNew ? null : `/admin/eventos/${eventoId}/manillas`, label: 'Entrega de manillas' },
+    { to: isNew ? null : `/admin/eventos/${eventoId}/pagos`, label: 'Venta y pagos' },
+    { to: isNew ? null : `/admin/eventos/${eventoId}/acceso`, label: 'Control de acceso' },
     { to: isNew ? null : `/admin/eventos/${eventoId}/personal`, label: 'Personal' },
     { to: isNew ? null : `/admin/eventos/${eventoId}/movimientos`, label: 'Movimientos de saldo' },
   ]
@@ -37,7 +40,7 @@ export default function EventoHeader({ eventoId, titulo, estado }) {
         )}
       </div>
 
-      <nav className="mt-5 flex flex-wrap gap-x-8" aria-label="Secciones del evento">
+      <nav className="mt-5 flex flex-wrap gap-x-6" aria-label="Secciones del evento">
         {tabs.map((tab, i) =>
           tab.to ? (
             <NavLink key={tab.label} to={tab.to} end={tab.end} className={tabClass}>

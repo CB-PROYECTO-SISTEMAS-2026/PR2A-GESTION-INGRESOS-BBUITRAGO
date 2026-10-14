@@ -4,6 +4,18 @@ import AuthHeader from '../../components/layout/AuthHeader'
 import { useAuth } from '../../context/AuthContext'
 import { getErrorMessage } from '../../utils/format'
 
+// TEMPORAL: accesos rápidos para pruebas. Eliminar antes de producción.
+const DEMO_USERS = [
+  { label: 'Admin', email: 'admin@eventix.com', password: 'Admin123!' },
+  { label: 'Organizador', email: 'organizador@eventix.com', password: 'Organiza123!' },
+  { label: 'Cliente', email: 'cliente@eventix.com', password: 'Cliente123!' },
+  { label: 'Jefe de negocio', email: 'negocio@eventix.com', password: 'Negocio123!' },
+  { label: 'Ayudante', email: 'ayudante@eventix.com', password: 'Ayudante123!' },
+  { label: 'Encargado de acceso', email: 'acceso@eventix.com', password: 'Acceso123!' },
+  { label: 'Recargador', email: 'recargador@eventix.com', password: 'Recarga123!' },
+  { label: 'Devoluciones', email: 'devoluciones@eventix.com', password: 'Devol123!' },
+]
+
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -14,12 +26,11 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const onSubmit = async (e) => {
-    e.preventDefault()
+  const doLogin = async (credentials) => {
     setError('')
     setLoading(true)
     try {
-      const user = await login({ email, password })
+      const user = await login(credentials)
       const redirect = searchParams.get('redirect')
       const from = location.state?.from
       if (from) {
@@ -34,6 +45,8 @@ export default function LoginPage() {
         navigate('/pos')
       } else if (user?.roles?.includes('RECARGADOR')) {
         navigate('/recargas')
+      } else if (user?.roles?.includes('ENCARGADO_ACCESO')) {
+        navigate('/supervisor')
       } else {
         navigate('/')
       }
@@ -42,6 +55,17 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const onSubmit = (e) => {
+    e.preventDefault()
+    doLogin({ email, password })
+  }
+
+  const onDemoLogin = (u) => {
+    setEmail(u.email)
+    setPassword(u.password)
+    doLogin({ email: u.email, password: u.password })
   }
 
   return (
@@ -95,6 +119,23 @@ export default function LoginPage() {
               Crear cuenta
             </Link>
           </p>
+
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted">Acceso rápido</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {DEMO_USERS.map((u) => (
+                <button
+                  key={u.email}
+                  type="button"
+                  className="rounded-lg border border-teal px-3 py-2 text-sm font-semibold text-teal hover:bg-teal hover:text-white disabled:opacity-50"
+                  onClick={() => onDemoLogin(u)}
+                  disabled={loading}
+                >
+                  {u.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </form>
       </div>
     </div>

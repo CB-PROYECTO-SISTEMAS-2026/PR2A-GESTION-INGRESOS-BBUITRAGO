@@ -10,7 +10,7 @@ const linkClass = ({ isActive }) =>
 
 function roleLabel(roles = []) {
   if (!roles.length) return 'Usuario'
-  const preferred = ['ADMIN', 'ORGANIZADOR', 'JEFE_NEGOCIO', 'AYUDANTE', 'RECARGADOR', 'CLIENTE']
+  const preferred = ['ADMIN', 'ORGANIZADOR', 'JEFE_NEGOCIO', 'AYUDANTE', 'ENCARGADO_ACCESO', 'RECARGADOR', 'CLIENTE']
   const found = preferred.find((r) => roles.includes(r)) || roles[0]
   return ROLE_LABELS[found] || found
 }
@@ -72,6 +72,28 @@ function UserMenu({ user, logout }) {
             </button>
             <button
               type="button"
+              className="block w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50"
+              onClick={() => {
+                setOpen(false)
+                navigate('/mis-entradas')
+              }}
+            >
+              Mis entradas
+            </button>
+            {user?.roles?.includes('CLIENTE') && (
+              <button
+                type="button"
+                className="block w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50"
+                onClick={() => {
+                  setOpen(false)
+                  navigate('/mis-compras')
+                }}
+              >
+                Mis compras
+              </button>
+            )}
+            <button
+              type="button"
               className="block w-full px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
               onClick={() => {
                 setOpen(false)
@@ -95,8 +117,13 @@ function navLinks(hasRole) {
     { to: '/eventos', label: 'Eventos' },
   ]
   if (hasRole('CLIENTE')) {
-    links.push({ label: 'Mis Entradas' })
+    links.push({ to: '/mis-entradas', label: 'Mis Entradas' })
+    links.push({ to: '/mis-compras', label: 'Mis Compras' })
     links.push({ to: '/mi-manilla', label: 'Mi Manilla' })
+  }
+  if (hasRole('ENCARGADO_ACCESO')) {
+    links.push({ to: '/supervisor', label: 'Manillas', end: true })
+    links.push({ to: '/supervisor/acceso', label: 'Control de acceso' })
   }
   if (hasRole('ADMIN')) links.push({ to: '/admin', label: 'Admin' })
   if (hasRole('ORGANIZADOR')) {

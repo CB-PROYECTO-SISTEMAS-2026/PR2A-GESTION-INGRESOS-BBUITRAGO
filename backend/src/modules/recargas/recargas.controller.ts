@@ -20,6 +20,8 @@ import {
   CreateRecargaDto,
   FiltroRecargasAdminDto,
   HistorialRecargasDto,
+  ReportarIncidenciaDto,
+  ResolverIncidenciaDto,
 } from './dto/recargas.dto';
 
 /** Terminal del recargador de saldo (HU-019, HU-020, HU-047). */
@@ -54,6 +56,15 @@ export class RecargasController {
   ) {
     return this.recargasService.misRecargas(userId, dto);
   }
+
+  @Post(':id/incidencias')
+  reportarIncidencia(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: ReportarIncidenciaDto,
+  ) {
+    return this.recargasService.reportarIncidencia(userId, id, dto);
+  }
 }
 
 /** Revisión y anulación de recargas por el administrador general (HU-047). */
@@ -75,5 +86,14 @@ export class RecargasAdminController {
     @Body() dto: AnularRecargaDto,
   ) {
     return this.recargasAdmin.anular(adminId, id, dto.motivo);
+  }
+
+  @Post('incidencias/:id/resolver')
+  resolverIncidencia(
+    @CurrentUser('id') adminId: string,
+    @Param('id') id: string,
+    @Body() dto: ResolverIncidenciaDto,
+  ) {
+    return this.recargasAdmin.resolverIncidencia(adminId, id, dto.resolucion);
   }
 }

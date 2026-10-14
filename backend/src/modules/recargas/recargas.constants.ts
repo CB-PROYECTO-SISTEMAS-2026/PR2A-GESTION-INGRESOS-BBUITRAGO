@@ -20,3 +20,6 @@ export const NOTA_METODO: Record<MetodoPago, string> = {
 
 /** Longitud máxima del motivo de anulación (la nota de la transacción es VARCHAR(191)). */
 export const MOTIVO_ANULACION_MAX = 120;
+
+/** Longitud máxima de la descripción y de la resolución de una incidencia (VARCHAR(500)). */
+export const INCIDENCIA_TEXTO_MAX = 500;

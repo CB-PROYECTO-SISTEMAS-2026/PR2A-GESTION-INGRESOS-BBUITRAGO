@@ -5,7 +5,7 @@ import { toast } from '../../components/Toast'
 import { IconCheck, IconQr, IconWallet, IconWarning } from '../../components/ui/icons'
 import { useAuth } from '../../context/AuthContext'
 import { feedbackError, feedbackOk } from '../../utils/feedback'
-import { formatBs, formatDayRange, formatTime, getErrorMessage } from '../../utils/format'
+import { formatBs, formatDateTime, formatDayRange, formatTime, getErrorMessage } from '../../utils/format'
 import { nuevaClave, readJson, readStorage, writeJson, writeStorage } from '../../utils/storage'
 
 // La librería de escaneo solo se descarga cuando el recargador va a escanear.
@@ -375,6 +375,42 @@ function ClienteCard({ cliente, saldoLabel = 'Saldo actual', saldo }) {
   )
 }
 
+/** HU-020: recargas que le hizo este recargador al cliente y sus compras, solo en este evento. */
+function ActividadCliente({ actividad }) {
+  return (
+    <details className="rounded-xl border border-border bg-white p-4 text-sm">
+      <summary className="cursor-pointer font-semibold">
+        Actividad en este evento <span className="font-normal text-muted">({actividad.length})</span>
+      </summary>
+      {actividad.length === 0 ? (
+        <p className="mt-2 text-muted">Todavía no le hiciste recargas ni tiene compras en este evento.</p>
+      ) : (
+        <ul className="mt-2 divide-y divide-border">
+          {actividad.map((m) => (
+            <li key={m.id} className="flex items-start justify-between gap-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{m.detalle}</p>
+                <p className="text-xs text-muted">
+                  {formatDateTime(m.fecha)} · {m.evento}
+                  {m.estado !== 'COMPLETADA' && ` · ${m.estado.toLowerCase()}`}
+                </p>
+              </div>
+              <span
+                className={`shrink-0 font-semibold tabular-nums ${
+                  Number(m.monto) < 0 ? 'text-red-600' : 'text-teal-dark'
+                } ${m.estado === 'ANULADA' ? 'line-through opacity-60' : ''}`}
+              >
+                {Number(m.monto) < 0 ? '− ' : '+ '}
+                {formatBs(Math.abs(Number(m.monto)))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
+  )
+}
+
 /** Valida el monto contra los límites de la API y el saldo máximo del cliente en el evento. */
 function errorDeMonto(monto, ctx, cliente) {
   if (monto === '') return ''
@@ -399,6 +435,7 @@ function ElegirMonto({ ctx, cliente, monto, onMonto, onContinuar, onCancelar }) 
         <p className="text-sm text-muted">Selecciona el monto que deseas recargar</p>
       </div>
       <ClienteCard cliente={cliente.cliente} saldo={cliente.saldo} />
+      <ActividadCliente actividad={cliente.actividad ?? []} />
 
       {sinCupo ? (
         <div className="flex gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900" role="alert">

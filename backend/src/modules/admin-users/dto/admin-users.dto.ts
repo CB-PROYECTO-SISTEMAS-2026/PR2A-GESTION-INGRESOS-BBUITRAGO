@@ -20,6 +20,7 @@ export const INVITABLE_ROLES = [
   Role.ADMIN,
   Role.ORGANIZADOR,
   Role.JEFE_NEGOCIO,
+  Role.ENCARGADO_ACCESO,
   Role.RECARGADOR,
 ] as const;
 

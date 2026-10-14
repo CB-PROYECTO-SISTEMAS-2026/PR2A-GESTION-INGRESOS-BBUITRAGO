@@ -10,6 +10,7 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
   ORGANIZADOR: 'Organizador de eventos',
   JEFE_NEGOCIO: 'Jefe de negocio',
+  ENCARGADO_ACCESO: 'Encargado de acceso (supervisor)',
 };
 
 function escapeHtml(value: string) {
@@ -207,6 +208,72 @@ export class MailService {
       `Míralo aquí: ${url}`,
     ].join('\n\n');
     await this.send(to, `Evento publicado: ${evento.titulo}`, html, text);
+  }
+
+  async sendCompraRevisada(
+    to: string,
+    nombre: string,
+    compra: {
+      evento: string;
+      aprobada: boolean;
+      entradas: number;
+      total: string;
+      motivo?: string | null;
+    },
+  ) {
+    const url = `${this.frontendUrl}${compra.aprobada ? '/mis-entradas' : '/mis-compras'}`;
+    const estado = compra.aprobada ? 'aprobada' : 'rechazada';
+    const detalle = compra.aprobada
+      ? `Ya emitimos tus ${compra.entradas === 1 ? 'entrada' : `${compra.entradas} entradas`}, cada una con su código QR. Las entradas que compraste para otras personas llegan a su propia cuenta.`
+      : 'No pudimos confirmar tu pago. Si crees que es un error, vuelve a realizar la compra con un comprobante válido.';
+    const motivo = compra.motivo?.trim();
+    const html = layout(
+      `Tu compra fue ${estado}`,
+      `<p>Hola ${escapeHtml(nombre)},</p>
+       <p>Revisamos el comprobante de tu compra para <strong>${escapeHtml(compra.evento)}</strong> (Bs ${escapeHtml(compra.total)}) y fue <strong>${estado}</strong>.</p>
+       ${motivo ? `<p style="margin:16px 0;padding:12px 16px;background:#f8fafc;border-left:3px solid #00c9d4;">${escapeHtml(motivo).replace(/\n/g, '<br>')}</p>` : ''}
+       <p>${detalle}</p>
+       ${button(url, compra.aprobada ? 'Ver mis entradas' : 'Ver mis compras')}`,
+    );
+    const text = [
+      `Hola ${nombre},`,
+      `Revisamos el comprobante de tu compra para ${compra.evento} (Bs ${compra.total}) y fue ${estado}.`,
+      ...(motivo ? [`Motivo: ${motivo}`] : []),
+      detalle,
+      url,
+    ].join('\n\n');
+    await this.send(to, `Compra ${estado}: ${compra.evento}`, html, text);
+  }
+
+  async sendEntradaParaTercero(
+    to: string,
+    nombre: string,
+    datos: {
+      evento: string;
+      comprador: string;
+      categoria: string;
+      dia: string;
+      tieneCuenta: boolean;
+    },
+  ) {
+    const url = `${this.frontendUrl}${datos.tieneCuenta ? '/mis-entradas' : '/register'}`;
+    const paso = datos.tieneCuenta
+      ? 'Ya está en tu cuenta: ingresa a "Mis entradas" para ver su código QR.'
+      : 'Crea tu cuenta en EvenTix con este mismo correo y la entrada aparecerá en "Mis entradas" con su código QR.';
+    const html = layout(
+      'Tienes una entrada',
+      `<p>Hola ${escapeHtml(nombre)},</p>
+       <p>${escapeHtml(datos.comprador)} compró una entrada <strong>${escapeHtml(datos.categoria)}</strong> para ti al evento <strong>${escapeHtml(datos.evento)}</strong> (${escapeHtml(datos.dia)}).</p>
+       <p>${paso}</p>
+       ${button(url, datos.tieneCuenta ? 'Ver mis entradas' : 'Crear mi cuenta')}`,
+    );
+    const text = [
+      `Hola ${nombre},`,
+      `${datos.comprador} compró una entrada ${datos.categoria} para ti al evento ${datos.evento} (${datos.dia}).`,
+      paso,
+      url,
+    ].join('\n\n');
+    await this.send(to, `Tienes una entrada para ${datos.evento}`, html, text);
   }
 
   private async send(to: string, subject: string, html: string, text: string) {

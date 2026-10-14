@@ -11,6 +11,7 @@ function homeFor(roles = []) {
   if (roles.includes('ADMIN')) return '/admin'
   if (roles.includes('JEFE_NEGOCIO')) return '/negocio'
   if (roles.includes('ORGANIZADOR')) return '/organizador/solicitudes'
+  if (roles.includes('ENCARGADO_ACCESO')) return '/supervisor'
   return '/'
 }
 

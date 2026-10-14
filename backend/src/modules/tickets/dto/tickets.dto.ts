@@ -21,6 +21,8 @@ import {
 
 const PRECIO_MESSAGE = `El precio debe ser un monto entre 0 y ${MAX_PRECIO.toLocaleString('es-BO')} Bs, con hasta 2 decimales.`;
 const CUPO_MESSAGE = `La cantidad de entradas debe ser un número entero entre 1 y ${MAX_CAPACIDAD.toLocaleString('es-BO')}.`;
+export const MAX_DESCUENTO = 100;
+const DESCUENTO_MESSAGE = `El descuento debe ser un porcentaje entero entre 0 y ${MAX_DESCUENTO}.`;
 export const MAX_BENEFICIOS = 20;
 export const MAX_CODIGOS_POR_PAGINA = 48;
 
@@ -41,6 +43,13 @@ export class CreateCategoriaDto {
   @Min(0, { message: PRECIO_MESSAGE })
   @Max(MAX_PRECIO, { message: PRECIO_MESSAGE })
   precio: number;
+
+  @IsOptional()
+  @Transform(toStrictInt)
+  @IsInt({ message: DESCUENTO_MESSAGE })
+  @Min(0, { message: DESCUENTO_MESSAGE })
+  @Max(MAX_DESCUENTO, { message: DESCUENTO_MESSAGE })
+  descuento?: number;
 
   @IsOptional()
   @IsArray()
@@ -86,6 +95,13 @@ export class UpdateCategoriaDto {
   @Min(0, { message: PRECIO_MESSAGE })
   @Max(MAX_PRECIO, { message: PRECIO_MESSAGE })
   precio?: number;
+
+  @IsOptional()
+  @Transform(toStrictInt)
+  @IsInt({ message: DESCUENTO_MESSAGE })
+  @Min(0, { message: DESCUENTO_MESSAGE })
+  @Max(MAX_DESCUENTO, { message: DESCUENTO_MESSAGE })
+  descuento?: number;
 
   @IsOptional()
   @IsArray()
