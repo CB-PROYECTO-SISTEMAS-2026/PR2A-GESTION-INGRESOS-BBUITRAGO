@@ -1,1 +1,49 @@
 
+name: CI/CD Eventix
+
+on:
+  push:
+    branches:
+      - Espinoza
+      - Prudencio
+      - Rocabado
+      - Torquato
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar backend
+        run: cd backend && npm ci
+
+      - name: Instalar frontend
+        run: cd frontend && npm ci
+
+      - name: Instalar pruebas
+        run: cd tests && npm ci
+
+      - name: Pruebas unitarias
+        run: cd tests && npm run test:unit
+
+      - name: Pruebas frontend
+        run: cd tests && npm run test:frontend
+
+      - name: Compilar backend
+        run: cd backend && npm run build
+
+      - name: Compilar frontend
+        run: cd frontend && npm run build
+
