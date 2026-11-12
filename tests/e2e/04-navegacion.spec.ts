@@ -45,6 +45,7 @@ const PANTALLAS: Record<RolE2E, string[]> = {
   ],
   ayudante: ['/pos', '/pos/historial'],
   recargador: ['/recargas', '/recargas/historial'],
+  devoluciones: ['/devoluciones'],
 };
 
 for (const [nombreTamano, viewport] of Object.entries(TAMANOS)) {

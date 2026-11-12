@@ -52,11 +52,13 @@ Ordenadas por prioridad (ver el plan completo más abajo).
 | `unit/pos-validacion.test.ts` | Datos aceptados por la API del POS: cantidades, código del cliente, clave anti-cobro-duplicado, campos no permitidos |
 | `unit/app-throttler.test.ts` | Límite de peticiones por usuario (y no por IP), resistente a tokens falsificados |
 | `unit/recargas-validacion.test.ts` | Módulo D: montos de recarga (mínimo Bs 10, máximo Bs 1.000, 2 decimales, solo efectivo), motivo de anulación, filtros de historiales, roles de personal y signo de los movimientos |
+| `unit/devoluciones-plazo.test.ts` | Sprint 3, Módulo A: fin del evento (también con horario hasta la madrugada), plazo de 30 días en hora de La Paz (último día incluido) y datos de la devolución (identidad verificada obligatoria, monto, clave anti-duplicado) |
 
 Estas pruebas ya encontraron y ayudaron a corregir dos errores:
 
 - Una fecha inexistente como `2026-02-30` no se rechazaba (se convertía en silencio al 2 de marzo).
 - Una cantidad `1.5` respondía "cantidad máxima 99" en lugar de "debe ser un número entero".
+- (Sprint 3) Con la conversión implícita global, el texto `"false"` se convertía en `true`: una devolución podía pasar como "identidad verificada". El DTO de devoluciones ahora solo acepta el booleano `true`.
 
 ### 1b. Unitarias del frontend (`frontend-unit/`): Vitest + React Testing Library
 
@@ -69,9 +71,10 @@ Prueban las pantallas y utilidades reales de `frontend/src` en un navegador simu
 | `frontend-unit/admin/RetirosPage.test.jsx` | 3 | **Regresión** de respuestas desactualizadas al cambiar de pestaña, aprobar y pago con comprobante |
 | `frontend-unit/business/VentasUI.test.jsx` | 8 | Gráfico de ventas por día (escala, montos, tabla) y filtros de fecha y negocio |
 | `frontend-unit/recargas/RecargaPage.test.jsx` | 16 | Terminal del recargador: recarga completa (sin enviar saldos), límites de monto y saldo máximo, **recargas pendientes sin conexión que se reintentan con la misma clave**, rechazos del servidor |
+| `frontend-unit/devoluciones/DevolucionPage.test.jsx` | 8 | Sprint 3, Módulo A: devolución completa (Figma p28–31) con foto del primer ingreso, **no se puede devolver sin confirmar la identidad** (o el carnet si no hay foto), sin saldo o plazo vencido, saldo que cambió y reintento sin conexión con la misma clave |
 
 - **Una sola copia de React.** Las pruebas usan React y React Router de `frontend/node_modules`, porque con dos copias los hooks fallan. Por eso `tests/.npmrc` no instala las dependencias "peer" de Testing Library. Los alias están en `vitest.config.mjs`.
-- **Verificación de mutación.** Se quitó a propósito la protección contra respuestas viejas de `RetirosPage` y la prueba de regresión falló, como se esperaba. Lo mismo con el recargador: si el reintento genera una clave nueva (y acreditaría dos veces), la prueba falla.
+- **Verificación de mutación.** Se quitó a propósito la protección contra respuestas viejas de `RetirosPage` y la prueba de regresión falló, como se esperaba. Lo mismo con el recargador: si el reintento genera una clave nueva (y acreditaría dos veces), la prueba falla. Y con las devoluciones: si el botón "Devolver Saldo" se habilita sin confirmar la identidad, la prueba falla.
 
 ### 2. Integración (`integracion/`): usan la base compartida de Aiven
 
@@ -87,8 +90,10 @@ Necesitan `backend/.env`, `backend/prisma/ca.pem` e internet. No hace falta leva
 | `integracion/pos-liquidacion.test.ts` | 23 | Panel de ventas del dueño (totales, días, eventos, productos, CSV), liquidación (acreditado/pendiente) y retiros (solicitud, aprobación, pago, rechazo, solicitudes simultáneas) |
 | `integracion/recargas.test.ts` | 37 | Módulo D: recarga 1:1 por manilla o QR, primera recarga que crea el saldo, evento no asignado o fuera de horario, saldo máximo (también con recargas simultáneas), reintentos sin duplicar, anulación por el admin (doble, simultánea, saldo ya gastado), historiales y personal del evento |
 | `integracion/recargas-seguridad.test.ts` | 79 | Seguridad por HTTP del Módulo D: roles de cada endpoint (60 combinaciones), recargador no asignado, el recargador no puede anular, el cliente solo ve lo suyo, validación y flujo completo con reintento |
+| `integracion/devoluciones.test.ts` | 23 | Sprint 3, Módulo A: identificación por manilla o QR con foto del primer ingreso, saldo devolvible según el plazo, devolución que deja el saldo en cero, eventos pasados y cancelados dentro de los 30 días, plazo vencido, saldo que cambió, **nunca se paga dos veces** (reintentos, envíos simultáneos, dos encargados), plazo en "Mis saldos" y asignación a eventos terminados |
+| `integracion/devoluciones-seguridad.test.ts` | 32 | Seguridad por HTTP del Módulo A: solo el rol DEVOLUCIONES usa la terminal (18 combinaciones), encargado no asignado, identidad como texto, campos inventados y flujo completo con reintento |
 
-Para comprobar que estas pruebas detectan errores reales, se rompieron a propósito dos protecciones y las pruebas fallaron, como se esperaba:
+Para comprobar que estas pruebas detectan errores reales (con las de devoluciones, quitar la condición `saldo = montoEsperado` hace fallar 3 pruebas), se rompieron a propósito dos protecciones y las pruebas fallaron, como se esperaba:
 
 - permitir cobrar aunque el saldo no alcance (fallan las de saldo insuficiente);
 - quitar el bloqueo de las solicitudes de retiro (falla la de solicitudes simultáneas);
@@ -109,10 +114,11 @@ Abren la aplicación real en **Microsoft Edge** (ya instalado en Windows; no se 
 | `e2e/01-pos.spec.ts` | 7 | Login del ayudante y punto de venta en el celular: cobro con manilla, comprobante, historial, saldo insuficiente, stock y código inexistente |
 | `e2e/02-panel-negocio.spec.ts` | 4 | Panel del dueño: dashboard, registro de ventas, CSV, solicitud de retiro y menú lateral en el celular |
 | `e2e/03-admin-retiros.spec.ts` | 3 | El administrador aprueba el retiro, el pago exige comprobante y el rechazo |
-| `e2e/04-navegacion.spec.ts` | 61 | Las pantallas de cada rol (incluido el recargador) en escritorio y celular, sin errores ni desbordes; rutas protegidas; menú móvil |
+| `e2e/04-navegacion.spec.ts` | 63 | Las pantallas de cada rol (incluido el recargador) en escritorio y celular, sin errores ni desbordes; rutas protegidas; menú móvil |
 | `e2e/05-recargas.spec.ts` | 9 | Módulo D: login del recargador, recarga en efectivo con la manilla, "Mis recargas", monto mínimo, "Mi Manilla" y movimientos del cliente (también en el celular), anulación por el admin, personal del evento y movimientos del evento |
+| `e2e/06-devoluciones.spec.ts` | 7 | Sprint 3, Módulo A: login del encargado, devolución completa con foto del primer ingreso (no se puede devolver sin verificar la identidad), segundo escaneo sin saldo, código de otro evento, el cliente ve su saldo en cero y la devolución, asignación a un evento finalizado y movimientos del evento |
 
-- Los archivos corren **en orden y de a uno** (01 → 05) porque comparten un escenario `[PRUEBA-AUTO]`: la venta de 01 aparece en el panel de 02, el retiro que pide 02 lo revisa el administrador en 03, y la recarga de 05 es la que el administrador anula después.
+- Los archivos corren **en orden y de a uno** (01 → 06) porque comparten un escenario `[PRUEBA-AUTO]`: la venta de 01 aparece en el panel de 02, el retiro que pide 02 lo revisa el administrador en 03, la recarga de 05 es la que el administrador anula después, y 06 devuelve el saldo que le queda al cliente.
 - El escenario se crea al inicio (`e2e/setup/global-setup.ts`) y se borra al final, aunque las pruebas fallen. Las sesiones de cada rol se guardan en `e2e/.auth/` (ignorada por git), así las pruebas no repiten el login.
 - **No suben archivos a Cloudinary.**
 - Si una prueba falla: `npm run test:e2e:reporte` muestra cada paso con capturas y peticiones de red, y `e2e-resultados/` guarda la captura del fallo.
@@ -133,6 +139,7 @@ También detectaron que **Mi Manilla** se desbordaba 60 px a lo ancho en el celu
 | 5 | Recorrido en navegador con Playwright (flujo del POS y pantallas por rol) | ✅ Hecha | Sí |
 | 6 | Unitarias del frontend (formatos, POS, retiros, gráfico y filtros) | ✅ Hecha | No |
 | 7 | Módulo D (recargas): unitarias, integración, seguridad, frontend y e2e | ✅ Hecha | Sí (salvo unitarias) |
+| 8 | Sprint 3, Módulo A (devolución de saldo): unitarias, frontend, integración y seguridad | ✅ Hecha (probada contra una MySQL local; falta repetirla contra Aiven cuando responda) | Sí (salvo unitarias y frontend) |
 
 ### Datos de prueba en la base compartida (pruebas 2 a 5)
 
@@ -181,3 +188,21 @@ tests/
 - **API igual a la de producción.** La prueba de seguridad usa `backend/src/app.setup.ts` (helmet, CORS, límite de 1 MB, validación), la misma función que llama `main.ts`.
 - **Cuentas de prueba con contraseña.** La prueba de seguridad inicia sesión de verdad: sus usuarios (incluido un administrador de prueba) reciben una contraseña aleatoria distinta en cada ejecución, que nunca se muestra, y se borran al terminar.
 - **Vulnerabilidad conocida en las herramientas.** `npm audit` reporta "19 vulnerabilidades moderadas", pero es **una sola**: la de `sprintf-js`, contada una vez por cada paquete que depende de ella. Es una dependencia interna de Jest. Solo afecta a las herramientas de prueba (no llega al backend ni al frontend) y corregirla exige `npm audit fix --force`, que cambia versiones de Jest. Por eso no se aplicó.
+
+### Correr las pruebas con una MySQL local (sin Aiven)
+
+Si la base compartida no responde, `DATABASE_URL` exportada tiene prioridad sobre `backend/.env`:
+
+```
+# una vez: MySQL 8.4 propio en el puerto 3307 y las tablas del schema
+mysqld --no-defaults --initialize-insecure --datadir=<carpeta>\data
+mysqld --no-defaults --datadir=<carpeta>\data --port=3307 --bind-address=127.0.0.1 --mysqlx=OFF
+mysql -h 127.0.0.1 -P 3307 -u root -e "CREATE DATABASE eventix"
+cd backend && DATABASE_URL=mysql://root@127.0.0.1:3307/eventix npx prisma db push
+
+# cada vez
+export DATABASE_URL=mysql://root@127.0.0.1:3307/eventix
+cd tests && npm run test:integracion && npx playwright test
+```
+
+Con el backend y el frontend ya levantados (`npm run start:dev` y `npm run dev`) la e2e no pierde tiempo esperando el arranque.

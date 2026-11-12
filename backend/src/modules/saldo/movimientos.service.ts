@@ -18,6 +18,7 @@ import { dateToDay, todayIn } from '../events/event-schedule';
 import { resolveDayRange } from '../pos/pos-dates';
 import { codigoTransaccion, money, nombreCompleto } from '../pos/pos-helpers';
 import { MisMovimientosDto, MovimientosEventoDto } from './dto/movimientos.dto';
+import { plazoRetiroEvento } from './plazo-retiro';
 import {
   estadoTemporal,
   montoConSigno,
@@ -133,6 +134,7 @@ export class MovimientosService {
     const saldos = eventos.map((e) => {
       const dias = e.fechas.map((f) => dateToDay(f.fecha));
       const saldo = e.saldos[0];
+      const plazo = plazoRetiroEvento(e.fechas, this.timeZone, now);
       return {
         eventoId: e.id,
         titulo: e.titulo,
@@ -146,6 +148,10 @@ export class MovimientosService {
         cancelado: e.estado === EventoEstado.CANCELADO,
         saldo: money(saldo?.saldo),
         actualizado: saldo?.updatedAt ?? null,
+        /** Hasta cuándo se puede pedir la devolución del saldo (30 días desde el fin del evento). */
+        plazoRetiro: plazo
+          ? { fechaLimite: plazo.fechaLimite, vencido: plazo.vencido }
+          : null,
       };
     });
     saldos.sort(

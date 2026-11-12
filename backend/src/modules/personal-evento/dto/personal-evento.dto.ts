@@ -13,10 +13,17 @@ import {
 } from '../../../common/validation/validators';
 
 /**
- * Roles de personal que se asignan por evento. Por ahora solo el recargador (Módulo D); el
- * control de acceso y las devoluciones se pueden sumar aquí cuando sus módulos lo necesiten.
+ * Roles de personal que se asignan por evento: el recargador (Módulo D del Sprint 2) y el
+ * encargado de devoluciones (Módulo A del Sprint 3). El control de acceso se puede sumar aquí
+ * cuando su módulo lo necesite.
  */
-export const ROLES_PERSONAL = [Role.RECARGADOR] as const;
+export const ROLES_PERSONAL = [Role.RECARGADOR, Role.DEVOLUCIONES] as const;
+
+/**
+ * Roles que se pueden asignar aunque el evento ya terminó o se canceló: las devoluciones de saldo
+ * siguen hasta 30 días después del fin del evento.
+ */
+export const ROLES_POST_EVENTO: readonly RolPersonal[] = [Role.DEVOLUCIONES];
 export type RolPersonal = (typeof ROLES_PERSONAL)[number];
 
 const ROL_MESSAGE = 'Rol de personal no válido.';

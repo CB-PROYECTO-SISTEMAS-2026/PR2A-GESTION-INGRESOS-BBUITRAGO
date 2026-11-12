@@ -45,6 +45,8 @@ export default function LoginPage() {
         navigate('/pos')
       } else if (user?.roles?.includes('RECARGADOR')) {
         navigate('/recargas')
+      } else if (user?.roles?.includes('DEVOLUCIONES')) {
+        navigate('/devoluciones')
       } else if (user?.roles?.includes('ENCARGADO_ACCESO')) {
         navigate('/supervisor')
       } else {

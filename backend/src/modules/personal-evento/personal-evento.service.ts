@@ -9,6 +9,7 @@ import { nombreCompleto } from '../pos/pos-helpers';
 import {
   AsignarPersonalDto,
   CandidatosPersonalDto,
+  ROLES_POST_EVENTO,
 } from './dto/personal-evento.dto';
 
 const MAX_CANDIDATOS = 20;
@@ -111,7 +112,10 @@ export class PersonalEventoService {
         },
       }),
     ]);
-    if (EVENTO_CERRADO.includes(evento.estado)) {
+    if (
+      EVENTO_CERRADO.includes(evento.estado) &&
+      !ROLES_POST_EVENTO.includes(dto.role)
+    ) {
       throw new BadRequestException(
         'No se puede asignar personal a un evento finalizado o cancelado.',
       );

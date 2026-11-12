@@ -24,6 +24,7 @@ import { PosModule } from './modules/pos/pos.module';
 import { SaldoModule } from './modules/saldo/saldo.module';
 import { RecargasModule } from './modules/recargas/recargas.module';
 import { PersonalEventoModule } from './modules/personal-evento/personal-evento.module';
+import { DevolucionesModule } from './modules/devoluciones/devoluciones.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { PersonalEventoModule } from './modules/personal-evento/personal-evento.
     SaldoModule,
     RecargasModule,
     PersonalEventoModule,
+    DevolucionesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AppThrottlerGuard }],
 })
