@@ -3,8 +3,15 @@ import { Link } from 'react-router-dom'
 import { getMisSaldos } from '../../api/recargas.api'
 import { IconWallet } from '../../components/ui/icons'
 import { useAuth } from '../../context/AuthContext'
-import { formatBs, formatDateTime, formatDayRange, getErrorMessage } from '../../utils/format'
+import { formatBs, formatDateTime, formatDay, formatDayRange, getErrorMessage } from '../../utils/format'
 import { MOMENTO_EVENTO } from '../../utils/movimientos'
+
+/** Plazo para pedir la devolución del saldo que sobró (30 días desde el fin del evento). */
+function plazoTexto(plazo) {
+  if (!plazo) return 'Evento finalizado con saldo pendiente'
+  if (plazo.vencido) return `El plazo para retirar este saldo venció el ${formatDay(plazo.fechaLimite)}`
+  return `Puedes pedir la devolución de este saldo hasta el ${formatDay(plazo.fechaLimite)}`
+}
 
 /**
  * HU-020 (cliente): saldo en cada evento (Figma: Mi Manilla → Mis saldos). Cada saldo pertenece
@@ -76,7 +83,7 @@ export default function MiManillaPage() {
                     <span className="min-w-0">
                       {s.momento === 'FINALIZADO'
                         ? Number(s.saldo) > 0
-                          ? 'Evento finalizado con saldo pendiente'
+                          ? plazoTexto(s.plazoRetiro)
                           : 'Sin saldo pendiente'
                         : 'Saldo disponible solo dentro de este evento'}
                       {s.actualizado && ` · Actualizado ${formatDateTime(s.actualizado)}`}

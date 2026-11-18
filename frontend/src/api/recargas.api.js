@@ -7,6 +7,11 @@ export const recargar = (data) => api.post('/recargas', data)
 export const getMisRecargas = (params) => api.get('/recargas/historial', { params })
 export const reportarIncidenciaRecarga = (id, data) => api.post(`/recargas/${id}/incidencias`, data)
 
+// Terminal del encargado de devoluciones de saldo
+export const getDevolucionesContexto = () => api.get('/devoluciones/contexto')
+export const consultarClienteDevolucion = (params) => api.get('/devoluciones/clientes', { params })
+export const devolverSaldo = (data) => api.post('/devoluciones', data)
+
 // Saldo y movimientos del cliente, por evento
 export const getMisSaldos = () => api.get('/users/me/saldos')
 export const getMisMovimientos = (params) => api.get('/users/me/movimientos', { params })

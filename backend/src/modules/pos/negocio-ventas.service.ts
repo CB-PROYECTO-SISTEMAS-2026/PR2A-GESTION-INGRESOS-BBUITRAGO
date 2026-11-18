@@ -7,7 +7,10 @@ import { ConfigService } from '@nestjs/config';
 import { EventoEstado, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { dateToDay, dayToDate, todayIn } from '../events/event-schedule';
-import { countAyudantesActivos, findEventosAceptados } from './negocio-compat';
+import {
+  countAyudantesActivos,
+  findEventosAceptados,
+} from './negocio-consultas';
 import { dayIn, resolveDayRange } from './pos-dates';
 import {
   VENTA_ROW_SELECT,

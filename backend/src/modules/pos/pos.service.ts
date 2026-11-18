@@ -5,16 +5,20 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventoEstado, Prisma, TipoTransaccionSaldo } from '@prisma/client';
+import {
+  AyudanteNegocio_estado,
+  EventoEstado,
+  Prisma,
+  TipoTransaccionSaldo,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { dateToDay, dayToDate, todayIn } from '../events/event-schedule';
 import {
-  AYUDANTE_ACTIVO,
   descontarStock,
   findAyudanteAsignacion,
   findEventosAceptados,
   findStockNegocio,
-} from './negocio-compat';
+} from './negocio-consultas';
 import { horarioActual, resolveDayRange } from './pos-dates';
 import {
   VENTA_ROW_SELECT,
@@ -449,7 +453,7 @@ export class PosService {
     if (!asignacion) {
       throw new ForbiddenException('No estás asignado a ningún negocio.');
     }
-    if (asignacion.estado !== AYUDANTE_ACTIVO) {
+    if (asignacion.estado !== AyudanteNegocio_estado.ACTIVO) {
       throw new ForbiddenException(
         'Tu cuenta de ayudante no está activa. Consulta con el jefe de tu negocio.',
       );

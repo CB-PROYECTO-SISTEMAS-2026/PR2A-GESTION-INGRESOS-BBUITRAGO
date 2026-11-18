@@ -5,16 +5,17 @@
  * Todo lo creado lleva la marca "[PRUEBA-AUTO]" (eventos, negocios) o un correo
  * "@pruebas.eventix.test" (usuarios), para que helpers/limpieza.js pueda encontrarlo y borrarlo
  * sin tocar datos reales. NUNCA uses aquí usuarios, negocios o eventos existentes.
- *
- * TEMPORAL: Negocio, RolNegocio, AyudanteNegocio y SolicitudNegocio se insertan con SQL porque la
- * base compartida tiene una estructura más nueva que el schema.prisma de esta rama (ver
- * backend/src/modules/pos/negocio-compat.ts). Cuando se integre el schema nuevo, cámbialos a
- * prisma.<modelo>.create().
  */
 import { randomBytes } from 'crypto';
-import { EntradaEstado, EventoEstado, Prisma, Role } from '@prisma/client';
+import {
+  AyudanteNegocio_estado,
+  EntradaEstado,
+  EventoEstado,
+  Prisma,
+  Role,
+  SolicitudNegocio_estado,
+} from '@prisma/client';
 import { PrismaService } from '../../../backend/src/prisma/prisma.service';
-import { newId } from '../../../backend/src/modules/pos/pos-helpers';
 import { minuteOfDayIn } from '../../../backend/src/modules/pos/pos-dates';
 import { todayIn } from '../../../backend/src/modules/events/event-schedule';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -111,26 +112,23 @@ export async function crearUsuario(
 }
 
 async function crearNegocio(prisma: PrismaService, duenoId: string, nombre: string) {
-  const id = newId();
-  await prisma.$executeRaw(Prisma.sql`
-    INSERT INTO Negocio (id, duenoId, nombre, activo, createdAt, updatedAt)
-    VALUES (${id}, ${duenoId}, ${`${MARCA} ${nombre}`}, 1, NOW(3), NOW(3))
-  `);
-  return id;
+  const negocio = await prisma.negocio.create({
+    data: { duenoId, nombre: `${MARCA} ${nombre}` },
+    select: { id: true },
+  });
+  return negocio.id;
 }
 
 async function crearAyudante(prisma: PrismaService, negocioId: string, usuarioId: string, jefeId: string, rolId: string) {
-  await prisma.$executeRaw(Prisma.sql`
-    INSERT INTO AyudanteNegocio (id, negocioId, usuarioId, jefeId, estado, rolId, createdAt)
-    VALUES (${newId()}, ${negocioId}, ${usuarioId}, ${jefeId}, 'ACTIVO', ${rolId}, NOW(3))
-  `);
+  await prisma.ayudanteNegocio.create({
+    data: { negocioId, usuarioId, jefeId, rolId, estado: AyudanteNegocio_estado.ACTIVO },
+  });
 }
 
 async function aceptarEnEvento(prisma: PrismaService, negocioId: string, eventoId: string) {
-  await prisma.$executeRaw(Prisma.sql`
-    INSERT INTO SolicitudNegocio (id, negocioId, eventoId, estado, mensaje, createdAt, updatedAt)
-    VALUES (${newId()}, ${negocioId}, ${eventoId}, 'ACEPTADA', ${MARCA}, NOW(3), NOW(3))
-  `);
+  await prisma.solicitudNegocio.create({
+    data: { negocioId, eventoId, estado: SolicitudNegocio_estado.ACEPTADA, mensaje: MARCA },
+  });
 }
 
 async function crearEvento(
@@ -220,11 +218,10 @@ export async function crearEscenario(prisma: PrismaService, sufijo: string): Pro
     crearNegocio(prisma, jefe, `Puesto ${S}`),
     crearNegocio(prisma, jefeOtroNegocio, `Otro puesto ${S}`),
   ]);
-  const rolId = newId();
-  await prisma.$executeRaw(Prisma.sql`
-    INSERT INTO RolNegocio (id, negocioId, nombre, descripcion, createdAt, updatedAt)
-    VALUES (${rolId}, ${negocioId}, 'Cajero', ${MARCA}, NOW(3), NOW(3))
-  `);
+  const { id: rolId } = await prisma.rolNegocio.create({
+    data: { negocioId, nombre: 'Cajero', descripcion: MARCA },
+    select: { id: true },
+  });
   await Promise.all([
     crearAyudante(prisma, negocioId, ayudante, jefe, rolId),
     crearAyudante(prisma, negocioId, ayudante2, jefe, rolId),
@@ -349,23 +346,22 @@ export async function getSaldo(prisma: PrismaService, esc: Escenario) {
   return s.saldo.toFixed(2);
 }
 
-/** Fija el stock de un producto (columna Producto.stock; null = sin control de stock). */
+/** Fija el stock de un producto (null = sin control de stock). */
 export async function setStock(prisma: PrismaService, productoId: string, stock: number | null) {
-  await prisma.$executeRaw(Prisma.sql`UPDATE Producto SET stock = ${stock} WHERE id = ${productoId}`);
+  await prisma.producto.update({ where: { id: productoId }, data: { stock } });
 }
 
 export async function getStock(prisma: PrismaService, productoId: string) {
-  const [row] = await prisma.$queryRaw<{ stock: number | bigint | null }[]>(
-    Prisma.sql`SELECT stock FROM Producto WHERE id = ${productoId}`,
-  );
-  return row.stock === null ? null : Number(row.stock);
+  const { stock } = await prisma.producto.findUniqueOrThrow({
+    where: { id: productoId },
+    select: { stock: true },
+  });
+  return stock;
 }
 
 /** Cambia el estado del ayudante (ACTIVO / INACTIVO) en la base compartida. */
 export async function setEstadoAyudante(prisma: PrismaService, usuarioId: string, estado: 'ACTIVO' | 'INACTIVO') {
-  await prisma.$executeRaw(
-    Prisma.sql`UPDATE AyudanteNegocio SET estado = ${estado} WHERE usuarioId = ${usuarioId}`,
-  );
+  await prisma.ayudanteNegocio.update({ where: { usuarioId }, data: { estado } });
 }
 
 export async function contarVentas(prisma: PrismaService, esc: Escenario) {

@@ -57,7 +57,25 @@ export default async function globalSetup() {
     const db = prisma as unknown as Parameters<typeof crearEscenario>[0];
     const esc = await crearEscenario(db, sufijo);
     const admin = await crearUsuario(db, 'admin', sufijo, [Role.ADMIN]);
-    await asignarClave(db, [...Object.values(esc.usuarios), admin], clave);
+    // Sprint 3, Módulo A: encargado de devoluciones asignado al evento abierto, y el cliente con
+    // la foto de su primer ingreso (con la entrada de la manilla).
+    const devoluciones = await crearUsuario(db, 'devoluciones', sufijo, [Role.DEVOLUCIONES]);
+    const manilla = await prisma.manilla.findFirstOrThrow({
+      where: { codigoFisico: esc.codigos.manilla },
+      select: { entradaId: true },
+    });
+    await prisma.staffEvento.create({
+      data: { usuarioId: devoluciones, eventoId: esc.eventos.abierto, role: Role.DEVOLUCIONES },
+    });
+    await prisma.accesoEvento.create({
+      data: {
+        eventoId: esc.eventos.abierto,
+        entradaId: manilla.entradaId!,
+        tipo: 'INGRESO',
+        fotoIngresoUrl: 'https://res.cloudinary.com/pruebas/image/upload/prueba-auto-primer-ingreso.jpg',
+      },
+    });
+    await asignarClave(db, [...Object.values(esc.usuarios), admin, devoluciones], clave);
     await setStock(db, esc.productos.limitado, 2);
 
     const finalizado = await crearEventoPasado(db, esc, 'Feria finalizada e2e', EventoEstado.FINALIZADO, 1);
@@ -74,6 +92,7 @@ export default async function globalSetup() {
       organizador: `organizador.${sufijo}${DOMINIO}`,
       admin: `admin.${sufijo}${DOMINIO}`,
       recargador: `recargador.${sufijo}${DOMINIO}`,
+      devoluciones: `devoluciones.${sufijo}${DOMINIO}`,
     };
 
     fs.mkdirSync(AUTH_DIR, { recursive: true });

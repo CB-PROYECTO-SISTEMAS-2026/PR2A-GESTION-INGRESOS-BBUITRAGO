@@ -62,6 +62,8 @@ import PosHistorialPage from './modules/pos/PosHistorialPage'
 import RecargasLayout from './modules/recargas/RecargasLayout'
 import RecargaPage from './modules/recargas/RecargaPage'
 import RecargasHistorialPage from './modules/recargas/RecargasHistorialPage'
+import DevolucionesLayout from './modules/devoluciones/DevolucionesLayout'
+import DevolucionPage from './modules/devoluciones/DevolucionPage'
 
 import MiManillaPage from './modules/billetera/MiManillaPage'
 import MovimientosPage from './modules/billetera/MovimientosPage'
@@ -191,6 +193,16 @@ const router = createBrowserRouter([
               { index: true, element: <RecargaPage /> },
               { path: 'historial', element: <RecargasHistorialPage /> },
             ],
+          },
+        ],
+      },
+      {
+        path: 'devoluciones',
+        element: <ProtectedRoute roles={['DEVOLUCIONES']} />,
+        children: [
+          {
+            element: <DevolucionesLayout />,
+            children: [{ index: true, element: <DevolucionPage /> }],
           },
         ],
       },

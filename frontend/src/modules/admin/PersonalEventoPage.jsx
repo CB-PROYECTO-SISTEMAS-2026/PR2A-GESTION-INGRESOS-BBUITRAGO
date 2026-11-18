@@ -10,11 +10,15 @@ import { roleLabel } from '../../utils/roles'
 import EventoHeader from './components/EventoHeader'
 
 /** Roles de personal que se asignan por evento (deben coincidir con ROLES_PERSONAL del backend). */
-const ROLES_PERSONAL = ['RECARGADOR']
+const ROLES_PERSONAL = ['RECARGADOR', 'DEVOLUCIONES']
+/** Roles que se pueden asignar con el evento ya terminado: las devoluciones siguen 30 días más. */
+const ROLES_POST_EVENTO = ['DEVOLUCIONES']
+
+const esCerrado = (evento) => ['FINALIZADO', 'CANCELADO'].includes(evento?.estado)
 
 /**
- * Personal del evento: el administrador asigna qué recargadores trabajan en cada evento.
- * Un recargador solo puede recargar en los eventos donde está asignado.
+ * Personal del evento: el administrador asigna qué recargadores y encargados de devoluciones
+ * trabajan en cada evento. Cada uno solo puede operar en los eventos donde está asignado.
  */
 export default function PersonalEventoPage() {
   const { id } = useParams()
@@ -33,8 +37,10 @@ export default function PersonalEventoPage() {
     Promise.all([getEventAdminById(id), getPersonalEvento(id)])
       .then(([ev, p]) => {
         if (cancel) return
-        setEvento(ev.data?.data ?? ev.data)
+        const datos = ev.data?.data ?? ev.data
+        setEvento(datos)
         setPersonal(p.data.personal)
+        if (esCerrado(datos)) setRole(ROLES_POST_EVENTO[0])
       })
       .catch((err) => !cancel && setError(getErrorMessage(err, 'No se pudo cargar el personal del evento.')))
     return () => {
@@ -97,7 +103,8 @@ export default function PersonalEventoPage() {
     }
   }
 
-  const cerrado = ['FINALIZADO', 'CANCELADO'].includes(evento?.estado)
+  const cerrado = esCerrado(evento)
+  const rolesDisponibles = cerrado ? ROLES_POST_EVENTO : ROLES_PERSONAL
 
   return (
     <>
@@ -106,7 +113,7 @@ export default function PersonalEventoPage() {
         <section className="card-surface p-6">
           <h2 className="font-display text-xl font-bold">Personal asignado</h2>
           <p className="mt-1 text-sm text-muted">
-            Los recargadores solo pueden recargar saldo en los eventos donde están asignados.
+            Los recargadores y los encargados de devoluciones solo pueden operar en los eventos donde están asignados.
           </p>
           {error && (
             <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
@@ -164,10 +171,13 @@ export default function PersonalEventoPage() {
 
         <section className="card-surface h-fit p-6">
           <h2 className="font-display text-lg font-bold">Asignar personal</h2>
-          {cerrado ? (
-            <p className="mt-2 text-sm text-muted">El evento está finalizado o cancelado: ya no se puede asignar personal.</p>
-          ) : (
-            <>
+          {cerrado && (
+            <p className="mt-2 text-sm text-muted">
+              El evento está finalizado o cancelado: solo se pueden asignar encargados de devoluciones, que atienden
+              hasta 30 días después del fin del evento.
+            </p>
+          )}
+          <>
               <p className="mt-1 text-sm text-muted">
                 Aparecen los usuarios con el rol elegido. Si no encuentras a alguien, invítalo desde{' '}
                 <Link to="/admin/usuarios" className="font-semibold text-teal-dark hover:underline">
@@ -175,9 +185,9 @@ export default function PersonalEventoPage() {
                 </Link>
                 .
               </p>
-              {ROLES_PERSONAL.length > 1 && (
+              {rolesDisponibles.length > 1 && (
                 <select className="input mt-4" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Rol">
-                  {ROLES_PERSONAL.map((r) => (
+                  {rolesDisponibles.map((r) => (
                     <option key={r} value={r}>
                       {roleLabel(r)}
                     </option>
@@ -217,8 +227,7 @@ export default function PersonalEventoPage() {
                   </li>
                 )}
               </ul>
-            </>
-          )}
+          </>
         </section>
       </div>
     </>
