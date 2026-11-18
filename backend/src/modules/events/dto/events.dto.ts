@@ -31,6 +31,9 @@ export const MAX_SERVICIOS = 30;
 export const MAX_ACTIVIDADES = 30;
 
 class ScheduleFields {
+  @IsOptional() @Transform(toStrictInt) @IsInt() @Min(0) @Max(8760)
+  reembolsoHoras?: number;
+
   @Matches(DAY, { message: 'Selecciona una fecha válida.' })
   fechaInicio: string;
 
@@ -203,6 +206,9 @@ export class CreateEventoDto extends ScheduleFields {
 }
 
 export class UpdateEventoDto {
+  @IsOptional() @Transform(toStrictInt) @IsInt() @Min(0) @Max(8760)
+  reembolsoHoras?: number;
+
   @IsOptional()
   @IsString()
   @Transform(trimString)

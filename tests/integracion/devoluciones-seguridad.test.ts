@@ -231,6 +231,10 @@ describe('Flujo completo por HTTP', () => {
     const reintento = await api.pedir('POST', '/api/devoluciones', { token: tokens.devoluciones, body });
     expect(reintento.status).toBe(201);
     expect(reintento.body).toMatchObject({ repetido: true, transaccionId: r.body.transaccionId });
+    const distintoMonto = await api.pedir('POST', '/api/devoluciones', {
+      token: tokens.devoluciones, body: { ...body, montoEsperado: 74 },
+    });
+    expect(distintoMonto.status).toBe(409);
     const registradas = await api.prisma.transaccionSaldo.count({
       where: { id: idempotencyKey, tipo: TipoTransaccionSaldo.DEVOLUCION },
     });

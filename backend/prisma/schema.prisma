@@ -111,6 +111,7 @@ model StaffEvento {
 }
 
 model SolicitudEvento {
+  reembolsoHoras Int @default(48)
   id            String          @id @default(cuid())
   organizadorId String
   nombreEvento  String
@@ -139,6 +140,7 @@ model SolicitudEvento {
 }
 
 model Evento {
+  reembolsoHoras Int @default(48)
   incidenciasOrganizador IncidenciaEvento[]
   id                   String               @id @default(cuid())
   solicitudId          String?              @unique
@@ -268,6 +270,7 @@ model TicketPool {
 }
 
 model CompraEntrada {
+  reembolsoHasta DateTime?
   id             String              @id @default(cuid())
   usuarioId      String
   eventoId       String
@@ -699,6 +702,9 @@ model DetalleVenta {
 }
 
 model RetiroGanancias {
+  motivoRechazo String? @db.VarChar(500)
+  pagadoPorId String?
+  pagadoAt DateTime?
   id           String   @id @default(cuid())
   negocioId    String
   monto        Decimal  @db.Decimal(12, 2)

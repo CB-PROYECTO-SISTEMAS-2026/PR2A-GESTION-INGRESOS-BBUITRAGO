@@ -53,12 +53,21 @@ export class IdentidadService {
       }),
     ]);
     return {
+      usuarioId: cliente.usuarioId,
       nombre: cliente.nombre,
       fotoIngreso: foto?.fotoIngresoUrl
         ? { url: foto.fotoIngresoUrl, tomadaAt: foto.createdAt }
         : null,
       movimientos,
     };
+  }
+
+  async validarReintento(id: string, operadorId: string, eventoId: string, usuarioId: string, monto: number) {
+    const original = await this.db.transaccionSaldo.findFirst({
+      where: { id, operadorId, eventoId, usuarioId, monto, tipo: 'DEVOLUCION', estado: 'COMPLETADA' },
+      select: { id: true },
+    });
+    if (!original) throw new ConflictException('La clave de esta devolución ya fue utilizada.');
   }
 
   async comprobante(

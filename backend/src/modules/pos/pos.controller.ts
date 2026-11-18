@@ -134,15 +134,29 @@ export class RetirosAdminController {
 
   @Patch(':id/estado')
   cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoRetiroDto) {
-    return this.retirosService.cambiarEstado(id, dto.estado);
+    return this.retirosService.cambiarEstado(id, dto.estado, dto.motivo);
+  }
+}
+
+@Controller('api/devoluciones/retiros')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.DEVOLUCIONES)
+export class RetirosCajaController {
+  constructor(private retirosService: RetirosAdminService) {}
+
+  @Get(':id')
+  consultar(@Param('id') id: string, @CurrentUser('id') operador: string) {
+    return this.retirosService.consultarCaja(id, operador);
   }
 
   @Post(':id/pagar')
   @UseInterceptors(FileInterceptor('evidencia', memoryUpload))
   pagar(
     @Param('id') id: string,
+    @CurrentUser('id') operador: string,
+    @Body('documento') documento: string,
     @UploadedFile() evidencia?: Express.Multer.File,
   ) {
-    return this.retirosService.pagar(id, evidencia);
+    return this.retirosService.pagar(id, evidencia, operador, documento);
   }
 }

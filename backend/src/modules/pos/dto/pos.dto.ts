@@ -134,6 +134,8 @@ export class FiltroRetirosDto {
 }
 
 export class CambiarEstadoRetiroDto {
+  @IsOptional() @IsString() @MaxLength(500) motivo?: string;
+
   @IsIn(['APROBADO', 'RECHAZADO'], {
     message: 'El estado debe ser APROBADO o RECHAZADO.',
   })

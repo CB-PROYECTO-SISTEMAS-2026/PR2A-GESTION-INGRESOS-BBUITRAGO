@@ -298,6 +298,7 @@ export class NegocioVentasService {
         select: {
           id: true,
           negocioId: true,
+          motivoRechazo: true,
           monto: true,
           estado: true,
           createdAt: true,
@@ -322,6 +323,7 @@ export class NegocioVentasService {
               id: r.id,
               monto: money(r.monto),
               estado: r.estado,
+              motivoRechazo: r.motivoRechazo,
               fecha: r.createdAt,
             })),
         };

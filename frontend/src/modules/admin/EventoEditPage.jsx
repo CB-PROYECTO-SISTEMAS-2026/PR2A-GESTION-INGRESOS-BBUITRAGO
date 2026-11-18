@@ -32,6 +32,7 @@ const emptyForm = {
   ubicacionUrl: '',
   tipoAcceso: 'QR_DIGITAL',
   estado: 'BORRADOR',
+  reembolsoHoras: 48,
   capacidad: '',
   organizadorId: '',
   fechaInicio: '',
@@ -95,6 +96,7 @@ export default function EventoEditPage() {
       ubicacionUrl: e.ubicacionUrl || '',
       tipoAcceso: e.tipoAcceso || 'QR_DIGITAL',
       estado: e.estado || 'BORRADOR',
+      reembolsoHoras: e.reembolsoHoras ?? 48,
       capacidad: e.capacidad != null ? String(e.capacidad) : '',
       organizadorId: e.organizadorId || '',
       fechaInicio: toDay(first?.fecha),
@@ -136,7 +138,8 @@ export default function EventoEditPage() {
             descripcion: s.descripcion || '',
             ubicacion: s.ubicacion || '',
             ubicacionUrl: s.ubicacionUrl || '',
-            capacidad: s.capacidad != null ? String(s.capacidad) : '',
+            reembolsoHoras: s.reembolsoHoras ?? 48,
+      capacidad: s.capacidad != null ? String(s.capacidad) : '',
             fechaInicio: toDay(s.fechaInicio),
             fechaFin: s.fechaFin ? toDay(s.fechaFin) : '',
             horaInicio: s.horaInicio || emptyForm.horaInicio,
@@ -250,6 +253,7 @@ export default function EventoEditPage() {
     descripcion: form.descripcion.trim(),
     ubicacion: form.ubicacion.trim(),
     ubicacionUrl: form.ubicacionUrl.trim(),
+    reembolsoHoras: Number(form.reembolsoHoras),
     capacidad: Number(form.capacidad),
     servicios,
     cronograma: toCronogramaPayload(cronograma),
@@ -341,6 +345,7 @@ export default function EventoEditPage() {
 
   return (
     <>
+      {!isNew && <Link className="btn-secondary" to={`/admin/eventos/${id}/reportes`}>Reportes e incidencias</Link>}
       <EventoHeader eventoId={isNew ? null : id} titulo={guardado.titulo} estado={guardado.estado} />
 
       <form onSubmit={onSubmit} noValidate className="mx-auto max-w-4xl space-y-6 p-8">
@@ -468,6 +473,9 @@ export default function EventoEditPage() {
                 )}
               </div>
             </Field>
+            <label className="label">Plazo de reembolso (horas antes del inicio)
+              <input className="input" type="number" required min="0" max="8760" step="1" value={form.reembolsoHoras} onChange={e => setField('reembolsoHoras', e.target.value)} />
+            </label>
             <Field label="Capacidad máxima" htmlFor="capacidad" required error={errors.capacidad}>
               <IntegerInput
                 id="capacidad"

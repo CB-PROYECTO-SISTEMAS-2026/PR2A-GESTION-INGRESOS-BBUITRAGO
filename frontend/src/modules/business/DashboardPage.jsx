@@ -43,7 +43,7 @@ export default function DashboardPage() {
     <div className="p-4 sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold">Dashboard</h1>
+          <h1 className="font-display text-3xl font-bold">Resumen del negocio</h1>
           <p className="mt-1 text-sm text-muted">Rendimiento de tus puntos de venta · se actualiza cada 30 segundos</p>
         </div>
       </div>
@@ -163,6 +163,41 @@ export default function DashboardPage() {
               </table>
             </section>
           </div>
+
+          {/* HU-037: desempeño por ayudante */}
+          <section className="mt-6 rounded-lg border border-border bg-white p-5">
+            <h2 className="font-semibold">Desempeño por ayudante</h2>
+            <p className="text-xs text-muted">Ventas cobradas por cada ayudante en el periodo</p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[420px] text-left text-sm">
+                <thead className="text-xs text-muted">
+                  <tr>
+                    <th className="py-2 font-medium">Ayudante</th>
+                    <th className="py-2 text-right font-medium">Ventas</th>
+                    <th className="py-2 text-right font-medium">Ticket promedio</th>
+                    <th className="py-2 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.porAyudante.map((a) => (
+                    <tr key={a.ayudanteId} className="border-t border-border">
+                      <td className="py-2.5 font-medium">{a.nombre}</td>
+                      <td className="py-2.5 text-right text-muted">{a.transacciones}</td>
+                      <td className="py-2.5 text-right tabular-nums text-muted">{formatBs(a.ticketPromedio)}</td>
+                      <td className="py-2.5 text-right font-semibold tabular-nums">{formatBs(a.total)}</td>
+                    </tr>
+                  ))}
+                  {!data.porAyudante.length && (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-muted">
+                        Sin ventas en este periodo.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
       )}
     </div>

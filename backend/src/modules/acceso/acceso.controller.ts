@@ -24,6 +24,7 @@ import {
   CandidatosAccesoQuery,
   EscaneoDto,
   FechaAccesoQuery,
+  HistorialAccesoQuery,
   RechazoAccesoDto,
   RegistroAccesoDto,
 } from './dto/acceso.dto';
@@ -40,6 +41,11 @@ export class AccesoController {
   @Get('mis-eventos')
   misEventos(@CurrentUser() user: AuthUser) {
     return this.accesoService.misEventos(user);
+  }
+
+  @Get('historial/mis-eventos')
+  eventosHistorial(@CurrentUser() user: AuthUser) {
+    return this.accesoService.eventosHistorial(user);
   }
 
   @Post('verificar')
@@ -76,7 +82,7 @@ export class AccesoController {
   registros(
     @CurrentUser() user: AuthUser,
     @Param('id') eventoId: string,
-    @Query() query: FechaAccesoQuery,
+    @Query() query: HistorialAccesoQuery,
   ) {
     return this.accesoService.registrosSupervisor(user, eventoId, query);
   }

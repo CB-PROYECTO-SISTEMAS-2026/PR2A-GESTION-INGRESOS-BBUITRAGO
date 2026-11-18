@@ -16,6 +16,6 @@ export const solicitarRetiro = (negocioId) => api.post('/negocio-panel/retiros',
 
 // Retiros de los negocios (administrador)
 export const getRetirosAdmin = (params) => api.get('/admin/retiros', { params })
-export const cambiarEstadoRetiro = (id, estado) => api.patch(`/admin/retiros/${id}/estado`, { estado })
+export const cambiarEstadoRetiro = (id, estado, motivo) => api.patch(`/admin/retiros/${id}/estado`, { estado, motivo })
 export const pagarRetiro = (id, formData) =>
-  api.post(`/admin/retiros/${id}/pagar`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+  api.post(`/devoluciones/retiros/${id}/pagar`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })

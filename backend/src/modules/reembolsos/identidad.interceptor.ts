@@ -29,7 +29,9 @@ export class IdentidadInterceptor implements NestInterceptor {
           );
           return {
             ...resultado,
-            ...datos,
+            nombre: datos.nombre,
+            fotoIngreso: datos.fotoIngreso,
+            movimientos: datos.movimientos,
             ...(!datos.fotoIngreso && {
               puedeDevolver: false,
               montoDevolvible: '0.00',
@@ -55,6 +57,16 @@ export class IdentidadInterceptor implements NestInterceptor {
         codigo,
       );
       if (!datos.fotoIngreso) throw new BadRequestException(SIN_FOTO);
+      return next.handle().pipe(
+        mergeMap(async (resultado) => {
+          if (resultado.repetido) {
+            await this.identidad.validarReintento(
+              resultado.transaccionId, req.user.id, eventoId, datos.usuarioId, Number(req.body.montoEsperado),
+            );
+          }
+          return resultado;
+        }),
+      );
     }
     return next.handle();
   }

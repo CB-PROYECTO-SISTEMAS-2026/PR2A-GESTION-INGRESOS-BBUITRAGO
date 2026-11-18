@@ -95,28 +95,49 @@ export class RetirosAdminService {
   }
 
   /** Aprueba o rechaza una solicitud. */
-  async cambiarEstado(id: string, estado: 'APROBADO' | 'RECHAZADO') {
+  async cambiarEstado(id: string, estado: 'APROBADO' | 'RECHAZADO', motivo?: string) {
+    if (estado === 'RECHAZADO' && !motivo?.trim()) throw new BadRequestException('Indica el motivo del rechazo.');
     const desde = TRANSICIONES[estado];
     const { count } = await this.prisma.retiroGanancias.updateMany({
       where: { id, estado: { in: desde } },
-      data: { estado },
+      data: { estado, motivoRechazo: estado === 'RECHAZADO' ? motivo!.trim() : null },
     });
     if (!count) await this.transicionInvalida(id, estado);
     return this.detalle(id);
   }
 
   /** Marca el retiro como pagado y guarda el comprobante de la transferencia o entrega. */
-  async pagar(id: string, evidencia: Express.Multer.File | undefined) {
+  private alcanceCaja(operadorId: string) {
+    return { negocio: { ventas: { some: { evento: { staff: { some: {
+      usuarioId: operadorId, role: 'DEVOLUCIONES' as const, activo: true,
+    } } } } } } };
+  }
+
+  async consultarCaja(id: string, operadorId: string) {
+    const retiro = await this.prisma.retiroGanancias.findFirst({
+      where: { id, ...this.alcanceCaja(operadorId), estado: { in: ['APROBADO', 'PAGADO'] } },
+      select: { id: true, estado: true, monto: true, negocio: { select: { nombre: true,
+        dueno: { select: { nombre: true, apellido: true } } } } },
+    });
+    if (!retiro) throw new NotFoundException('Retiro aprobado no encontrado en tus eventos.');
+    return { id, estado: retiro.estado, monto: money(retiro.monto), negocio: retiro.negocio.nombre, dueno: nombreCompleto(retiro.negocio.dueno) };
+  }
+
+  async pagar(id: string, evidencia: Express.Multer.File | undefined, operadorId: string, documento: string) {
     if (!evidencia) {
       throw new BadRequestException(
         'Adjunta el comprobante del pago (imagen o PDF).',
       );
     }
-    const actual = await this.prisma.retiroGanancias.findUnique({
-      where: { id },
-      select: { estado: true },
+    const alcance = this.alcanceCaja(operadorId);
+    const actual = await this.prisma.retiroGanancias.findFirst({
+      where: { id, ...alcance },
+      select: { estado: true, pagadoPorId: true, negocio: { select: { dueno: { select: { documento: true } } } } },
     });
     if (!actual) throw new NotFoundException('Retiro no encontrado');
+    if (typeof documento !== 'string' || !documento.trim() || documento.trim() !== actual.negocio.dueno.documento)
+      throw new BadRequestException('El documento no coincide con el titular del negocio.');
+    if (actual.estado === 'PAGADO' && actual.pagadoPorId === operadorId) return { ...(await this.detalle(id)), repetido: true };
     if (actual.estado !== 'APROBADO') {
       throw new ConflictException(
         'Solo se puede registrar el pago de un retiro aprobado.',
@@ -129,8 +150,8 @@ export class RetirosAdminService {
       'imageOrPdf',
     );
     const { count } = await this.prisma.retiroGanancias.updateMany({
-      where: { id, estado: 'APROBADO' },
-      data: { estado: 'PAGADO', evidenciaUrl: stored.url },
+      where: { id, estado: 'APROBADO', ...alcance },
+      data: { estado: 'PAGADO', evidenciaUrl: stored.url, pagadoPorId: operadorId, pagadoAt: new Date() },
     });
     if (!count) {
       // Otro administrador lo cambió mientras se subía el archivo.

@@ -7,7 +7,7 @@ import path from 'path';
 import type { Page } from '@playwright/test';
 import type { Escenario } from '../../integracion/helpers/escenario';
 
-export const AUTH_DIR = path.resolve(__dirname, '../.auth');
+export const AUTH_DIR = process.env.EVENTIX_QA_AUTH_DIR ?? path.resolve(__dirname, '../.auth');
 
 export const ROLES_E2E = ['cliente', 'ayudante', 'jefe', 'organizador', 'admin', 'recargador', 'devoluciones'] as const;
 export type RolE2E = (typeof ROLES_E2E)[number];

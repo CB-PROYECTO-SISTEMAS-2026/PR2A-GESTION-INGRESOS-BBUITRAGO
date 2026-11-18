@@ -27,6 +27,7 @@ import {
   CandidatosAccesoQuery,
   EscaneoDto,
   FechaAccesoQuery,
+  HistorialAccesoQuery,
   RechazoAccesoDto,
   RegistroAccesoDto,
   Sentido,
@@ -184,23 +185,28 @@ export class AccesoService {
 
   // ---------- Supervisor ----------
 
+  private asignacionSupervisor(user: AuthUser): Prisma.EventoWhereInput {
+    return user.roles.includes(Role.ADMIN)
+      ? {}
+      : { staff: { some: { usuarioId: user.id, role: Role.ENCARGADO_ACCESO, activo: true } } };
+  }
+
+  async eventosHistorial(user: AuthUser) {
+    const eventos = await this.prisma.evento.findMany({
+      where: { estado: { not: EventoEstado.BORRADOR }, ...this.asignacionSupervisor(user) },
+      orderBy: [{ titulo: 'asc' }, { id: 'asc' }],
+      select: { id: true, titulo: true, fechas: eventoAccesoSelect.fechas },
+    });
+    return { eventos };
+  }
+
   /** Eventos publicados en los que el supervisor controla el acceso; primero los de hoy. */
   async misEventos(user: AuthUser) {
     const today = todayIn(this.timeZone);
     const eventos = await this.prisma.evento.findMany({
       where: {
         estado: EventoEstado.PUBLICADO,
-        ...(user.roles.includes(Role.ADMIN)
-          ? {}
-          : {
-              staff: {
-                some: {
-                  usuarioId: user.id,
-                  role: Role.ENCARGADO_ACCESO,
-                  activo: true,
-                },
-              },
-            }),
+        ...this.asignacionSupervisor(user),
       },
       select: eventoAccesoSelect,
     });
@@ -411,14 +417,12 @@ export class AccesoService {
   async registrosSupervisor(
     user: AuthUser,
     eventoId: string,
-    query: FechaAccesoQuery,
+    query: HistorialAccesoQuery,
   ) {
     const evento = await this.requireEventoSupervisado(user, eventoId, false);
-    return this.listarRegistros(
-      evento,
-      this.fechaConsultada(evento, query.fechaId),
-      user.id,
-    );
+    const fecha = this.fechaConsultada(evento, query.fechaId);
+    const registros = await this.listarRegistros(evento, fecha, user.id, query.page);
+    return { ...registros, fechaId: fecha?.id ?? null, pageSize: MAX_REGISTROS };
   }
 
   // ---------- Administración ----------
@@ -757,6 +761,7 @@ export class AccesoService {
     evento: EventoAcceso,
     fecha: FechaAcceso | null,
     encargadoId?: string,
+    page = 1,
   ) {
     if (!fecha) return { total: 0, registros: [], rechazos: [] };
     const where = {
@@ -768,13 +773,15 @@ export class AccesoService {
       this.prisma.accesoEvento.count({ where }),
       this.prisma.accesoEvento.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * MAX_REGISTROS,
         take: MAX_REGISTROS,
         select: registroSelect,
       }),
       this.prisma.accesoRechazo.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * MAX_REGISTROS,
         take: MAX_REGISTROS,
         select: rechazoSelect,
       }),

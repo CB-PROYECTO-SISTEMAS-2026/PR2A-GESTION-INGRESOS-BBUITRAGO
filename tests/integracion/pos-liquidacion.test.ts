@@ -94,6 +94,8 @@ let ventas: NegocioVentasService;
 let retiros: RetirosAdminService;
 let esc: Escenario;
 const sufijo = nuevoSufijo();
+let cajero: string;
+const documento = "QA" + sufijo;
 const eventos = { finalizado: '', pasado: '', cancelado: '' };
 
 /** Almacenamiento de comprobantes simulado: no sube nada a Cloudinary. */
@@ -148,6 +150,9 @@ beforeAll(async () => {
     crearEventoPasado(prisma, esc, 'Feria cancelada', EventoEstado.CANCELADO, 2),
     crearUsuario(prisma, 'cliente-malicioso', sufijo, [Role.CLIENTE], NOMBRE_MALICIOSO),
   ]);
+  cajero = await crearUsuario(prisma, "caja", sufijo, [Role.DEVOLUCIONES]);
+  await prisma.staffEvento.create({data:{eventoId:finalizado, usuarioId:cajero, role:Role.DEVOLUCIONES}});
+  await prisma.usuario.update({where:{id:esc.usuarios.jefe},data:{documento}});
   Object.assign(eventos, { finalizado, pasado, cancelado });
 
   const { empanada, refresco, limitado } = esc.productos;
@@ -336,7 +341,7 @@ describe('Flujo de un retiro: solicitud → aprobación → pago', () => {
   });
 
   it('no se puede pagar un retiro que no fue aprobado', async () => {
-    const err = await capturar(retiros.pagar(retiroId, comprobante));
+    const err = await capturar(retiros.pagar(retiroId, comprobante, cajero, documento));
     expect(err).toBeInstanceOf(ConflictException);
     expect(mensaje(err)).toBe('Solo se puede registrar el pago de un retiro aprobado.');
   });
@@ -349,13 +354,13 @@ describe('Flujo de un retiro: solicitud → aprobación → pago', () => {
   });
 
   it('exige el comprobante para registrar el pago', async () => {
-    const err = await capturar(retiros.pagar(retiroId, undefined));
+    const err = await capturar(retiros.pagar(retiroId, undefined, cajero, documento));
     expect(err).toBeInstanceOf(BadRequestException);
   });
 
   it('registra el pago con el comprobante (guardado en la carpeta "retiros")', async () => {
     storage.upload.mockClear();
-    const r = await retiros.pagar(retiroId, comprobante);
+    const r = await retiros.pagar(retiroId, comprobante, cajero, documento);
     expect(r).toMatchObject({
       estado: 'PAGADO',
       evidenciaUrl: 'https://comprobantes.prueba.test/retiro.png',
@@ -365,7 +370,7 @@ describe('Flujo de un retiro: solicitud → aprobación → pago', () => {
   });
 
   it('un retiro pagado ya no se puede rechazar', async () => {
-    const err = await capturar(retiros.cambiarEstado(retiroId, 'RECHAZADO'));
+    const err = await capturar(retiros.cambiarEstado(retiroId, 'RECHAZADO', 'Revisión del retiro'));
     expect(err).toBeInstanceOf(ConflictException);
     expect(mensaje(err)).toBe('No se puede pasar un retiro PAGADO a RECHAZADO.');
   });
@@ -374,7 +379,7 @@ describe('Flujo de un retiro: solicitud → aprobación → pago', () => {
     expect(await capturar(retiros.cambiarEstado('no-existe-prueba-auto', 'APROBADO'))).toBeInstanceOf(
       NotFoundException,
     );
-    expect(await capturar(retiros.pagar('no-existe-prueba-auto', comprobante))).toBeInstanceOf(
+    expect(await capturar(retiros.pagar('no-existe-prueba-auto', comprobante, cajero, documento))).toBeInstanceOf(
       NotFoundException,
     );
   });
@@ -395,7 +400,7 @@ describe('Rechazos y solicitudes simultáneas', () => {
     const r = await ventas.solicitarRetiro(esc.usuarios.jefe, esc.negocioId);
     expect(await liquidacion()).toMatchObject({ disponible: '0.00' });
 
-    await retiros.cambiarEstado(r.id, 'RECHAZADO');
+    await retiros.cambiarEstado(r.id, 'RECHAZADO', 'Revisión del retiro');
     expect(await liquidacion()).toMatchObject({ retirado: '72.00', disponible: '8.00' });
   });
 
@@ -424,7 +429,7 @@ describe('Rechazos y solicitudes simultáneas', () => {
       return { url: 'https://comprobantes.prueba.test/tarde.png', publicId: 'eventix/retiros/tarde', nombre: 'tarde.png' };
     });
 
-    const err = await capturar(retiros.pagar(pendiente.id, comprobante));
+    const err = await capturar(retiros.pagar(pendiente.id, comprobante, cajero, documento));
     expect(err).toBeInstanceOf(ConflictException);
     expect(mensaje(err)).toBe('El retiro cambió de estado. Actualiza la lista.');
     expect(storage.remove).toHaveBeenCalledWith('eventix/retiros/tarde');

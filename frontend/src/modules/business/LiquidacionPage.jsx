@@ -144,6 +144,8 @@ export default function LiquidacionPage() {
                     <div>
                       <p className="font-semibold tabular-nums">{formatBs(r.monto)}</p>
                       <p className="text-xs text-muted">{formatDateTime(r.fecha)}</p>
+                      {r.estado === 'APROBADO' && <p>Presentá tu documento y este código en devoluciones: <strong>{r.id}</strong></p>}
+                      {r.motivoRechazo && <p>Motivo del rechazo: {r.motivoRechazo}</p>}
                     </div>
                     <span className={`badge ${RETIRO_BADGE[r.estado] || 'bg-page text-muted'}`}>{r.estado}</span>
                   </li>

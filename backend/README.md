@@ -34,21 +34,6 @@ desde la app los ven los demás al instante. No hay seeds ni base local.
 | `npm run start:dev` | Regenera el cliente de Prisma y levanta la API en modo watch |
 | `npm run db:sync` | Actualiza `prisma/schema.prisma` desde la base y regenera el cliente |
 
-## Usuarios de prueba
-| Rol | Email | Password |
-|-----|-------|----------|
-| ADMIN | admin@eventix.com | Admin123! |
-| ORGANIZADOR | organizador@eventix.com | Organiza123! |
-| CLIENTE | cliente@eventix.com | Cliente123! |
-| JEFE_NEGOCIO | negocio@eventix.com | Negocio123! |
-| AYUDANTE | ayudante@eventix.com | Ayudante123! |
-| ENCARGADO_ACCESO | acceso@eventix.com | Acceso123! |
-| RECARGADOR | recargador@eventix.com | Recarga123! |
-| DEVOLUCIONES | devoluciones@eventix.com | Devol123! |
-
-Las cuentas de administradores, organizadores y jefes de negocio reales se crean por invitación
-desde el panel **Admin → Usuarios**: el invitado recibe un correo y la cuenta se crea al aceptarlo.
-
 ## Módulos
 `auth`, `users`, `admin-users`, `events`, `tickets`, `businesses`, y los servicios comunes
 `common/mail` (SMTP) y `common/storage` (Cloudinary).

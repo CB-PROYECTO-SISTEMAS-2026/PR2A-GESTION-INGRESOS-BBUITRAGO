@@ -2,13 +2,16 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
+  IsInt,
+  Max,
+  Min,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { trimString } from '../../../common/validation/validators';
+import { toStrictInt, trimString } from '../../../common/validation/validators';
 
 /** Puerta en la que está el supervisor: cada escaneo se registra como ingreso o como salida (HU-017). */
 export const SENTIDOS = ['ENTRADA', 'SALIDA'] as const;
@@ -55,6 +58,15 @@ export class FechaAccesoQuery {
   @IsString()
   @MaxLength(191)
   fechaId?: string;
+}
+
+export class HistorialAccesoQuery extends FechaAccesoQuery {
+  @IsOptional()
+  @Transform(toStrictInt)
+  @IsInt()
+  @Min(1)
+  @Max(1000000)
+  page?: number;
 }
 
 export class CandidatosAccesoQuery {

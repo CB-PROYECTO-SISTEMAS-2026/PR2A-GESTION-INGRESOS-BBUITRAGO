@@ -90,6 +90,7 @@ export class EventsService {
         data: {
           organizadorId,
           nombreEvento: dto.nombreEvento,
+          reembolsoHoras: dto.reembolsoHoras,
           descripcion: dto.descripcion,
           ubicacion: dto.ubicacion,
           ubicacionUrl: dto.ubicacionUrl,
@@ -264,6 +265,7 @@ export class EventsService {
       );
     }
     let organizadorId = dto.organizadorId;
+    let horas = dto.reembolsoHoras;
     let mapaUrl: string | null = null;
     let mapaNombre: string | null = null;
     const solicitudId = dto.solicitudId;
@@ -283,6 +285,7 @@ export class EventsService {
           'La solicitud debe estar APROBADA para crear el evento',
         );
       }
+      horas ??= solicitud.reembolsoHoras;
       organizadorId = solicitud.organizadorId;
       mapaUrl = solicitud.mapaUrl;
       mapaNombre = solicitud.mapaNombre;
@@ -296,6 +299,7 @@ export class EventsService {
           solicitudId,
           organizadorId: organizadorId!,
           titulo: dto.titulo,
+          reembolsoHoras: horas,
           descripcion: dto.descripcion,
           ubicacion: dto.ubicacion,
           ubicacionUrl: dto.ubicacionUrl,

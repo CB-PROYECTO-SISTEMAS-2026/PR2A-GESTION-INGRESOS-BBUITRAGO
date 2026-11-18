@@ -15,6 +15,7 @@ const initialForm = {
   descripcion: '',
   ubicacion: '',
   ubicacionUrl: '',
+  reembolsoHoras: 48,
   capacidad: '',
   empresa: '',
   fechaInicio: '',
@@ -88,6 +89,7 @@ export default function SolicitudFormPage() {
       fd.append('descripcion', form.descripcion.trim())
       fd.append('ubicacion', form.ubicacion.trim())
       fd.append('ubicacionUrl', form.ubicacionUrl.trim())
+      fd.append('reembolsoHoras', String(form.reembolsoHoras))
       fd.append('capacidad', form.capacidad)
       if (form.empresa.trim()) fd.append('empresa', form.empresa.trim())
       fd.append('fechaInicio', form.fechaInicio)
@@ -177,6 +179,9 @@ export default function SolicitudFormPage() {
                 )}
               </div>
             </Field>
+            <label className="label">Plazo de reembolso (horas antes del inicio)
+              <input className="input" type="number" required min="0" max="8760" step="1" value={form.reembolsoHoras} onChange={e => setField('reembolsoHoras', e.target.value)} />
+            </label>
             <Field label="Capacidad máxima" htmlFor="capacidad" required error={errors.capacidad}>
               <IntegerInput
                 id="capacidad"

@@ -49,22 +49,6 @@ export function isPdfUrl(url) {
   return /\.pdf($|\?)/i.test(url || '') || /\/raw\/upload\//.test(url || '')
 }
 
-/** Ej. "15 SEP 2026 · 09:00" para cards del homepage (Figma). */
-export function formatEventCardDate(fecha, hora) {
-  if (!fecha && !hora) return '—'
-  const d = fecha ? new Date(fecha) : null
-  const datePart =
-    d && !Number.isNaN(d.getTime())
-      ? d
-          .toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })
-          .replace(/\./g, '')
-          .toUpperCase()
-      : ''
-  const timePart = hora ? String(hora).slice(0, 5) : ''
-  if (datePart && timePart) return `${datePart} · ${timePart}`
-  return datePart || timePart || '—'
-}
-
 export function formatDateTime(value) {
   if (!value) return '—'
   const d = new Date(value)
@@ -104,6 +88,11 @@ export function lowestPrice(evento) {
 export function getErrorMessage(error, fallback = 'Ocurrió un error') {
   const status = error?.response?.status
   if (status === 429) return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
+  if (status >= 500 && (!error.response.data?.message || error.response.data.message === 'Internal server error')) {
+    return error.config?.method?.toLowerCase() === 'get'
+      ? 'No se pudieron cargar los datos. Inténtalo de nuevo en unos instantes.'
+      : 'No se pudo confirmar la operación. Consulta su estado antes de repetirla.'
+  }
   if (error && !error.response && error.request) {
     return 'No se pudo conectar con el servidor. Revisa tu conexión.'
   }

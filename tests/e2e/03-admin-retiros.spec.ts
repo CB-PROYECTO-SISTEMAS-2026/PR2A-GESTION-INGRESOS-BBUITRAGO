@@ -56,22 +56,10 @@ test.describe.serial('Retiros del administrador', () => {
     expect(errores).toEqual([]);
   });
 
-  test('el pago exige adjuntar el comprobante', async ({ page }) => {
-    await page.goto('/admin/retiros');
-    await page.getByRole('tab', { name: /Aprobados/ }).click();
-    await filaDelNegocio(page).getByRole('button', { name: 'Registrar pago' }).click();
-
-    const modal = page.getByRole('dialog');
-    await expect(modal.getByText('Registrar pago del retiro')).toBeVisible();
-    await modal.getByRole('button', { name: 'Marcar como pagado' }).click();
-    await expect(modal.getByRole('alert')).toHaveText('Adjunta el comprobante del pago.');
-    await modal.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(modal).toBeHidden();
-  });
-
   test('rechaza el retiro y pasa a "Rechazados"', async ({ page }) => {
     await page.goto('/admin/retiros');
     await page.getByRole('tab', { name: /Aprobados/ }).click();
+    page.once('dialog', dialog => dialog.accept('Revisión administrativa'));
     await filaDelNegocio(page).getByRole('button', { name: 'Rechazar' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Rechazar' }).click();
     await expect(page.getByText('Retiro rechazado')).toBeVisible();

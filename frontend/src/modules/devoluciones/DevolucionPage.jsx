@@ -1,3 +1,5 @@
+import { Comprobante } from '../sprint3/Devoluciones'
+import { Tabla } from '../sprint3/comun'
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { consultarClienteDevolucion, devolverSaldo, getDevolucionesContexto } from '../../api/recargas.api'
 import { IconCheck, IconQr, IconWallet, IconWarning } from '../../components/ui/icons'
@@ -348,7 +350,8 @@ function DetalleCliente({ cliente, verificado, onVerificado, rechazo, onContinua
 
       <Rechazo rechazo={rechazo} />
 
-      {cliente.puedeDevolver ? (
+      <Tabla titulo="Últimos movimientos del evento" columnas={['Fecha','Operación','Monto','Estado']} filas={(cliente.movimientos||[]).map(m=>[formatDateTime(m.createdAt),m.tipo,formatBs(m.monto),m.estado])}/>
+      {cliente.puedeDevolver && fotoIngreso ? (
         <>
           <p className="rounded-xl bg-teal/10 p-4 text-sm text-teal-dark">
             El saldo será devuelto al asistente y su saldo en este evento quedará en {formatBs(0)}.
@@ -361,9 +364,7 @@ function DetalleCliente({ cliente, verificado, onVerificado, rechazo, onContinua
               onChange={(e) => onVerificado(e.target.checked)}
             />
             <span>
-              {fotoIngreso
-                ? 'Comparé la foto del primer ingreso y la persona es la misma.'
-                : 'Esta persona no tiene foto de ingreso: verifiqué su carnet de identidad y coincide con el titular.'}
+              Comparé la foto del primer ingreso y la persona es la misma.
             </span>
           </label>
           <div className="mt-auto grid gap-2">
@@ -380,7 +381,7 @@ function DetalleCliente({ cliente, verificado, onVerificado, rechazo, onContinua
           <div className="flex gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900" role="alert">
             <IconWarning className="mt-0.5 h-6 w-6 shrink-0" />
             <div className="text-sm">
-              <p>{cliente.motivo}</p>
+              <p>{cliente.motivo || 'No se pueden devolver puntos sin la foto del primer ingreso.'}</p>
               {cliente.ultimaDevolucion && (
                 <p className="mt-1">
                   Última devolución: {formatBs(cliente.ultimaDevolucion.monto)} el{' '}
@@ -469,7 +470,8 @@ function DevolucionExitosa({ resultado, onNueva, onInicio }) {
         <p className="mt-3 text-xs text-muted">Monto devuelto</p>
         <p className="font-display text-3xl font-bold text-teal-dark">{formatBs(resultado.monto)}</p>
       </div>
-      <dl className="grid w-full gap-2 rounded-xl border border-border bg-white p-4 text-sm">
+      <Comprobante id={resultado.transaccionId}/>
+        <dl className="grid w-full gap-2 rounded-xl border border-border bg-white p-4 text-sm">
         {[
           ['Pago', 'Efectivo'],
           ['Saldo después', formatBs(resultado.saldoResultante)],

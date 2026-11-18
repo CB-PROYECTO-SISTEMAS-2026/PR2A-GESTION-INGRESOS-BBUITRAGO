@@ -89,6 +89,8 @@ const parseItems = ({ value }: { value: unknown }) => {
 };
 
 export class CreateCompraDto {
+  @IsOptional() @IsString() @MaxLength(32) reembolsoHasta?: string;
+
   @Transform(parseItems)
   @IsArray({ message: 'Agrega al menos una entrada.' })
   @ArrayMinSize(1, { message: 'Agrega al menos una entrada.' })

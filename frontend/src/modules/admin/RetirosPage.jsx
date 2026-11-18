@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cambiarEstadoRetiro, getRetirosAdmin, pagarRetiro } from '../../api/pos.api'
+import { cambiarEstadoRetiro, getRetirosAdmin } from '../../api/pos.api'
 import { toast } from '../../components/Toast'
-import Modal from '../../components/ui/Modal'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import { IconExternal } from '../../components/ui/icons'
 import { formatBs, formatDateTime, getErrorMessage } from '../../utils/format'
@@ -23,7 +22,6 @@ export default function RetirosPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState(null)
-  const [pagando, setPagando] = useState(null)
 
   // Número de la última petición: si el usuario cambia de pestaña antes de que llegue la
   // respuesta anterior, esa respuesta vieja se descarta (no pisa la tabla de la pestaña nueva).
@@ -50,16 +48,18 @@ export default function RetirosPage() {
     const ok = await confirmDialog({
       title: aprobar ? 'Aprobar retiro' : 'Rechazar retiro',
       message: aprobar
-        ? `Se aprobará el retiro de ${formatBs(retiro.monto)} para ${retiro.negocio}. Después podrás registrar el pago.`
+        ? `Se aprobará el retiro de ${formatBs(retiro.monto)} para ${retiro.negocio}. El titular podrá cobrar en devoluciones.`
         : `Se rechazará el retiro de ${formatBs(retiro.monto)} de ${retiro.negocio}. El monto vuelve a quedar disponible para el negocio.`,
       confirmText: aprobar ? 'Aprobar' : 'Rechazar',
       cancelText: 'Cancelar',
       tone: aprobar ? undefined : 'danger',
     })
     if (!ok) return
+    const motivo = aprobar ? undefined : window.prompt('Motivo del rechazo que verá el dueño del negocio')?.trim()
+    if (!aprobar && !motivo) return
     setOcupado(retiro.id)
     try {
-      await cambiarEstadoRetiro(retiro.id, nuevo)
+      await cambiarEstadoRetiro(retiro.id, nuevo, motivo)
       toast(aprobar ? 'Retiro aprobado' : 'Retiro rechazado', 'success')
       await cargar()
     } catch (err) {
@@ -74,7 +74,7 @@ export default function RetirosPage() {
       <h1 className="font-display text-3xl font-bold">Retiros de negocios</h1>
       <p className="mt-1 max-w-2xl text-sm text-muted">
         Los dueños de negocio solicitan el retiro de lo vendido cuando sus eventos terminan. Aprueba la solicitud,
-        entrega el dinero y registra el pago con su comprobante.
+        o recházala con un motivo. El encargado de devoluciones entrega el efectivo.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Estado">
@@ -150,11 +150,6 @@ export default function RetirosPage() {
                           Aprobar
                         </button>
                       )}
-                      {r.estado === 'APROBADO' && (
-                        <button type="button" className="btn-primary btn-sm" onClick={() => setPagando(r)}>
-                          Registrar pago
-                        </button>
-                      )}
                       {['SOLICITADO', 'APROBADO'].includes(r.estado) && (
                         <button
                           type="button"
@@ -191,96 +186,6 @@ export default function RetirosPage() {
         </div>
       )}
 
-      <RegistrarPagoModal
-        retiro={pagando}
-        onClose={() => setPagando(null)}
-        onPagado={async () => {
-          setPagando(null)
-          toast('Pago registrado', 'success')
-          await cargar()
-        }}
-      />
     </div>
-  )
-}
-
-function RegistrarPagoModal({ retiro, onClose, onPagado }) {
-  const [archivo, setArchivo] = useState(null)
-  const [enviando, setEnviando] = useState(false)
-  const [error, setError] = useState('')
-
-  const cerrar = () => {
-    if (enviando) return
-    setArchivo(null)
-    setError('')
-    onClose()
-  }
-
-  const enviar = async (e) => {
-    e.preventDefault()
-    if (!archivo) {
-      setError('Adjunta el comprobante del pago.')
-      return
-    }
-    setEnviando(true)
-    setError('')
-    try {
-      const form = new FormData()
-      form.append('evidencia', archivo)
-      await pagarRetiro(retiro.id, form)
-      setArchivo(null)
-      await onPagado()
-    } catch (err) {
-      setError(getErrorMessage(err, 'No se pudo registrar el pago.'))
-    } finally {
-      setEnviando(false)
-    }
-  }
-
-  return (
-    <Modal
-      open={Boolean(retiro)}
-      onClose={cerrar}
-      title="Registrar pago del retiro"
-      size="sm"
-      labelledBy="pago-retiro-title"
-      footer={
-        <>
-          <button type="button" className="btn-secondary" onClick={cerrar} disabled={enviando}>
-            Cancelar
-          </button>
-          <button type="submit" form="form-pago-retiro" className="btn-primary" disabled={enviando}>
-            {enviando ? 'Subiendo…' : 'Marcar como pagado'}
-          </button>
-        </>
-      }
-    >
-      {retiro && (
-        <form id="form-pago-retiro" onSubmit={enviar} className="grid gap-4 px-6 py-5">
-          <p className="text-sm text-muted">
-            Retiro de <strong className="text-ink">{formatBs(retiro.monto)}</strong> para{' '}
-            <strong className="text-ink">{retiro.negocio}</strong> ({retiro.dueno}).
-          </p>
-          <div>
-            <label className="label" htmlFor="evidencia-retiro">
-              Comprobante de la transferencia o entrega *
-            </label>
-            <input
-              id="evidencia-retiro"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,application/pdf"
-              className="input"
-              onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-            />
-            <p className="mt-1 text-xs text-muted">Imagen o PDF de hasta 10 MB.</p>
-          </div>
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-      )}
-    </Modal>
   )
 }

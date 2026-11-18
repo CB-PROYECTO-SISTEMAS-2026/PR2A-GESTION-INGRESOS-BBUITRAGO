@@ -110,7 +110,9 @@ async function limpiarDatosPrueba(prisma, opciones = {}) {
       await tx.venta.deleteMany({ where: f.ventas }); // DetalleVenta se borra en cascada
       await tx.retiroGanancias.deleteMany({ where: f.retiros });
       await tx.manilla.deleteMany({ where: f.manillas });
+      await tx.reembolsoEntrada.deleteMany({ where: { entrada: { eventoId: { in: E } }, usuarioId: { in: U } } });
       await tx.entrada.deleteMany({ where: f.entradas });
+      await tx.compraEntrada.deleteMany({ where: { eventoId: { in: E }, usuarioId: { in: U } } });
       await tx.solicitudNegocio.deleteMany({
         where: { OR: [{ eventoId: { in: E } }, { negocioId: { in: N } }] },
       });

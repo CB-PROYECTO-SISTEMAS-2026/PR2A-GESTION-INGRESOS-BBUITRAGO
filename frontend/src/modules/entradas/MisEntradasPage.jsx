@@ -43,6 +43,7 @@ export default function MisEntradasPage() {
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-10">
       <div>
         <h1 className="font-display text-3xl font-bold text-ink">Mis entradas</h1>
+        <Link className="font-semibold text-teal-dark" to="/mis-reembolsos">Mis reembolsos</Link>
         <p className="mt-1 text-sm text-muted">
           Aquí aparecen tus entradas en cuanto se aprueba tu compra, cada una con su propio código QR.
         </p>
@@ -154,6 +155,7 @@ export default function MisEntradasPage() {
                 </div>
               )}
             </div>
+            {['ASIGNADA','GENERADA'].includes(e.estado) && <Link className="btn-secondary m-3" to={'/mis-reembolsos?entrada='+encodeURIComponent(e.id)}>Solicitar devolución de entrada</Link>}
           </li>
         ))}
       </ul>

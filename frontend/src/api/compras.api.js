@@ -4,10 +4,11 @@ const multipart = { headers: { 'Content-Type': 'multipart/form-data' } }
 
 // Comprador (HU-010, HU-011, HU-012)
 export const getCheckout = (eventoId) => api.get(`/compras/eventos/${eventoId}/checkout`)
-export const crearCompra = (eventoId, { items, referencia, comprobante }) => {
+export const crearCompra = (eventoId, { items, referencia, comprobante, reembolsoHasta }) => {
   const fd = new FormData()
   fd.append('items', JSON.stringify(items))
   if (referencia) fd.append('referencia', referencia)
+  if (reembolsoHasta) fd.append('reembolsoHasta', reembolsoHasta)
   if (comprobante) fd.append('comprobante', comprobante)
   return api.post(`/compras/eventos/${eventoId}`, fd, multipart)
 }

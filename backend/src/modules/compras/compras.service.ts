@@ -1,3 +1,4 @@
+import { startOfDayIn } from '../pos/pos-dates';
 import {
   BadRequestException,
   ConflictException,
@@ -45,6 +46,7 @@ const personaSelect = {
 } as const;
 
 const compraSelect = {
+  reembolsoHasta: true,
   id: true,
   estado: true,
   montoTotal: true,
@@ -125,6 +127,7 @@ function presentarCompra(
     id: c.id,
     estado: c.estado,
     montoTotal: c.montoTotal.toFixed(2),
+    reembolsoHasta: c.reembolsoHasta,
     comprobanteUrl: c.comprobanteUrl,
     referencia: c.pago?.referencia ?? null,
     motivoRechazo: c.estado === CompraEstado.RECHAZADA ? c.observaciones : null,
@@ -196,6 +199,14 @@ export class ComprasService {
   // Comprador
 
   /** Todo lo necesario para armar la compra: categorías con descuento, días a la venta y QR de pago. */
+  private limiteReembolso(evento: { fechas: { fecha: Date; horaInicio: string }[]; reembolsoHoras: number }) {
+    const primera = evento.fechas[0];
+    if (!primera) throw new BadRequestException('El evento no tiene fechas.');
+    const [hora, minutos] = primera.horaInicio.split(':').map(Number);
+    const inicio = startOfDayIn(dateToDay(primera.fecha), this.timeZone);
+    return new Date(inicio.getTime() + ((hora - evento.reembolsoHoras) * 60 + minutos) * 60000);
+  }
+
   async checkout(eventoId: string) {
     const evento = await this.prisma.evento.findFirst({
       where: { id: eventoId, estado: EventoEstado.PUBLICADO },
@@ -205,6 +216,7 @@ export class ComprasService {
         fotoUrl: true,
         ubicacion: true,
         tipoAcceso: true,
+        reembolsoHoras: true,
         qrPagoUrl: true,
         instruccionesPago: true,
         fechas: {
@@ -242,6 +254,7 @@ export class ComprasService {
     return {
       evento: {
         ...rest,
+        reembolsoHasta: this.limiteReembolso(evento),
         multiDia: fechas.length > 1,
         fechas: fechas.map((f) => ({ ...f, aLaVenta: vigentes.has(f.id) })),
       },
@@ -278,10 +291,11 @@ export class ComprasService {
       where: { id: eventoId, estado: EventoEstado.PUBLICADO },
       select: {
         id: true,
+        reembolsoHoras: true,
         qrPagoUrl: true,
         fechas: {
           orderBy: { fecha: 'asc' },
-          select: { id: true, fecha: true },
+          select: { id: true, fecha: true, horaInicio: true },
         },
         categorias: {
           select: {
@@ -322,6 +336,9 @@ export class ComprasService {
     });
     const emailComprador = normalizeEmail(comprador.email);
 
+    const reembolsoHasta = this.limiteReembolso(evento);
+    if (dto.reembolsoHasta && dto.reembolsoHasta !== reembolsoHasta.toISOString())
+      throw new ConflictException('Cambió el plazo de reembolso. Actualiza la página para revisar las condiciones.');
     const lineas = dto.items.map((item, i) => {
       const n = i + 1;
       const categoria = evento.categorias.find(
@@ -432,6 +449,7 @@ export class ComprasService {
       const compra = await this.prisma.compraEntrada.create({
         data: {
           usuarioId: user.id,
+          reembolsoHasta: this.limiteReembolso(evento),
           eventoId,
           estado: CompraEstado.PENDIENTE,
           montoTotal,
@@ -615,6 +633,7 @@ export class ComprasService {
         id: true,
         titulo: true,
         estado: true,
+        reembolsoHoras: true,
         qrPagoUrl: true,
         instruccionesPago: true,
       },
@@ -856,7 +875,7 @@ export class ComprasService {
       fechaIds.length
         ? this.prisma.fechaEvento.findMany({
             where: { id: { in: fechaIds } },
-            select: { id: true, fecha: true },
+            select: { id: true, fecha: true, horaInicio: true },
           })
         : [],
       revisorIds.length

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Paginas } from '../sprint3/comun'
 import { Link, useSearchParams } from 'react-router-dom'
 import { getMisMovimientos, getMisSaldos } from '../../api/recargas.api'
 import { formatBs, formatDateTime, formatTime, getErrorMessage } from '../../utils/format'
@@ -13,6 +14,7 @@ import {
 export default function MovimientosPage() {
   const [params, setParams] = useSearchParams()
   const eventoId = params.get('evento') || ''
+  const page = Math.max(1, Number.parseInt(params.get('page'),10)||1)
   const tipo = params.get('tipo') || ''
   const [eventos, setEventos] = useState(null)
   const [data, setData] = useState(null)
@@ -23,6 +25,7 @@ export default function MovimientosPage() {
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev)
+        if(key !== 'page') next.delete('page')
         if (value) next.set(key, value)
         else next.delete(key)
         return next
@@ -45,14 +48,15 @@ export default function MovimientosPage() {
   useEffect(() => {
     if (!eventoId) return
     const peticion = ++ultimaPeticion.current
-    getMisMovimientos({ eventoId, tipo: tipo || undefined })
+    setData(null)
+    getMisMovimientos({ eventoId, page, tipo: tipo || undefined })
       .then(({ data }) => {
         if (peticion !== ultimaPeticion.current) return
         setData(data)
         setError('')
       })
       .catch((err) => peticion === ultimaPeticion.current && setError(getErrorMessage(err)))
-  }, [eventoId, tipo])
+  }, [eventoId, tipo,page])
 
   const vigente = data && data.evento.id === eventoId ? data : null
 
@@ -134,6 +138,7 @@ export default function MovimientosPage() {
               <p className="mt-4 text-sm text-muted">
                 {vigente.cantidad} {vigente.cantidad === 1 ? 'movimiento encontrado' : 'movimientos encontrados'}
               </p>
+              <Paginas page={page} onChange={p=>setFiltro('page',String(p))} mas={page*vigente.pageSize<vigente.cantidad}/>
               <ul className="mt-3 divide-y divide-border">
                 {vigente.movimientos.map((m) => {
                   const negativo = Number(m.monto) < 0

@@ -14,6 +14,10 @@ export class ReembolsoEntradasService {
   listar(usuarioId: string | undefined, page: number) {
     return this.db.reembolsoEntrada.findMany({
       where: { usuarioId },
+      include: {
+        entrada: { select: { codigo: true, evento: { select: { titulo: true } } } },
+        usuario: { select: { nombre: true, apellido: true } },
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 50,
       skip: (page - 1) * 50,
@@ -24,6 +28,7 @@ export class ReembolsoEntradasService {
     const entrada = await this.db.entrada.findFirst({
       where: { id: entradaId, titularId: usuarioId },
       include: {
+        evento: { select: { estado: true } },
         reembolso: true,
         itemCompra: true,
         compra: { include: { items: true } },
@@ -41,6 +46,8 @@ export class ReembolsoEntradasService {
       throw new BadRequestException(
         'Solo puedes solicitar el reembolso de una entrada pagada y sin usar.',
       );
+    if (entrada.evento.estado !== 'CANCELADO' && entrada.compra.reembolsoHasta && new Date() > entrada.compra.reembolsoHasta)
+      throw new BadRequestException('Venció el plazo de reembolso informado al comprar la entrada.');
     const precios = entrada.itemCompra
       ? [entrada.itemCompra.precioUnit]
       : entrada.compra.items

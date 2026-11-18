@@ -114,33 +114,17 @@ describe('Acciones sobre un retiro', () => {
     expect(dialogo).toHaveTextContent('Se aprobará el retiro de Bs 30 para Puesto Prueba');
     await user.click(within(dialogo).getByRole('button', { name: 'Aprobar' }));
 
-    expect(cambiarEstadoRetiro).toHaveBeenCalledWith('r-SOLICITADO', 'APROBADO');
+    expect(cambiarEstadoRetiro).toHaveBeenCalledWith('r-SOLICITADO', 'APROBADO', undefined);
     expect(await screen.findByText('Retiro aprobado')).toBeInTheDocument();
   });
 
-  it('el pago exige el comprobante y lo envía como archivo "evidencia"', async () => {
+  it('el administrador puede revisar el retiro aprobado', async () => {
     const user = userEvent.setup();
     getRetirosAdmin.mockResolvedValue(respuesta('APROBADO', 'Puesto Prueba'));
-    pagarRetiro.mockResolvedValue({ data: {} });
     renderRetiros();
 
     await user.click(screen.getByRole('tab', { name: /Aprobados/ }));
     const fila = (await screen.findByText('Puesto Prueba')).closest('tr');
-    await user.click(within(fila).getByRole('button', { name: 'Registrar pago' }));
-    const modal = await screen.findByRole('dialog');
-
-    await user.click(within(modal).getByRole('button', { name: 'Marcar como pagado' }));
-    expect(within(modal).getByRole('alert')).toHaveTextContent('Adjunta el comprobante del pago.');
-    expect(pagarRetiro).not.toHaveBeenCalled();
-
-    const archivo = new File(['comprobante'], 'comprobante.png', { type: 'image/png' });
-    await user.upload(within(modal).getByLabelText(/Comprobante de la transferencia/), archivo);
-    await user.click(within(modal).getByRole('button', { name: 'Marcar como pagado' }));
-
-    expect(pagarRetiro).toHaveBeenCalledTimes(1);
-    const [id, formData] = pagarRetiro.mock.calls[0];
-    expect(id).toBe('r-APROBADO');
-    expect(formData.get('evidencia')).toBe(archivo);
-    expect(await screen.findByText('Pago registrado')).toBeInTheDocument();
+    expect(within(fila).queryByRole('button', { name: 'Registrar pago' })).toBeNull();
   });
 });

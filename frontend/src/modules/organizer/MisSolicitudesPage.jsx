@@ -244,6 +244,7 @@ export default function MisSolicitudesPage() {
                   <span className="text-slate-600">{s.observaciones}</span>
                 </div>
               )}
+              {s.evento && <Link className="btn-secondary mr-3" to={`/organizador/eventos/${s.evento.id}/reportes`}>Reporte e incidencias</Link>}
               {s.evento?.estado === 'PUBLICADO' && (
                 <Link to={`/eventos/${s.evento.id}`} className="mt-3 inline-block text-sm font-semibold text-teal-dark hover:underline">
                   Ver evento publicado

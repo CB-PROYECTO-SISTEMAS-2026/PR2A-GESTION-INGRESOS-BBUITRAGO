@@ -5,8 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { IconX } from '../ui/icons'
 
 /**
- * Menú lateral de los paneles. Los elementos sin `to` aún no tienen pantalla
- * y se muestran sin enlace.
+ * Menú lateral de los paneles.
  *
  * En pantallas grandes (lg) es una columna fija. En celulares y tablets es un cajón que se
  * abre con el botón "Menú" de PanelLayout (`open`) y se cierra al elegir una opción.
@@ -46,27 +45,21 @@ export default function PanelSidebar({ items, roleLabel, open = false, onClose }
           </button>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-3">
-          {items.map((item) =>
-            item.to ? (
-              <NavLink
-                key={item.label}
-                to={item.to}
-                end={item.end}
-                onClick={onClose}
-                className={({ isActive }) =>
-                  `rounded-md px-3 py-2 text-sm font-medium transition ${
-                    isActive ? 'bg-teal text-white' : 'hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ) : (
-              <span key={item.label} className="cursor-default px-3 py-2 text-sm font-medium text-slate-500">
-                {item.label}
-              </span>
-            ),
-          )}
+          {items.map((item) => (
+            <NavLink
+              key={item.label}
+              to={item.to}
+              end={item.end}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `rounded-md px-3 py-2 text-sm font-medium transition ${
+                  isActive ? 'bg-teal text-white' : 'hover:bg-slate-800 hover:text-white'
+                }`
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         {nombre && (
           <div className="border-t border-slate-800 px-5 py-4">

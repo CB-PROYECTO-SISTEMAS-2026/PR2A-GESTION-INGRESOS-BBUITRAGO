@@ -204,13 +204,14 @@ describe('Devolución completa (Figma p28–31)', () => {
     expect(await screen.findByRole('button', { name: 'Simular escaneo' })).toBeInTheDocument();
   });
 
-  it('sin foto de ingreso pide verificar el carnet', async () => {
+  it('sin foto de ingreso bloquea la devolución', async () => {
     consultarClienteDevolucion.mockResolvedValue({ data: CLIENTE({ fotoIngreso: null }) });
     const user = userEvent.setup();
     renderPagina();
     await escanear(user);
     expect(await screen.findByText('Sin foto de ingreso')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /verifiqué su carnet de identidad/ })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name:'Devolver Saldo'})).not.toBeInTheDocument();
   });
 
   it('sin saldo no muestra el botón de devolver y explica por qué', async () => {

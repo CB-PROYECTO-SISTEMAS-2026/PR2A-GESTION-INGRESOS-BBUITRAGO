@@ -24,6 +24,7 @@ function CompraCard({ compra, onCancelar, busy }) {
         <div className="text-right">
           <span className={`badge ${compraEstadoBadge(compra.estado)}`}>{compraEstadoLabel(compra.estado)}</span>
           <p className="mt-1 font-display text-xl font-bold text-ink">{formatBs(compra.montoTotal)}</p>
+          {compra.reembolsoHasta && <p className="text-sm">Reembolso hasta el {new Date(compra.reembolsoHasta).toLocaleString('es-BO', { timeZone: 'America/La_Paz' })} (hora de Bolivia). En caso de cancelación, el plazo no aplica.</p>}
         </div>
       </div>
 

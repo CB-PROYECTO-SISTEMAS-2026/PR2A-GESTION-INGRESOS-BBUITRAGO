@@ -219,7 +219,7 @@ export default function CompraEntradasPage() {
     }))
     setSending(true)
     try {
-      const { data: compra } = await crearCompra(id, { items, referencia: referencia.trim(), comprobante })
+      const { data: compra } = await crearCompra(id, { items, referencia: referencia.trim(), comprobante, reembolsoHasta: evento.reembolsoHasta })
       setEnviada(compra)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -300,6 +300,7 @@ export default function CompraEntradasPage() {
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Comprar entradas</p>
           <h1 className="font-display text-2xl font-bold text-ink">{evento.titulo}</h1>
+          <p>Podés solicitar el reembolso de una entrada sin usar hasta el {new Date(evento.reembolsoHasta).toLocaleString('es-BO', { timeZone: 'America/La_Paz' })} (hora de Bolivia). Si el evento se cancela, ese plazo no aplica.</p>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
             <span className="inline-flex items-center gap-1">
               <IconCalendar className="h-4 w-4 text-teal-dark" />

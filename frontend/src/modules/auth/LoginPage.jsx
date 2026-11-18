@@ -4,20 +4,8 @@ import AuthHeader from '../../components/layout/AuthHeader'
 import { useAuth } from '../../context/AuthContext'
 import { getErrorMessage } from '../../utils/format'
 
-// TEMPORAL: accesos rápidos para pruebas. Eliminar antes de producción.
-const DEMO_USERS = [
-  { label: 'Admin', email: 'admin@eventix.com', password: 'Admin123!' },
-  { label: 'Organizador', email: 'organizador@eventix.com', password: 'Organiza123!' },
-  { label: 'Cliente', email: 'cliente@eventix.com', password: 'Cliente123!' },
-  { label: 'Jefe de negocio', email: 'negocio@eventix.com', password: 'Negocio123!' },
-  { label: 'Ayudante', email: 'ayudante@eventix.com', password: 'Ayudante123!' },
-  { label: 'Encargado de acceso', email: 'acceso@eventix.com', password: 'Acceso123!' },
-  { label: 'Recargador', email: 'recargador@eventix.com', password: 'Recarga123!' },
-  { label: 'Devoluciones', email: 'devoluciones@eventix.com', password: 'Devol123!' },
-]
-
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, startSession } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -26,11 +14,11 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const doLogin = async (credentials) => {
+  const doLogin = async (iniciar) => {
     setError('')
     setLoading(true)
     try {
-      const user = await login(credentials)
+      const user = await iniciar()
       const redirect = searchParams.get('redirect')
       const from = location.state?.from
       if (from) {
@@ -61,14 +49,14 @@ export default function LoginPage() {
 
   const onSubmit = (e) => {
     e.preventDefault()
-    doLogin({ email, password })
+    doLogin(() => login({ email, password }))
   }
 
-  const onDemoLogin = (u) => {
-    setEmail(u.email)
-    setPassword(u.password)
-    doLogin({ email: u.email, password: u.password })
-  }
+  const accesoRapido = (indice) => doLogin(async () => {
+    const respuesta = await fetch('/presentacion/sesion/' + indice, { method: 'POST' })
+    if (!respuesta.ok) throw new Error('No se pudo iniciar la sesión de presentación.')
+    return startSession(await respuesta.json())
+  })
 
   return (
     <div className="flex min-h-screen flex-col bg-page">
@@ -97,7 +85,7 @@ export default function LoginPage() {
             id="password"
             type="password"
             className="input"
-            placeholder="Tu contraseña"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -109,10 +97,10 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
 
           <button type="submit" className="btn-primary mt-5 w-full" disabled={loading}>
-            {loading ? 'Ingresando…' : 'Iniciar Sesión'}
+            {loading ? 'Ingresando…' : 'Iniciar sesión'}
           </button>
 
           <p className="mt-4 text-center text-sm text-muted">
@@ -122,22 +110,19 @@ export default function LoginPage() {
             </Link>
           </p>
 
-          <div className="mt-6 border-t border-border pt-4">
-            <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted">Acceso rápido</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {DEMO_USERS.map((u) => (
-                <button
-                  key={u.email}
-                  type="button"
-                  className="rounded-lg border border-teal px-3 py-2 text-sm font-semibold text-teal hover:bg-teal hover:text-white disabled:opacity-50"
-                  onClick={() => onDemoLogin(u)}
-                  disabled={loading}
-                >
-                  {u.label}
-                </button>
-              ))}
+          {import.meta.env.DEV && import.meta.env.EVENTIX_ROLES_DEMO?.length > 0 && (
+            <div className="mt-6 border-t border-border pt-4">
+              <p className="text-center text-xs font-semibold uppercase tracking-wide text-muted">Acceso rápido</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {import.meta.env.EVENTIX_ROLES_DEMO.map((label, indice) => (
+                  <button key={label} type="button" disabled={loading} onClick={() => accesoRapido(indice)}
+                    className="rounded-lg border border-teal px-3 py-2 text-sm font-semibold text-teal hover:bg-teal hover:text-white disabled:opacity-50">
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </form>
       </div>
     </div>

@@ -8,6 +8,10 @@ import BusinessLayout from './components/layout/BusinessLayout'
 import SupervisorLayout from './components/layout/SupervisorLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 
+import Reportes from './modules/sprint3/Reportes'
+import Reembolsos from './modules/sprint3/Reembolsos'
+import HistorialAccesos from './modules/sprint3/HistorialAccesos'
+import { HistorialDevoluciones } from './modules/sprint3/Devoluciones'
 import HomePage from './modules/public/HomePage'
 import EventsPage from './modules/public/EventsPage'
 import EventDetailPage from './modules/public/EventDetailPage'
@@ -62,6 +66,7 @@ import PosHistorialPage from './modules/pos/PosHistorialPage'
 import RecargasLayout from './modules/recargas/RecargasLayout'
 import RecargaPage from './modules/recargas/RecargaPage'
 import RecargasHistorialPage from './modules/recargas/RecargasHistorialPage'
+import RetirosCaja from './modules/devoluciones/RetirosCaja'
 import DevolucionesLayout from './modules/devoluciones/DevolucionesLayout'
 import DevolucionPage from './modules/devoluciones/DevolucionPage'
 
@@ -105,6 +110,7 @@ const router = createBrowserRouter([
             element: <ProtectedRoute roles={['CLIENTE']} />,
             children: [
               { path: 'eventos/:id/comprar', element: <CompraEntradasPage /> },
+              { path: 'mis-reembolsos', element: <Reembolsos /> },
               { path: 'mis-compras', element: <MisComprasPage /> },
             ],
           },
@@ -118,6 +124,7 @@ const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={['ORGANIZADOR', 'ADMIN']} />,
             children: [
+              { path: 'organizador/eventos/:id/reportes', element: <Reportes /> },
               { path: 'organizador/solicitudes', element: <MisSolicitudesPage /> },
               { path: 'organizador/nueva-solicitud', element: <SolicitudFormPage /> },
             ],
@@ -133,6 +140,9 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <AdminDashboardPage /> },
               { path: 'solicitudes', element: <SolicitudesListPage /> },
+              { path: 'reportes', element: <Reportes admin /> },
+              { path: 'eventos/:id/reportes', element: <Reportes admin /> },
+              { path: 'reembolsos', element: <Reembolsos admin /> },
               { path: 'solicitudes/:id', element: <SolicitudDetailPage /> },
               { path: 'eventos', element: <EventosAdminPage /> },
               { path: 'eventos/:id', element: <EventoEditPage /> },
@@ -202,7 +212,7 @@ const router = createBrowserRouter([
         children: [
           {
             element: <DevolucionesLayout />,
-            children: [{ index: true, element: <DevolucionPage /> }],
+            children: [{ index: true, element: <DevolucionPage /> }, { path: 'retiros', element: <RetirosCaja /> }, { path: 'historial', element: <HistorialDevoluciones /> }],
           },
         ],
       },
@@ -214,6 +224,7 @@ const router = createBrowserRouter([
             element: <SupervisorLayout />,
             children: [
               { index: true, element: <EntregaManillasPage /> },
+              { path: 'historial-accesos', element: <HistorialAccesos /> },
               { path: 'entregas', element: <MisEntregasPage /> },
               { path: 'acceso', element: <ControlAccesoPage /> },
             ],
