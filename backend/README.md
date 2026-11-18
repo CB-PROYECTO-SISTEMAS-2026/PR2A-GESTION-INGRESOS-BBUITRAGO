@@ -58,3 +58,10 @@ desde el panel **Admin → Usuarios**: el invitado recibe un correo y la cuenta 
 - Validación estricta de entrada: se rechazan campos no declarados en los DTO.
 - Tokens de invitación y recuperación guardados como hash SHA-256, de un solo uso y con expiración.
 - Los archivos se validan por su contenido real (no por la extensión) antes de subirlos.
+
+### Sprint 3 · Identidad y reembolsos (módulo E)
+
+- `GET /api/devoluciones/clientes?eventoId=…&codigo=…` incluye la foto del primer ingreso de la entrada escaneada y los cinco últimos movimientos del titular en ese evento. Si falta la foto, el monto retirable es cero y el POST de devolución devuelve 400.
+- `POST /api/devoluciones/:id/comprobante` acepta una imagen en el campo multipart `foto`. El comprobante es opcional y solo lo puede adjuntar el encargado que registró la devolución, mientras siga asignado al evento. Reenviar la misma imagen devuelve el comprobante existente.
+- `POST /api/entradas/:id/reembolso` recibe `{"motivo":"…"}`. El titular puede solicitar una vez el precio unitario efectivamente pagado por una entrada aprobada y sin uso. Puede consultar sus solicitudes con `GET /api/users/me/reembolsos?page=1`.
+- El administrador consulta `GET /api/admin/reembolsos?page=1` y actualiza `PATCH /api/admin/reembolsos/:id` con `{"estado":"APROBADO"}`, `RECHAZADO` o `PAGADO`. Aprobar invalida la entrada y su credencial. El administrador registra PAGADO después de entregar el efectivo. El reembolso de una entrada es independiente del saldo de puntos.

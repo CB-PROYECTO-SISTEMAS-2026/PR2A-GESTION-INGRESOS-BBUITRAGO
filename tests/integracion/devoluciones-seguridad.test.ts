@@ -207,6 +207,12 @@ describe('Entrada inválida: 400 y el saldo no se toca', () => {
 describe('Flujo completo por HTTP', () => {
   it('consulta → devolución 201 → saldo en cero → el reintento no duplica', async () => {
     await setSaldo(api.prisma, esc, 75);
+    const sinFoto = await api.pedir('POST', '/api/devoluciones', { token: tokens.devoluciones, body: cuerpoDevolucion(75) });
+    expect(sinFoto.status).toBe(400);
+    expect(sinFoto.body.message).toContain('foto del primer ingreso');
+    expect(await getSaldo(api.prisma, esc)).toBe('75.00');
+    const manilla = await api.prisma.manilla.findFirstOrThrow({ where: { eventoId: esc.eventos.abierto, codigoFisico: esc.codigos.manilla } });
+    await api.prisma.accesoEvento.create({ data: { entradaId: manilla.entradaId!, eventoId: esc.eventos.abierto, tipo: 'INGRESO', fotoIngresoUrl: 'https://example.invalid/ingreso.jpg' } });
     const consulta = await api.pedir(
       'GET',
       `/api/devoluciones/clientes?eventoId=${esc.eventos.abierto}&codigo=${esc.codigos.manilla}`,
@@ -230,4 +236,31 @@ describe('Flujo completo por HTTP', () => {
     });
     expect(registradas).toBe(1);
   });
+});
+
+it('reembolsa una entrada sin usar una sola vez y desactiva su QR al aprobar', async () => {
+  const db = api.prisma;
+  const eventoId = esc.eventos.abierto, usuarioId = esc.usuarios.cliente;
+  const entrada = await db.entrada.findFirstOrThrow({ where: { eventoId, titularId: usuarioId, estado: { in: ['GENERADA','ASIGNADA'] }, accesos: { none: {} } } });
+  const compra = await db.compraEntrada.create({ data: { usuarioId, eventoId, estado: 'APROBADA', montoTotal: 32, items: { create: { categoriaId: entrada.categoriaId, precioUnit: 32 } } } });
+  try {
+    await db.entrada.update({ where: { id: entrada.id }, data: { compraId: compra.id } });
+    const solicitar = () => api.pedir('POST', '/api/entradas/' + entrada.id + '/reembolso', { token: tokens.cliente, body: { motivo: 'No podré asistir' } });
+    const [a,b] = await Promise.all([solicitar(), solicitar()]);
+    expect([a.status,b.status]).toEqual([201,201]);
+    expect(a.body.id).toBe(b.body.id);
+    expect(Number(a.body.monto)).toBe(32);
+    const ruta = '/api/admin/reembolsos/' + a.body.id;
+    expect((await api.pedir('PATCH', ruta, { token: tokens.cliente, body: { estado: 'APROBADO' } })).status).toBe(403);
+    for (const estado of ['APROBADO','PAGADO','PAGADO']) {
+      const r = await api.pedir('PATCH', ruta, { token: tokens.admin, body: { estado } });
+      expect(r.status).toBe(200);
+      expect(r.body.estado).toBe(estado);
+    }
+    expect((await db.entrada.findUniqueOrThrow({ where: { id: entrada.id } })).estado).toBe('REEMBOLSADA');
+  } finally {
+    await db.reembolsoEntrada.deleteMany({ where: { entradaId: entrada.id } });
+    await db.entrada.update({ where: { id: entrada.id }, data: { compraId: null } });
+    await db.compraEntrada.delete({ where: { id: compra.id } });
+  }
 });

@@ -1,3 +1,4 @@
+import { ReembolsosModule } from './modules/reembolsos/reembolsos.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -58,6 +59,7 @@ import { DevolucionesModule } from './modules/devoluciones/devoluciones.module';
     RecargasModule,
     PersonalEventoModule,
     DevolucionesModule,
+    ReembolsosModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AppThrottlerGuard }],
 })
