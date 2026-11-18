@@ -8,13 +8,22 @@ import {
   type AuthUser,
 } from '../../common/decorators/current-user.decorator';
 import { MovimientosService } from './movimientos.service';
-import { MisMovimientosDto, MovimientosEventoDto } from './dto/movimientos.dto';
+import { HistorialPorEventoDto, MisMovimientosDto, MovimientosEventoDto } from './dto/movimientos.dto';
 
 /** Saldo por evento y su historial de movimientos (HU-020). */
 @Controller('api')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MovimientosController {
   constructor(private movimientosService: MovimientosService) {}
+
+  @Get('historiales/devoluciones')
+  @Roles(Role.DEVOLUCIONES)
+  misDevoluciones(
+    @CurrentUser('id') encargadoId: string,
+    @Query() dto: HistorialPorEventoDto,
+  ) {
+    return this.movimientosService.devolucionesPorEncargado(encargadoId, dto);
+  }
 
   @Get('users/me/saldos')
   @Roles(Role.CLIENTE)

@@ -17,7 +17,7 @@ import type { AuthUser } from '../../common/decorators/current-user.decorator';
 import { dateToDay, todayIn } from '../events/event-schedule';
 import { resolveDayRange } from '../pos/pos-dates';
 import { codigoTransaccion, money, nombreCompleto } from '../pos/pos-helpers';
-import { MisMovimientosDto, MovimientosEventoDto } from './dto/movimientos.dto';
+import { HistorialPorEventoDto, MisMovimientosDto, MovimientosEventoDto } from './dto/movimientos.dto';
 import { plazoRetiroEvento } from './plazo-retiro';
 import {
   estadoTemporal,
@@ -86,6 +86,28 @@ export class MovimientosService {
     config: ConfigService,
   ) {
     this.timeZone = config.get<string>('APP_TIMEZONE', 'America/La_Paz');
+  }
+
+  /** HU-029: historial personal del encargado en su evento asignado. */
+  async devolucionesPorEncargado(encargadoId: string, dto: HistorialPorEventoDto) {
+    const { eventoId, page = 1 } = dto;
+    const asignado = await this.prisma.staffEvento.findFirst({
+      where: { usuarioId: encargadoId, eventoId, role: Role.DEVOLUCIONES, activo: true },
+      select: { id: true },
+    });
+    if (!asignado) throw new ForbiddenException('No tienes asignado este evento para devoluciones.');
+    const where = { eventoId, operadorId: encargadoId, tipo: TipoTransaccionSaldo.DEVOLUCION, estado: EstadoTransaccion.COMPLETADA };
+    const [cantidad, filas] = await this.prisma.$transaction([
+      this.prisma.transaccionSaldo.count({ where }),
+      this.prisma.transaccionSaldo.findMany({
+        where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE,
+        select: { id: true, createdAt: true, monto: true, usuario: { select: { nombre: true, apellido: true } } },
+      }),
+    ]);
+    return { eventoId, page, pageSize: PAGE_SIZE, cantidad, devoluciones: filas.map(f => ({
+      id: f.id, fecha: f.createdAt, monto: money(f.monto), usuario: nombreCompleto(f.usuario),
+    })) };
   }
 
   /** "Mis saldos": eventos donde el cliente tiene saldo o una entrada válida. */
@@ -182,7 +204,8 @@ export class MovimientosService {
       }),
       this.prisma.transaccionSaldo.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: ((dto.page ?? 1) - 1) * MIS_MOVIMIENTOS_LIMIT,
         take: MIS_MOVIMIENTOS_LIMIT,
         select: MOVIMIENTO_SELECT,
       }),
@@ -195,6 +218,8 @@ export class MovimientosService {
       saldo: money(saldo?.saldo),
       actualizado: saldo?.updatedAt ?? null,
       cantidad,
+      page: dto.page ?? 1,
+      pageSize: MIS_MOVIMIENTOS_LIMIT,
       movimientos: movimientos.map(toMovimiento),
     };
   }

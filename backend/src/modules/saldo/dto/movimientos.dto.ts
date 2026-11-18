@@ -17,10 +17,18 @@ import { RangoFechasDto } from '../../pos/dto/pos.dto';
 const TIPOS = Object.values(TipoTransaccionSaldo);
 const ESTADOS = Object.values(EstadoTransaccion);
 
-export class MisMovimientosDto {
+export class HistorialPorEventoDto {
+  @IsOptional()
+  @Transform(toStrictInt)
+  @IsInt()
+  @Min(1)
+  page?: number;
   @IsString()
   @IsNotEmpty({ message: 'Selecciona un evento.' })
   eventoId: string;
+}
+
+export class MisMovimientosDto extends HistorialPorEventoDto {
 
   @IsOptional()
   @Transform(emptyToUndefined)
