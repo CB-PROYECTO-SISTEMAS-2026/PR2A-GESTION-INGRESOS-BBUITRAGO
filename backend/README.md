@@ -65,3 +65,13 @@ desde el panel **Admin → Usuarios**: el invitado recibe un correo y la cuenta 
 - `POST /api/devoluciones/:id/comprobante` acepta una imagen en el campo multipart `foto`. El comprobante es opcional y solo lo puede adjuntar el encargado que registró la devolución, mientras siga asignado al evento. Reenviar la misma imagen devuelve el comprobante existente.
 - `POST /api/entradas/:id/reembolso` recibe `{"motivo":"…"}`. El titular puede solicitar una vez el precio unitario efectivamente pagado por una entrada aprobada y sin uso. Puede consultar sus solicitudes con `GET /api/users/me/reembolsos?page=1`.
 - El administrador consulta `GET /api/admin/reembolsos?page=1` y actualiza `PATCH /api/admin/reembolsos/:id` con `{"estado":"APROBADO"}`, `RECHAZADO` o `PAGADO`. Aprobar invalida la entrada y su credencial. El administrador registra PAGADO después de entregar el efectivo. El reembolso de una entrada es independiente del saldo de puntos.
+
+### Reportes del Sprint 3
+
+El administrador consulta `GET /api/reportes/global`. El organizador consulta `GET /api/reportes/evento/:id` para cada evento propio. Los importes están en bolivianos. El ingreso neto de entradas es el total de compras aprobadas menos los reembolsos aprobados o pagados. Las ventas de los negocios se muestran por separado. Este indicador no descuenta gastos operativos, que el sistema no registra.
+
+El resumen incluye accesos por tipo, entradas pendientes de primer ingreso, movimientos completados, operadores ordenados por importe y saldos positivos por evento con su plazo de retiro. Un saldo registrado con plazo vencido ya no es retirable.
+
+`GET /api/reportes/evento/:id/ventas?formato=csv` (o `xlsx`) descarga las ventas brutas de entradas y puestos. Las fechas se expresan en UTC. En ambos formatos una fila representa una compra aprobada o una venta del puesto.
+
+El organizador registra incidencias de su evento por `POST /api/reportes/evento/:id/incidencias` con `descripcion` e `idempotencyKey`. El organizador o administrador consulta la lista en esa ruta con GET y `page`. El administrador registra la resolución mediante `PATCH /api/reportes/evento/:id/incidencias/:incidenciaId` con `resolucion`.

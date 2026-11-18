@@ -139,6 +139,7 @@ model SolicitudEvento {
 }
 
 model Evento {
+  incidenciasOrganizador IncidenciaEvento[]
   id                   String               @id @default(cuid())
   solicitudId          String?              @unique
   organizadorId        String
@@ -895,4 +896,20 @@ enum Negocio_tipoSociedad {
   SA
   COOPERATIVA
   OTRO
+}
+
+model IncidenciaEvento {
+  id String @id @default(cuid())
+  eventoId String
+  autorId String
+  clave String
+  descripcion String @db.VarChar(500)
+  resolucion String? @db.VarChar(500)
+  resueltaPorId String?
+  resueltaAt DateTime?
+  createdAt DateTime @default(now())
+  evento Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@unique([eventoId, autorId, clave])
+  @@index([eventoId, createdAt])
 }
