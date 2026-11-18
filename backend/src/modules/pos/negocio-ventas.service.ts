@@ -17,6 +17,7 @@ import {
   VentaRow,
   csvCell,
   money,
+  nombreCompleto,
   nombresDeVentas,
 } from './pos-helpers';
 import { FiltroVentasNegocioDto, ListadoVentasNegocioDto } from './dto/pos.dto';
@@ -69,7 +70,12 @@ export class NegocioVentasService {
     ] = await Promise.all([
       this.prisma.venta.findMany({
         where,
-        select: { total: true, createdAt: true, eventoId: true },
+        select: {
+          total: true,
+          createdAt: true,
+          eventoId: true,
+          ayudanteId: true,
+        },
       }),
       this.prisma.detalleVenta.aggregate({
         where: { venta: where },
@@ -101,7 +107,19 @@ export class NegocioVentasService {
       string,
       { total: Prisma.Decimal; transacciones: number }
     >();
+    const porAyudante = new Map<
+      string,
+      { total: Prisma.Decimal; transacciones: number }
+    >();
     for (const v of ventas) {
+      const ay = porAyudante.get(v.ayudanteId) ?? {
+        total: new Prisma.Decimal(0),
+        transacciones: 0,
+      };
+      porAyudante.set(v.ayudanteId, {
+        total: ay.total.add(v.total),
+        transacciones: ay.transacciones + 1,
+      });
       const dia = dayIn(v.createdAt, this.timeZone);
       porDia.set(dia, (porDia.get(dia) ?? new Prisma.Decimal(0)).add(v.total));
       const ev = porEvento.get(v.eventoId) ?? {
@@ -114,13 +132,20 @@ export class NegocioVentasService {
       });
     }
 
-    const [nombresProducto, nombres] = await Promise.all([
+    const [nombresProducto, nombres, usuariosAyudantes] = await Promise.all([
       this.prisma.producto.findMany({
         where: { id: { in: topProductos.map((t) => t.productoId) } },
         select: { id: true, nombre: true },
       }),
       nombresDeVentas(this.prisma, ultimas),
+      this.prisma.usuario.findMany({
+        where: { id: { in: [...porAyudante.keys()] } },
+        select: { id: true, nombre: true, apellido: true },
+      }),
     ]);
+    const nombreAyudante = new Map(
+      usuariosAyudantes.map((u) => [u.id, nombreCompleto(u) ?? '']),
+    );
     const titulos = new Map(eventos.map((e) => [e.id, e.titulo]));
 
     return {
@@ -145,6 +170,16 @@ export class NegocioVentasService {
           titulo: titulos.get(eventoId) ?? 'Evento',
           total: money(v.total),
           transacciones: v.transacciones,
+        }))
+        .sort((a, b) => Number(b.total) - Number(a.total)),
+      /** HU-037: desempeño por ayudante, de mayor a menor monto vendido. */
+      porAyudante: [...porAyudante.entries()]
+        .map(([ayudanteId, a]) => ({
+          ayudanteId,
+          nombre: nombreAyudante.get(ayudanteId) || 'Ayudante',
+          total: money(a.total),
+          transacciones: a.transacciones,
+          ticketPromedio: money(a.total.div(a.transacciones)),
         }))
         .sort((a, b) => Number(b.total) - Number(a.total)),
       topProductos: topProductos.map((t) => ({
