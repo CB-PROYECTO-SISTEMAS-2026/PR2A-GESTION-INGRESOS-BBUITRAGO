@@ -1,42 +1,53 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { getMisEntradas } from '../../api/entradas.api'
 import { getMyProfile, removeMyFoto, updateMe, uploadMyFoto } from '../../api/users.api'
 import { toast } from '../../components/Toast'
 import Field, { Section } from '../../components/form/Field'
+import ImageCaptureField from '../../components/form/ImageCaptureField'
+import { Skeleton } from '../../components/ui/Skeleton'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../context/AuthContext'
 import { getErrorMessage, toDay } from '../../utils/format'
-import { ACCEPT_IMAGE, validateFile } from '../../utils/files'
-import { roleLabel } from '../../utils/roles'
+import { joinPhone, isValidLocalPhone, PHONE_COUNTRY_CODES, splitPhone } from '../../utils/phone'
 import { todayLocal } from '../../utils/schedule'
+import IdentidadSection from './IdentidadSection'
 
 const MIN_BIRTH_DAY = '1900-01-01'
-const ENTRADAS_EN_PERFIL = 3
-const emptyForm = { nombre: '', apellido: '', telefono: '', documento: '', email: '', fechaNac: '' }
+const emptyForm = {
+  nombre: '',
+  apellido: '',
+  email: '',
+  fechaNac: '',
+  countryCode: '+591',
+  phoneNumber: '',
+  nombreProductora: '',
+}
 
 function toForm(data) {
+  const phone = splitPhone(data?.telefono)
   return {
     nombre: data?.nombre || '',
     apellido: data?.apellido || '',
-    telefono: data?.telefono || '',
-    documento: data?.documento || '',
     email: data?.email || '',
     fechaNac: toDay(data?.fechaNac),
+    countryCode: phone.countryCode,
+    phoneNumber: phone.number,
+    nombreProductora: data?.nombreProductora || '',
   }
 }
 
+/** Perfil: datos básicos + identidad; organizadores editan también la productora. */
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth()
+  const { user, refreshUser, hasRole } = useAuth()
+  const isOrganizador = hasRole('ORGANIZADOR')
   const [form, setForm] = useState(emptyForm)
-  const [roles, setRoles] = useState([])
   const [fotoUrl, setFotoUrl] = useState('')
+  const [fotoFile, setFotoFile] = useState(null)
+  const [fotoError, setFotoError] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [fotoBusy, setFotoBusy] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
-  const [entradas, setEntradas] = useState([])
   const hoy = todayLocal()
 
   useEffect(() => {
@@ -45,7 +56,6 @@ export default function ProfilePage() {
       .then(({ data }) => {
         if (!alive) return
         setForm(toForm(data))
-        setRoles(data?.roles ?? [])
         setFotoUrl(data?.fotoUrl || '')
       })
       .catch((err) => alive && setError(getErrorMessage(err, 'No se pudo cargar tu perfil')))
@@ -55,18 +65,6 @@ export default function ProfilePage() {
     }
   }, [user?.id])
 
-  useEffect(() => {
-    let alive = true
-    getMisEntradas()
-      .then(({ data }) => alive && setEntradas(data.entradas ?? []))
-      .catch(() => alive && setEntradas([]))
-    return () => {
-      alive = false
-    }
-  }, [user?.id])
-
-  const entradasConQr = entradas.filter((e) => e.qr)
-
   const set = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }))
     setFieldErrors((fe) => ({ ...fe, [key]: undefined }))
@@ -74,13 +72,12 @@ export default function ProfilePage() {
 
   const validate = () => {
     const next = {}
-    if (form.nombre.trim().length < 2) next.nombre = 'Ingresa tu nombre (mínimo 2 caracteres).'
-    if (form.telefono.trim() && !/^[\d+\s()-]{7,20}$/.test(form.telefono.trim())) {
-      next.telefono = 'Ingresa un teléfono válido, de 7 a 20 dígitos.'
+    if (form.nombre.trim().length < 2) next.nombre = 'Mínimo 2 caracteres.'
+    if (form.phoneNumber.trim() && !isValidLocalPhone(form.phoneNumber)) {
+      next.phoneNumber = '7 a 15 dígitos.'
     }
-    if (form.documento.trim() && form.documento.trim().length < 5) next.documento = 'El documento es demasiado corto.'
     if (form.fechaNac && (form.fechaNac < MIN_BIRTH_DAY || form.fechaNac > hoy)) {
-      next.fechaNac = 'Ingresa una fecha de nacimiento válida.'
+      next.fechaNac = 'Fecha inválida.'
     }
     setFieldErrors(next)
     return Object.keys(next).length === 0
@@ -88,20 +85,19 @@ export default function ProfilePage() {
 
   const onSave = async (e) => {
     e.preventDefault()
-    setError('')
     if (!validate()) return
     setSaving(true)
+    setError('')
     try {
-      const { data } = await updateMe({
+      await updateMe({
         nombre: form.nombre.trim(),
-        apellido: form.apellido.trim() || undefined,
-        telefono: form.telefono.trim() || undefined,
-        documento: form.documento.trim() || undefined,
+        apellido: form.apellido.trim(),
+        telefono: joinPhone(form.countryCode, form.phoneNumber) || null,
         fechaNac: form.fechaNac || null,
+        ...(isOrganizador ? { nombreProductora: form.nombreProductora.trim() || null } : {}),
       })
-      setForm(toForm(data))
       await refreshUser()
-      toast('Perfil actualizado', 'success')
+      toast('Perfil guardado', 'success')
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -109,21 +105,15 @@ export default function ProfilePage() {
     }
   }
 
-  const onFotoChange = async (e) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
+  const applyFotoFile = async (file) => {
     if (!file) return
-    const invalid = validateFile(file)
-    if (invalid) {
-      toast(invalid, 'error')
-      return
-    }
     setFotoBusy(true)
     try {
       const fd = new FormData()
       fd.append('foto', file)
       const { data } = await uploadMyFoto(fd)
       setFotoUrl(data?.fotoUrl || '')
+      setFotoFile(null)
       await refreshUser()
       toast('Foto actualizada', 'success')
     } catch (err) {
@@ -135,9 +125,9 @@ export default function ProfilePage() {
 
   const onQuitarFoto = async () => {
     const ok = await confirmDialog({
-      title: 'Quitar foto de perfil',
-      message: 'Se mostrarán tus iniciales en lugar de la foto.',
-      confirmText: 'Quitar foto',
+      title: 'Quitar foto',
+      message: 'Se mostrarán tus iniciales.',
+      confirmText: 'Quitar',
       tone: 'danger',
     })
     if (ok !== true) return
@@ -155,39 +145,52 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return <div className="mx-auto max-w-3xl px-4 py-12 text-muted">Cargando perfil…</div>
+    return (
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-12" aria-busy="true">
+        <span className="sr-only">Cargando…</span>
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    )
   }
 
   const iniciales = `${(form.nombre[0] || '?').toUpperCase()}${(form.apellido[0] || '').toUpperCase()}`
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-10">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-bold text-ink">Mi perfil</h1>
-        {roles.map((r) => (
-          <span key={r} className="badge bg-teal/10 text-teal-dark">
-            {roleLabel(r)}
-          </span>
-        ))}
-      </div>
+      <h1 className="font-display text-3xl font-bold text-ink text-balance">Mi perfil</h1>
 
-      <Section title="Foto de perfil">
+      <Section title="Foto">
         <div className="flex flex-wrap items-center gap-5">
           {fotoUrl ? (
-            <img src={fotoUrl} alt="Tu foto de perfil" className="h-20 w-20 rounded-full border border-border object-cover" />
+            <img
+              src={fotoUrl}
+              alt="Tu foto de perfil"
+              className="h-20 w-20 rounded-full border border-border object-cover"
+              width={80}
+              height={80}
+            />
           ) : (
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-navy font-display text-2xl font-bold text-white">
+            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-sidebar font-display text-2xl font-bold text-white">
               {iniciales}
             </span>
           )}
-          <div className="flex flex-wrap gap-3">
-            <label className={`btn-secondary ${fotoBusy ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}>
-              {fotoBusy ? 'Subiendo…' : fotoUrl ? 'Cambiar foto' : 'Subir foto'}
-              <input type="file" accept={ACCEPT_IMAGE} className="hidden" onChange={onFotoChange} disabled={fotoBusy} />
-            </label>
+          <div className="min-w-0 flex-1 space-y-2">
+            <ImageCaptureField
+              value={fotoFile}
+              disabled={fotoBusy}
+              previewAlt="Nueva foto"
+              onChange={(file, err) => {
+                setFotoError(err || '')
+                setFotoFile(file)
+                if (file && !err) applyFotoFile(file)
+              }}
+              error={fotoError}
+            />
             {fotoUrl && (
-              <button type="button" className="btn-secondary" onClick={onQuitarFoto} disabled={fotoBusy}>
-                Quitar
+              <button type="button" className="btn-secondary btn-sm" onClick={onQuitarFoto} disabled={fotoBusy}>
+                Quitar foto
               </button>
             )}
           </div>
@@ -195,27 +198,82 @@ export default function ProfilePage() {
       </Section>
 
       <form onSubmit={onSave} noValidate>
-        <Section title="Datos personales">
+        <Section title="Datos">
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Nombre" htmlFor="nombre" required error={fieldErrors.nombre}>
-              <input id="nombre" className="input" value={form.nombre} onChange={set('nombre')} maxLength={100} />
+              <input
+                id="nombre"
+                name="given-name"
+                autoComplete="given-name"
+                className="input"
+                value={form.nombre}
+                onChange={set('nombre')}
+                maxLength={100}
+              />
             </Field>
             <Field label="Apellido" htmlFor="apellido">
-              <input id="apellido" className="input" value={form.apellido} onChange={set('apellido')} maxLength={100} />
+              <input
+                id="apellido"
+                name="family-name"
+                autoComplete="family-name"
+                className="input"
+                value={form.apellido}
+                onChange={set('apellido')}
+                maxLength={100}
+              />
             </Field>
-            <Field label="Correo electrónico" htmlFor="email">
-              <input id="email" className="input" value={form.email} disabled />
+            {isOrganizador && (
+              <Field label="Nombre de productora" htmlFor="nombreProductora" className="sm:col-span-2">
+                <input
+                  id="nombreProductora"
+                  name="organization"
+                  autoComplete="organization"
+                  className="input"
+                  value={form.nombreProductora}
+                  onChange={set('nombreProductora')}
+                  maxLength={120}
+                  placeholder="Ej. Sich Producciones"
+                />
+              </Field>
+            )}
+            <Field label="Correo" htmlFor="email">
+              <input id="email" className="input" value={form.email} disabled spellCheck={false} />
             </Field>
-            <Field label="Teléfono" htmlFor="telefono" error={fieldErrors.telefono}>
-              <input id="telefono" className="input" value={form.telefono} onChange={set('telefono')} maxLength={20} inputMode="tel" />
+            <Field label="Celular" htmlFor="phoneNumber" error={fieldErrors.phoneNumber}>
+              <div className="flex gap-2">
+                <select
+                  className="input w-[7.5rem] shrink-0"
+                  aria-label="Código de país"
+                  name="country-code"
+                  value={form.countryCode}
+                  onChange={set('countryCode')}
+                >
+                  {PHONE_COUNTRY_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  id="phoneNumber"
+                  name="tel-national"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel-national"
+                  className="input min-w-0 flex-1"
+                  value={form.phoneNumber}
+                  onChange={set('phoneNumber')}
+                  maxLength={15}
+                  placeholder="71234567…"
+                />
+              </div>
             </Field>
-            <Field label="Documento de identidad" htmlFor="documento" error={fieldErrors.documento}>
-              <input id="documento" className="input" value={form.documento} onChange={set('documento')} maxLength={30} />
-            </Field>
-            <Field label="Fecha de nacimiento" htmlFor="fechaNac" error={fieldErrors.fechaNac}>
+            <Field label="Nacimiento" htmlFor="fechaNac" error={fieldErrors.fechaNac}>
               <input
                 id="fechaNac"
                 type="date"
+                name="bday"
+                autoComplete="bday"
                 className="input"
                 value={form.fechaNac}
                 onChange={set('fechaNac')}
@@ -224,40 +282,20 @@ export default function ProfilePage() {
               />
             </Field>
           </div>
-          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+          {error && (
+            <p className="mt-4 text-sm text-danger" role="alert">
+              {error}
+            </p>
+          )}
           <div className="mt-6 flex justify-end">
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Guardando…' : 'Guardar cambios'}
+              {saving ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </Section>
       </form>
 
-      <Section title="Mis entradas">
-        {entradasConQr.length > 0 && (
-          <ul className="mb-5 grid gap-4 sm:grid-cols-3">
-            {entradasConQr.slice(0, ENTRADAS_EN_PERFIL).map((e) => (
-              <li key={e.id} className="flex flex-col items-center gap-2 rounded-md border border-border p-3 text-center">
-                <img src={e.qr} alt={`QR de la entrada ${e.codigo}`} className="h-32 w-32" />
-                <p className="line-clamp-2 text-sm font-semibold text-ink">{e.evento.titulo}</p>
-                <p className="text-xs text-muted">
-                  {e.qrUso === 'ACCESO' ? 'QR digital del evento' : 'QR para recoger tu manilla'} · {e.categoria}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="max-w-lg text-sm text-muted">
-            {entradasConQr.length
-              ? 'Usa el QR digital para moverte en el evento o el QR de retiro en un punto de entrega de manillas.'
-              : 'Tus entradas aprobadas aparecen aquí con su código QR: el QR digital para moverte en el evento o el QR para recoger tu manilla.'}
-          </p>
-          <Link to="/mis-entradas" className="btn-primary">
-            Ver mis entradas
-          </Link>
-        </div>
-      </Section>
+      <IdentidadSection />
     </div>
   )
 }

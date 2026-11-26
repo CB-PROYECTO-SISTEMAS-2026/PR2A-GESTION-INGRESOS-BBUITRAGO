@@ -13,6 +13,7 @@ import Reembolsos from './modules/sprint3/Reembolsos'
 import HistorialAccesos from './modules/sprint3/HistorialAccesos'
 import { HistorialDevoluciones } from './modules/sprint3/Devoluciones'
 import HomePage from './modules/public/HomePage'
+import NotFoundPage from './modules/public/NotFoundPage'
 import EventsPage from './modules/public/EventsPage'
 import EventDetailPage from './modules/public/EventDetailPage'
 
@@ -26,6 +27,7 @@ import ProfilePage from './modules/profile/ProfilePage'
 import MisEntradasPage from './modules/entradas/MisEntradasPage'
 import CompraEntradasPage from './modules/compras/CompraEntradasPage'
 import MisComprasPage from './modules/compras/MisComprasPage'
+import InvitarEntradaPage from './modules/asignaciones/InvitarEntradaPage'
 
 import SolicitudFormPage from './modules/organizer/SolicitudFormPage'
 import MisSolicitudesPage from './modules/organizer/MisSolicitudesPage'
@@ -33,6 +35,7 @@ import MisSolicitudesPage from './modules/organizer/MisSolicitudesPage'
 import AdminDashboardPage from './modules/admin/AdminDashboardPage'
 import SolicitudesListPage from './modules/admin/SolicitudesListPage'
 import SolicitudDetailPage from './modules/admin/SolicitudDetailPage'
+import SolicitudesNegocioPage from './modules/admin/SolicitudesNegocioPage'
 import EventosAdminPage from './modules/admin/EventosAdminPage'
 import EventoEditPage from './modules/admin/EventoEditPage'
 import CategoriasPage from './modules/admin/CategoriasPage'
@@ -99,11 +102,13 @@ const router = createBrowserRouter([
           { path: 'forgot-password', element: <ForgotPasswordPage /> },
           { path: 'reset-password', element: <ResetPasswordPage /> },
           { path: 'activar-cuenta', element: <AceptarInvitacionPage /> },
+          { path: 'invitar-entrada', element: <InvitarEntradaPage /> },
           {
             element: <ProtectedRoute />,
             children: [
               { path: 'perfil', element: <ProfilePage /> },
               { path: 'mis-entradas', element: <MisEntradasPage /> },
+              { path: 'mis-asignaciones', element: <Navigate to="/mis-entradas" replace /> },
             ],
           },
           {
@@ -140,6 +145,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <AdminDashboardPage /> },
               { path: 'solicitudes', element: <SolicitudesListPage /> },
+              { path: 'negocios/solicitudes', element: <SolicitudesNegocioPage /> },
               { path: 'reportes', element: <Reportes admin /> },
               { path: 'eventos/:id/reportes', element: <Reportes admin /> },
               { path: 'reembolsos', element: <Reembolsos admin /> },
@@ -231,7 +237,7 @@ const router = createBrowserRouter([
           },
         ],
       },
-      { path: '*', element: <Navigate to="/" replace /> },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

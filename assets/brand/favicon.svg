@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 84" width="84" height="84" fill="none">
+  <g transform="translate(2, 2)">
+    
+    <defs>
+      <linearGradient id="ev-pass-color" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1D4ED8" />
+        <stop offset="60%" stop-color="#2563EB" />
+        <stop offset="100%" stop-color="#3B82F6" />
+      </linearGradient>
+      <linearGradient id="ev-beam-color" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#2563EB" />
+        <stop offset="55%" stop-color="#0284C7" />
+        <stop offset="100%" stop-color="#00F2FE" />
+      </linearGradient>
+      
+      <filter id="ev-glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="2.5" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+
+    <!-- Master Symbol Group: Balanced on 80x80 canvas -->
+    <g id="eventix-symbol-geometry">
+      <!-- Facet 1: Primary Ticket Pass (Top-Left to Bottom-Right) with geometric security notch -->
+      <path d="M 19 12
+               C 13 12, 9 16, 9 22
+               L 9 33
+               C 13.5 35, 16 38.5, 16 42
+               C 16 45.5, 13.5 49, 9 51
+               L 9 62
+               C 9 68, 13 72, 19 72
+               L 33 72
+               C 37 72, 40.5 69, 43 65.5
+               L 67 27
+               C 69 24, 67 20, 63 20
+               L 50 20
+               C 46.5 20, 43.5 22, 41.5 25
+               L 26.5 49
+               C 25.5 50.5, 23.5 49.5, 23.5 47.5
+               L 23.5 19
+               C 23.5 15, 21 12, 19 12 Z"
+            fill="url(#ev-pass-color)" />
+
+      <!-- Facet 2: Crossing Kinetic Pulse Beam (Bottom-Left to Top-Right) -->
+      <path d="M 27 67
+               C 24 70.5, 27 75, 31.5 75
+               L 45 75
+               C 49 75, 52 73, 54.5 69
+               L 73 37
+               C 75 33.5, 73.5 29.5, 70 27
+               L 59 18.5
+               C 56 16.5, 52 17.5, 50 20.5
+               L 36.5 43.5
+               C 35.5 45, 37.5 47, 39 46
+               L 48.5 31
+               C 50 28.5, 53 28.5, 55 30
+               L 61.5 36.5
+               C 63.5 38.5, 63 41.5, 61 44
+               L 44.5 71
+               Z"
+            fill="url(#ev-beam-color)" />
+
+      <!-- Central Verified Nexus / Laser Diamond -->
+      <polygon points="43.5,37 51.5,43.5 43.5,50 35.5,43.5"
+               fill="#00F2FE"
+               filter="url(#ev-glow)" />
+    </g>
+  
+  </g>
+</svg>

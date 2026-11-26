@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80" fill="none">
+    
+    <defs>
+      <linearGradient id="cB-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#3B82F6" />
+        <stop offset="50%" stop-color="#1D4ED8" />
+        <stop offset="100%" stop-color="#0A1128" />
+      </linearGradient>
+      <linearGradient id="cB-grad-2" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#00F2FE" />
+        <stop offset="70%" stop-color="#2563EB" />
+        <stop offset="100%" stop-color="#1E3A8A" />
+      </linearGradient>
+      <linearGradient id="cB-edge" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#00F2FE" />
+        <stop offset="100%" stop-color="#60A5FA" />
+      </linearGradient>
+    </defs>
+
+    <g id="concept-B-vortex">
+      <!-- Outer Dynamic Sonic Blade (E-Curve) -->
+      <path d="M 12 16
+               C 22 10, 48 8, 64 16
+               C 70 19, 72 25, 68 30
+               L 48 54
+               C 44 59, 38 60, 32 58
+               L 16 52
+               C 10 50, 8 44, 12 38
+               L 26 22
+               Z"
+            fill="url(#cB-grad-2)" />
+
+      <!-- Crossing Accelerating Blade (The X-Thrust) -->
+      <path d="M 68 64
+               C 58 70, 32 72, 16 64
+               C 10 61, 8 55, 12 50
+               L 32 26
+               C 36 21, 42 20, 48 22
+               L 64 28
+               C 70 30, 72 36, 68 42
+               L 54 58
+               Z"
+            fill="url(#cB-grad-1)" />
+
+      <!-- Central Kinetic Aperture (Precision Diamond) -->
+      <polygon points="40,32 50,40 40,48 30,40"
+               fill="#00F2FE"
+               stroke="#FFFFFF"
+               stroke-width="1.5" />
+
+      <!-- High-Speed Accent Winglets -->
+      <path d="M 66 18 L 72 26 L 68 32" stroke="url(#cB-edge)" stroke-width="3" stroke-linecap="round" fill="none" />
+      <path d="M 14 62 L 8 54 L 12 48" stroke="url(#cB-edge)" stroke-width="3" stroke-linecap="round" fill="none" />
+    </g>
+  
+  </svg>

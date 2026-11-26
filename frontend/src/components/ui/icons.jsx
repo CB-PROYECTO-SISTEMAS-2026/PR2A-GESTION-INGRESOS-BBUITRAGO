@@ -128,6 +128,12 @@ export const IconChevronDown = (p) => (
   </Icon>
 )
 
+export const IconChevronUp = (p) => (
+  <Icon {...p}>
+    <path d="m18 15-6-6-6 6" />
+  </Icon>
+)
+
 export const IconChevronLeft = (p) => (
   <Icon {...p}>
     <path d="m15 6-6 6 6 6" />

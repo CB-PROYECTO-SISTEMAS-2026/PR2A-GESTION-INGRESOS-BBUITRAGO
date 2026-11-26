@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthHeader from '../../components/layout/AuthHeader'
 import { useAuth } from '../../context/AuthContext'
 import { getErrorMessage } from '../../utils/format'
+import { goHomeHero } from '../../utils/goHomeHero'
 
 export default function RegisterPage() {
   const { register } = useAuth()
@@ -54,7 +55,7 @@ export default function RegisterPage() {
         telefono: form.telefono.trim() || undefined,
         password: form.password,
       })
-      navigate('/')
+      goHomeHero(navigate)
     } catch (err) {
       setUserExists(err?.response?.status === 409)
       setError(getErrorMessage(err, 'No se pudo crear la cuenta'))

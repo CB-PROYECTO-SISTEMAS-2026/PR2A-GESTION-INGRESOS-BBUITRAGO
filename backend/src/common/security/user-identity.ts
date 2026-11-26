@@ -63,7 +63,7 @@ export async function isIdentityTaken(
   const or: Prisma.UsuarioWhereInput[] = [];
   if (identity.email) or.push({ email: identity.email });
   if (identity.telefono) or.push({ telefono: identity.telefono });
-  if (identity.documento) or.push({ documento: identity.documento });
+  // documento en Usuario es solo máscara; la unicidad real vive en IdentidadUsuario.identityHmac.
   if (!or.length) return false;
 
   const found = await db.usuario.findFirst({

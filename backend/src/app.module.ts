@@ -27,6 +27,10 @@ import { SaldoModule } from './modules/saldo/saldo.module';
 import { RecargasModule } from './modules/recargas/recargas.module';
 import { PersonalEventoModule } from './modules/personal-evento/personal-evento.module';
 import { DevolucionesModule } from './modules/devoluciones/devoluciones.module';
+import { ContactoModule } from './modules/contacto/contacto.module';
+import { IdentidadModule } from './modules/identidad/identidad.module';
+import { AsignacionesModule } from './modules/asignaciones/asignaciones.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -62,7 +66,11 @@ import { DevolucionesModule } from './modules/devoluciones/devoluciones.module';
     DevolucionesModule,
     ReembolsosModule,
     ReportesModule,
+    ContactoModule,
+    IdentidadModule,
+    AsignacionesModule,
   ],
+  controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: AppThrottlerGuard }],
 })
 export class AppModule {}

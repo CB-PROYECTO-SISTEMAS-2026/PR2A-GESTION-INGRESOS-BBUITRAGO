@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createSolicitud } from '../../api/events.api'
+import { createSolicitud, getCategoriasEvento } from '../../api/events.api'
+import { getMyProfile } from '../../api/users.api'
 import { toast } from '../../components/Toast'
 import Field, { Section } from '../../components/form/Field'
 import { IntegerInput } from '../../components/form/NumberInputs'
+import CategoriaEventoPicker, { selectionIsMusical } from '../../components/form/CategoriaEventoPicker'
 import { IconExternal, IconUpload } from '../../components/ui/icons'
 import { getErrorMessage } from '../../utils/format'
 import { ACCEPT_MAPA, validateFile } from '../../utils/files'
@@ -15,6 +17,7 @@ const initialForm = {
   descripcion: '',
   ubicacion: '',
   ubicacionUrl: '',
+  spotifyUrl: '',
   reembolsoHoras: 48,
   capacidad: '',
   empresa: '',
@@ -30,9 +33,35 @@ export default function SolicitudFormPage() {
   const [form, setForm] = useState(initialForm)
   const [variosDias, setVariosDias] = useState(false)
   const [mapa, setMapa] = useState(null)
+  const [categoriaEventoIds, setCategoriaEventoIds] = useState([])
+  const [categoriasEventoOpts, setCategoriasEventoOpts] = useState([])
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [loading, setLoading] = useState(false)
+  const showSpotify = selectionIsMusical(categoriasEventoOpts, categoriaEventoIds)
+
+  useEffect(() => {
+    let alive = true
+    getCategoriasEvento()
+      .then(({ data }) => {
+        if (!alive) return
+        setCategoriasEventoOpts(Array.isArray(data) ? data : data?.data ?? [])
+      })
+      .catch(() => {
+        if (alive) setCategoriasEventoOpts([])
+      })
+    getMyProfile()
+      .then(({ data }) => {
+        if (!alive) return
+        const productora = data?.nombreProductora?.trim()
+        if (!productora) return
+        setForm((f) => (f.empresa.trim() ? f : { ...f, empresa: productora }))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const mapaPreview = useMemo(() => (mapa && mapa.type !== 'application/pdf' ? URL.createObjectURL(mapa) : ''), [mapa])
   useEffect(() => () => mapaPreview && URL.revokeObjectURL(mapaPreview), [mapaPreview])
@@ -72,6 +101,11 @@ export default function SolicitudFormPage() {
     const scheduleError = validateSchedule({ ...form, variosDias })
     if (scheduleError) next.fechas = scheduleError
     if (!mapa) next.mapa = 'Adjunta el mapa de la zona del evento (imagen o PDF).'
+    if (!categoriaEventoIds.length) {
+      next.categoriaEventoIds = 'Elige al menos una categoría del evento (temática).'
+    } else if (categoriaEventoIds.length > 3) {
+      next.categoriaEventoIds = 'Puedes elegir hasta 3 categorías del evento.'
+    }
     return next
   }
 
@@ -96,6 +130,10 @@ export default function SolicitudFormPage() {
       if (variosDias) fd.append('fechaFin', form.fechaFin)
       fd.append('horaInicio', form.horaInicio)
       fd.append('horaFin', form.horaFin)
+      fd.append('categoriaEventoIds', JSON.stringify(categoriaEventoIds))
+      if (showSpotify && form.spotifyUrl.trim()) {
+        fd.append('spotifyUrl', form.spotifyUrl.trim())
+      }
       fd.append('mapa', mapa)
 
       await createSolicitud(fd)
@@ -143,6 +181,40 @@ export default function SolicitudFormPage() {
             <Field label="Empresa u organización" htmlFor="empresa">
               <input id="empresa" className="input" value={form.empresa} onChange={set('empresa')} maxLength={191} />
             </Field>
+            <Field
+              label="Categorías del evento"
+              htmlFor="categoriaEventoIds"
+              required
+              error={errors.categoriaEventoIds}
+            >
+              <CategoriaEventoPicker
+                options={categoriasEventoOpts}
+                value={categoriaEventoIds}
+                onChange={(ids) => {
+                  setCategoriaEventoIds(ids)
+                  setErrors((e) => (e.categoriaEventoIds ? { ...e, categoriaEventoIds: '' } : e))
+                  if (!selectionIsMusical(categoriasEventoOpts, ids)) {
+                    setField('spotifyUrl', '')
+                  }
+                }}
+              />
+            </Field>
+            {showSpotify && (
+              <Field label="Spotify del artista (opcional)" htmlFor="spotifyUrl">
+                <input
+                  id="spotifyUrl"
+                  className="input"
+                  type="url"
+                  value={form.spotifyUrl}
+                  onChange={set('spotifyUrl')}
+                  maxLength={500}
+                  placeholder="https://open.spotify.com/artist/..."
+                />
+                <p className="mt-1 text-xs text-muted">
+                  Enlace open.spotify.com de artista, álbum o playlist. Se muestra en la ficha pública.
+                </p>
+              </Field>
+            )}
           </div>
         </Section>
 

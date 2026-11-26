@@ -13,10 +13,12 @@ model Usuario {
   passwordHash            String
   nombre                  String
   apellido                String?
+  /// Marca pública del organizador (ej. "Sich Producciones"). Null si no aplica.
+  nombreProductora        String?
   /// Forma canónica (ver normalizePhone); único para evitar cuentas duplicadas.
   telefono                String?                 @unique
-  /// Forma canónica (ver normalizeDocument); único para evitar cuentas duplicadas.
-  documento               String?                 @unique
+  /// Solo máscara de visualización (p. ej. ******567). El número completo no se almacena.
+  documento               String?
   fechaNac                DateTime?
   fotoUrl                 String?
   fotoPublicId            String?
@@ -34,6 +36,7 @@ model Usuario {
   compras                 CompraEntrada[]
   entradas                Entrada[]               @relation("TitularEntrada")
   eventosOrganizados      Evento[]                @relation("OrganizadorEventos")
+  identidad               IdentidadUsuario?
   incidenciasReportadas   IncidenciaRecarga[]     @relation("RecargadorIncidencias")
   incidenciasResueltas    IncidenciaRecarga[]     @relation("IncidenciasResueltas")
   invitacionesCreadas     InvitacionUsuario[]     @relation("InvitacionesCreadas")
@@ -52,6 +55,47 @@ model Usuario {
   transaccionesSaldo      TransaccionSaldo[]      @relation("UsuarioTransacciones")
   roles                   UsuarioRol[]
   ventasRealizadas        Venta[]                 @relation("AyudanteVentas")
+  asignacionesEnviadas    AsignacionEntrada[]     @relation("AsignacionRemitente")
+  asignacionesRecibidas   AsignacionEntrada[]     @relation("AsignacionDestinatario")
+  auditoriasIdentidad     AuditoriaIdentidad[]
+  verificacionesIdentidad VerificacionIdentidadIntento[]
+  busquedasEvento          BusquedaEventoReciente[]
+}
+
+/// Identidad verificable del usuario. Guarda solo huellas HMAC; nunca el documento en claro.
+model IdentidadUsuario {
+  id                 String   @id @default(cuid())
+  usuarioId          String   @unique
+  nombresLegales     String
+  apellidosLegales   String
+  documentType       String   @db.VarChar(20)
+  documentCountry    String   @db.VarChar(2)
+  /// Máscara para UI (p. ej. ******567). No es el número completo.
+  documentMask       String   @db.VarChar(32)
+  tieneComplemento   Boolean  @default(false)
+  identityHmac       String   @db.VarChar(64)
+  identityKeyVersion Int
+  suffixHmac         String   @db.VarChar(64)
+  suffixKeyVersion   Int
+  consentAt          DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  usuario            Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([identityHmac, identityKeyVersion])
+  @@index([suffixHmac, suffixKeyVersion])
+}
+
+model AuditoriaIdentidad {
+  id         String   @id @default(cuid())
+  usuarioId  String
+  accion     String   @db.VarChar(40)
+  detalle    String?  @db.VarChar(500)
+  actorId    String?
+  createdAt  DateTime @default(now())
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, createdAt])
 }
 
 /// Cuenta pendiente creada por un admin; el Usuario solo existe cuando el invitado acepta.
@@ -128,15 +172,54 @@ model SolicitudEvento {
   horaFin       String          @db.VarChar(5)
   mapaUrl       String?
   mapaNombre    String?
+  /// Spotify opcional (artista/álbum/playlist) si hay categoría musical.
+  spotifyUrl    String?         @db.VarChar(500)
   estado        SolicitudEstado @default(PENDIENTE)
   observaciones String?         @db.Text
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   evento        Evento?
   mapHistory    MapaHistorial[]
+  /// Temáticas del evento (máx. 3 en app). No confundir con CategoriaEntrada.
+  categoriasEvento SolicitudCategoriaEvento[]
   organizador   Usuario         @relation("OrganizadorSolicitudes", fields: [organizadorId], references: [id])
 
   @@index([organizadorId], map: "SolicitudEvento_organizadorId_fkey")
+}
+
+/// Catálogo de temáticas/géneros del evento.
+/// NO confundir con CategoriaEntrada (VIP/General = tipos de ticket).
+model CategoriaEvento {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  slug        String   @unique
+  /// Si true, el formulario puede pedir enlace de Spotify (opcional).
+  esMusical   Boolean  @default(false)
+  orden       Int      @default(0)
+  activa      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  eventos     EventoCategoriaEvento[]
+  solicitudes SolicitudCategoriaEvento[]
+}
+
+model EventoCategoriaEvento {
+  eventoId          String
+  categoriaEventoId String
+  evento            Evento         @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  categoriaEvento   CategoriaEvento @relation(fields: [categoriaEventoId], references: [id], onDelete: Restrict)
+
+  @@id([eventoId, categoriaEventoId])
+  @@index([categoriaEventoId])
+}
+
+model SolicitudCategoriaEvento {
+  solicitudId       String
+  categoriaEventoId String
+  solicitud         SolicitudEvento @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  categoriaEvento   CategoriaEvento @relation(fields: [categoriaEventoId], references: [id], onDelete: Restrict)
+
+  @@id([solicitudId, categoriaEventoId])
+  @@index([categoriaEventoId])
 }
 
 model Evento {
@@ -166,11 +249,20 @@ model Evento {
   qrPagoUrl            String?              @db.VarChar(500)
   qrPagoPublicId       String?
   instruccionesPago    String?              @db.Text
+  /// URL pública de Spotify (artist/album/playlist/track) para embed en ficha.
+  spotifyUrl           String?              @db.VarChar(500)
+  /// Cesión de titular entre cuentas de Eventix (post-asignación).
+  permiteTransferencias Boolean             @default(true)
+  /// Fecha/hora límite para transferir; null = sin límite extra (sigue valiendo el estado del evento).
+  transferenciaHasta   DateTime?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   accesos              AccesoEvento[]
   accesosRechazados    AccesoRechazo[]
+  /// Tipos de ticket (VIP, General…). No confundir con categoriasEvento.
   categorias           CategoriaEntrada[]
+  /// Temáticas/géneros del evento (Conciertos, Urbano…). Máx. 3 en app.
+  categoriasEvento     EventoCategoriaEvento[]
   compras              CompraEntrada[]
   entradas             Entrada[]
   organizador          Usuario              @relation("OrganizadorEventos", fields: [organizadorId], references: [id])
@@ -324,49 +416,100 @@ model PagoQR {
 }
 
 model Entrada {
-  id           String             @id @default(cuid())
-  compraId     String?
-  eventoId     String
-  categoriaId  String
-  fechaId      String?
-  titularId    String?
-  ticketPoolId String?            @unique
-  codigoQr     String             @unique
-  codigo       String             @unique
-  estado       EntradaEstado      @default(GENERADA)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  accesos      AccesoEvento[]
-  rechazos     AccesoRechazo[]
-  credencial   Credencial?
-  categoria    CategoriaEntrada   @relation(fields: [categoriaId], references: [id])
-  compra       CompraEntrada?     @relation(fields: [compraId], references: [id])
-  evento       Evento             @relation(fields: [eventoId], references: [id])
-  fecha        FechaEvento?       @relation(fields: [fechaId], references: [id])
-  ticketPool   TicketPool?        @relation(fields: [ticketPoolId], references: [id])
-  titular      Usuario?           @relation("TitularEntrada", fields: [titularId], references: [id])
-  manilla      Manilla?
-  reembolso    ReembolsoEntrada?
-  itemCompra   CompraEntradaItem?
+  id              String                 @id @default(cuid())
+  compraId        String?
+  eventoId        String
+  categoriaId     String
+  fechaId         String?
+  titularId       String?
+  ticketPoolId    String?                @unique
+  codigoQr        String                 @unique
+  codigo          String                 @unique
+  estado          EntradaEstado          @default(GENERADA)
+  /// Estado del titular (independiente del pago y del uso en puerta).
+  titularEstado   TitularAsignacionEstado @default(SIN_ASIGNAR)
+  /// Incrementa al regenerar la credencial QR (transferencias / revocación).
+  tokenVersion    Int                    @default(1)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  accesos         AccesoEvento[]
+  rechazos        AccesoRechazo[]
+  credencial      Credencial?
+  categoria       CategoriaEntrada       @relation(fields: [categoriaId], references: [id])
+  compra          CompraEntrada?         @relation(fields: [compraId], references: [id])
+  evento          Evento                 @relation(fields: [eventoId], references: [id])
+  fecha           FechaEvento?           @relation(fields: [fechaId], references: [id])
+  ticketPool      TicketPool?            @relation(fields: [ticketPoolId], references: [id])
+  titular         Usuario?               @relation("TitularEntrada", fields: [titularId], references: [id])
+  manilla         Manilla?
+  reembolso       ReembolsoEntrada?
+  itemCompra      CompraEntradaItem?
+  asignaciones    AsignacionEntrada[]
+  verificaciones  VerificacionIdentidadIntento[]
 
   @@index([categoriaId], map: "Entrada_categoriaId_fkey")
   @@index([compraId], map: "Entrada_compraId_fkey")
   @@index([eventoId], map: "Entrada_eventoId_fkey")
   @@index([fechaId], map: "Entrada_fechaId_fkey")
   @@index([titularId], map: "Entrada_titularId_fkey")
+  @@index([titularEstado])
+}
+
+/// Invitación / transferencia de titular de una entrada. El token en claro nunca se guarda.
+model AsignacionEntrada {
+  id                 String                   @id @default(cuid())
+  entradaId          String
+  remitenteId        String
+  destinatarioEmail  String
+  destinatarioId     String?
+  tokenHash          String?                  @unique
+  tipo               AsignacionEntradaTipo     @default(INVITACION)
+  estado             AsignacionEntradaEstado  @default(PENDIENTE)
+  expiresAt          DateTime?
+  acceptedAt         DateTime?
+  cancelledAt        DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  entrada            Entrada                  @relation(fields: [entradaId], references: [id], onDelete: Cascade)
+  remitente          Usuario                  @relation("AsignacionRemitente", fields: [remitenteId], references: [id])
+  destinatario       Usuario?                 @relation("AsignacionDestinatario", fields: [destinatarioId], references: [id])
+
+  @@index([entradaId, estado])
+  @@index([destinatarioEmail, estado])
+  @@index([destinatarioId, estado])
+  @@index([remitenteId], map: "AsignacionEntrada_remitenteId_fkey")
+}
+
+model VerificacionIdentidadIntento {
+  id          String   @id @default(cuid())
+  entradaId   String
+  eventoId    String
+  encargadoId String?
+  coincidio   Boolean
+  createdAt   DateTime @default(now())
+  entrada     Entrada  @relation(fields: [entradaId], references: [id], onDelete: Cascade)
+  encargado   Usuario? @relation(fields: [encargadoId], references: [id], onDelete: SetNull)
+
+  @@index([entradaId, createdAt])
+  @@index([eventoId, createdAt])
+  @@index([encargadoId])
 }
 
 model ReembolsoEntrada {
-  id        String          @id @default(cuid())
-  entradaId String          @unique
-  usuarioId String
-  motivo    String?         @db.Text
-  estado    ReembolsoEstado @default(SOLICITADO)
-  monto     Decimal?        @db.Decimal(12, 2)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  entrada   Entrada         @relation(fields: [entradaId], references: [id])
-  usuario   Usuario         @relation(fields: [usuarioId], references: [id])
+  id           String          @id @default(cuid())
+  entradaId    String          @unique
+  usuarioId    String
+  motivo       String?         @db.Text
+  estado       ReembolsoEstado @default(SOLICITADO)
+  monto        Decimal?        @db.Decimal(12, 2)
+  /// Foto/comprobante de la entrega en efectivo al marcar PAGADO.
+  evidenciaUrl String?
+  pagadoAt     DateTime?
+  pagadoPorId  String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  entrada      Entrada         @relation(fields: [entradaId], references: [id])
+  usuario      Usuario         @relation(fields: [usuarioId], references: [id])
 
   @@index([usuarioId], map: "ReembolsoEntrada_usuarioId_fkey")
 }
@@ -375,8 +518,10 @@ model Credencial {
   id        String   @id @default(cuid())
   entradaId String   @unique
   codigoQr  String   @unique
+  version   Int      @default(1)
   activa    Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   entrada   Entrada  @relation(fields: [entradaId], references: [id], onDelete: Cascade)
   manilla   Manilla?
 }
@@ -434,18 +579,20 @@ model SupervisorPuntoRetiro {
 }
 
 model AccesoEvento {
-  id             String       @id @default(cuid())
-  eventoId       String
-  entradaId      String
-  fechaId        String?
-  encargadoId    String?
-  tipo           AccesoTipo
-  fotoIngresoUrl String?
-  createdAt      DateTime     @default(now())
-  encargado      Usuario?     @relation("EncargadoAccesos", fields: [encargadoId], references: [id])
-  entrada        Entrada      @relation(fields: [entradaId], references: [id], onDelete: Cascade)
-  evento         Evento       @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  fecha          FechaEvento? @relation(fields: [fechaId], references: [id])
+  id                    String       @id @default(cuid())
+  eventoId              String
+  entradaId             String
+  fechaId               String?
+  encargadoId           String?
+  tipo                  AccesoTipo
+  fotoIngresoUrl        String?
+  /// Resultado de la verificación de sufijo del documento en puerta (sin guardar dígitos).
+  verificacionIdentidad Boolean?
+  createdAt             DateTime     @default(now())
+  encargado             Usuario?     @relation("EncargadoAccesos", fields: [encargadoId], references: [id])
+  entrada               Entrada      @relation(fields: [entradaId], references: [id], onDelete: Cascade)
+  evento                Evento       @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  fecha                 FechaEvento? @relation(fields: [fechaId], references: [id])
 
   @@index([encargadoId], map: "AccesoEvento_encargadoId_fkey")
   @@index([entradaId], map: "AccesoEvento_entradaId_fkey")
@@ -808,6 +955,28 @@ enum EntradaEstado {
   ANULADA
 }
 
+/// Titular de la entrada (no confundir con estado de pago ni de uso).
+enum TitularAsignacionEstado {
+  SIN_ASIGNAR
+  INVITACION_PENDIENTE
+  ASIGNADA
+  CANCELADA
+  REVOCADA
+}
+
+enum AsignacionEntradaTipo {
+  INVITACION
+  TRANSFERENCIA
+}
+
+enum AsignacionEntradaEstado {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  CANCELADA
+  EXPIRADA
+}
+
 enum AccesoTipo {
   INGRESO
   SALIDA
@@ -902,6 +1071,31 @@ enum Negocio_tipoSociedad {
   SA
   COOPERATIVA
   OTRO
+}
+
+/// Términos agregados al explorar eventos (contador global).
+model BusquedaEventoPopular {
+  terminoNorm String   @id @db.VarChar(120)
+  termino     String   @db.VarChar(120)
+  busquedas   Int      @default(1)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([busquedas(sort: Desc), updatedAt(sort: Desc)])
+}
+
+/// Últimas búsquedas por usuario autenticado o visitante (clave en localStorage).
+model BusquedaEventoReciente {
+  id          String   @id @default(cuid())
+  usuarioId   String?
+  visitorKey  String?  @db.VarChar(64)
+  termino     String   @db.VarChar(120)
+  terminoNorm String   @db.VarChar(120)
+  createdAt   DateTime @default(now())
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, createdAt(sort: Desc)])
+  @@index([visitorKey, createdAt(sort: Desc)])
 }
 
 model IncidenciaEvento {

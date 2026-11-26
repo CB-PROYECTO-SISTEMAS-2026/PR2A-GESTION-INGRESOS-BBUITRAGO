@@ -16,7 +16,9 @@
     "lint": "eslint \"src/**/*.ts\" --fix",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "db:sync": "prisma db pull && prisma generate"
+    "db:sync": "prisma db pull && prisma generate",
+    "seed:show": "node prisma/seed-show/index.js",
+    "db:seed:produccion": "node prisma/seed-show/index.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

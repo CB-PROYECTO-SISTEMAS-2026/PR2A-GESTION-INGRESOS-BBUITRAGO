@@ -248,7 +248,11 @@ export class TicketsService {
     const [vendidas, pendientes] = await Promise.all([
       this.prisma.entrada.groupBy({
         by: ['fechaId'],
-        where: { categoriaId, fechaId: { in: fechaIds } },
+        where: {
+          categoriaId,
+          fechaId: { in: fechaIds },
+          estado: { notIn: ['REEMBOLSADA', 'ANULADA'] },
+        },
         _count: { _all: true },
       }),
       this.prisma.compraEntradaItem.groupBy({

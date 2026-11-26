@@ -1,14 +1,13 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import AuthHeader from '../../components/layout/AuthHeader'
 import { useAuth } from '../../context/AuthContext'
 import { getErrorMessage } from '../../utils/format'
+import { goHomeHero } from '../../utils/goHomeHero'
 
 export default function LoginPage() {
   const { login, startSession } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
-  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -18,28 +17,8 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const user = await iniciar()
-      const redirect = searchParams.get('redirect')
-      const from = location.state?.from
-      if (from) {
-        navigate(from, { replace: true })
-      } else if (redirect && /^\/(?![/\\])/.test(redirect)) {
-        navigate(redirect, { replace: true })
-      } else if (user?.roles?.includes('ADMIN')) {
-        navigate('/admin')
-      } else if (user?.roles?.includes('JEFE_NEGOCIO')) {
-        navigate('/negocio/dashboard')
-      } else if (user?.roles?.includes('AYUDANTE')) {
-        navigate('/pos')
-      } else if (user?.roles?.includes('RECARGADOR')) {
-        navigate('/recargas')
-      } else if (user?.roles?.includes('DEVOLUCIONES')) {
-        navigate('/devoluciones')
-      } else if (user?.roles?.includes('ENCARGADO_ACCESO')) {
-        navigate('/supervisor')
-      } else {
-        navigate('/')
-      }
+      await iniciar()
+      goHomeHero(navigate)
     } catch (err) {
       setError(getErrorMessage(err, 'Credenciales inválidas'))
     } finally {

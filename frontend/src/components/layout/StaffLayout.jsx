@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import BrandLogo from '../BrandLogo'
 import { useAuth } from '../../context/AuthContext'
+import { confirmLogout } from '../../utils/confirmLogout'
 
 const tabClass = ({ isActive }) =>
   `flex-1 rounded-md py-2 text-center text-sm font-semibold transition ${
@@ -26,7 +27,8 @@ export default function StaffLayout({ tabs, label }) {
               <button
                 type="button"
                 className="text-xs font-semibold text-slate-300 hover:text-white"
-                onClick={() => {
+                onClick={async () => {
+                  if (!(await confirmLogout())) return
                   logout()
                   navigate('/login', { replace: true })
                 }}

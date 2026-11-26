@@ -12,6 +12,7 @@ import {
   EventoEstado,
   Prisma,
   Role,
+  TitularAsignacionEstado,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -19,6 +20,7 @@ import {
   StoredFile,
 } from '../../common/storage/storage.service';
 import { EntradasService } from '../entradas/entradas.service';
+import { IdentidadService } from '../identidad/identidad.service';
 import { ENTRADA_INVALIDA } from '../entradas/entradas-emision';
 import { dateToDay, todayIn } from '../events/event-schedule';
 import { nombreCompleto } from '../manillas/manillas-helpers';
@@ -31,6 +33,7 @@ import {
   RechazoAccesoDto,
   RegistroAccesoDto,
   Sentido,
+  VerificarDocumentoDto,
 } from './dto/acceso.dto';
 
 type AuthUser = { id: string; roles: Role[] };
@@ -40,6 +43,8 @@ export type EstadoEscaneo = 'VALIDO' | 'YA_USADO' | 'INVALIDO';
 
 const MAX_CANDIDATOS = 20;
 const MAX_REGISTROS = 200;
+const MAX_INTENTOS_SUFIJO = 5;
+const VENTANA_INTENTOS_MS = 15 * 60 * 1000;
 const DENTRO: AccesoTipo[] = [AccesoTipo.INGRESO, AccesoTipo.REINGRESO];
 const ACCESO_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
 const MOTIVO_RECHAZO_FOTO =
@@ -69,6 +74,7 @@ const fichaSelect = {
   codigo: true,
   estado: true,
   fechaId: true,
+  titularEstado: true,
   categoria: {
     select: {
       nombre: true,
@@ -88,6 +94,15 @@ const fichaSelect = {
       email: true,
       telefono: true,
       fotoUrl: true,
+      identidad: {
+        select: {
+          documentMask: true,
+          documentType: true,
+          documentCountry: true,
+          suffixHmac: true,
+          suffixKeyVersion: true,
+        },
+      },
     },
   },
   manilla: { select: { codigoFisico: true, vinculada: true } },
@@ -178,6 +193,7 @@ export class AccesoService {
     private prisma: PrismaService,
     private storage: StorageService,
     private entradas: EntradasService,
+    private identidad: IdentidadService,
     config: ConfigService,
   ) {
     this.timeZone = config.get<string>('APP_TIMEZONE', 'America/La_Paz');
@@ -264,6 +280,74 @@ export class AccesoService {
   }
 
   /**
+   * Verificación complementaria en puerta: últimos 4 caracteres del documento.
+   * No sustituye la revisión visual del documento físico ni es una consulta SEGIP.
+   */
+  async verificarDocumento(user: AuthUser, dto: VerificarDocumentoDto) {
+    const evento = await this.requireEventoSupervisado(user, dto.eventoId);
+    const { entrada } = await this.entradas.resolverCodigoEscaneado(
+      evento.id,
+      dto.codigo,
+    );
+    const ficha = await this.prisma.entrada.findUniqueOrThrow({
+      where: { id: entrada.id },
+      select: {
+        id: true,
+        titularEstado: true,
+        titular: {
+          select: {
+            identidad: {
+              select: { suffixHmac: true, suffixKeyVersion: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (
+      ficha.titularEstado !== TitularAsignacionEstado.ASIGNADA ||
+      !ficha.titular?.identidad
+    ) {
+      throw new BadRequestException(
+        'La entrada no tiene un titular con identidad registrada.',
+      );
+    }
+
+    await this.assertIntentosSufijo(ficha.id);
+
+    const coincidio = this.identidad.verificarSufijoAlmacenado(
+      dto.documentSuffix,
+      ficha.titular.identidad.suffixHmac,
+      ficha.titular.identidad.suffixKeyVersion,
+    );
+    // No persistir el sufijo introducido.
+    (dto as { documentSuffix?: string }).documentSuffix = undefined;
+
+    await this.prisma.verificacionIdentidadIntento.create({
+      data: {
+        entradaId: ficha.id,
+        eventoId: evento.id,
+        encargadoId: user.id,
+        coincidio,
+      },
+    });
+
+    if (!coincidio) {
+      return {
+        coincidio: false,
+        titulo: 'DOCUMENTO NO COINCIDENTE',
+        mensaje:
+          'Los datos introducidos no coinciden. Verifique el documento presentado.',
+      };
+    }
+    return {
+      coincidio: true,
+      titulo: 'DOCUMENTO COINCIDENTE',
+      mensaje: 'Identidad coincidente. Puede continuar con el ingreso.',
+    };
+  }
+
+  /**
    * HU-017 / HU-046: registra el ingreso, reingreso o salida. El primer ingreso exige la foto y,
    * desde entonces, el supervisor debe confirmar que la persona coincide con esa foto.
    */
@@ -298,6 +382,26 @@ export class AccesoService {
       );
     }
 
+    let verificacionIdentidad: boolean | null = null;
+    if (dto.sentido === 'ENTRADA') {
+      if (!dto.documentSuffix) {
+        throw new BadRequestException(
+          'Ingresa los últimos 4 caracteres del documento del titular antes de registrar el ingreso.',
+        );
+      }
+      const verif = await this.verificarDocumento(user, {
+        eventoId: dto.eventoId,
+        codigo: dto.codigo,
+        sentido: dto.sentido,
+        documentSuffix: dto.documentSuffix,
+      });
+      if (!verif.coincidio) {
+        throw new BadRequestException(verif.mensaje);
+      }
+      verificacionIdentidad = true;
+      (dto as { documentSuffix?: string }).documentSuffix = undefined;
+    }
+
     let stored: StoredFile | null = null;
     if (previa.requiereFoto && foto)
       stored = await this.storage.upload(foto, 'accesos', 'image');
@@ -329,12 +433,14 @@ export class AccesoService {
             encargadoId: user.id,
             tipo: d.movimiento,
             fotoIngresoUrl: d.requiereFoto ? stored!.url : null,
+            verificacionIdentidad,
           },
           select: {
             id: true,
             tipo: true,
             fotoIngresoUrl: true,
             createdAt: true,
+            verificacionIdentidad: true,
           },
         });
         if (
@@ -600,12 +706,22 @@ export class AccesoService {
       persona: entrada.titular
         ? {
             nombre: nombreCompleto(entrada.titular),
-            documento: entrada.titular.documento,
+            documento:
+              entrada.titular.identidad?.documentMask ??
+              entrada.titular.documento,
+            documentType: entrada.titular.identidad?.documentType ?? null,
+            documentCountry:
+              entrada.titular.identidad?.documentCountry ?? null,
             email: entrada.titular.email,
             telefono: entrada.titular.telefono,
             fotoPerfilUrl: entrada.titular.fotoUrl,
+            identidadRegistrada: Boolean(entrada.titular.identidad),
           }
         : null,
+      requiereVerificacionDocumento:
+        sentido === 'ENTRADA' &&
+        Boolean(entrada.titular?.identidad) &&
+        entrada.titularEstado === TitularAsignacionEstado.ASIGNADA,
       fotoIngreso,
       rechazosHoy,
       ultimoMovimiento: ultimoHoy
@@ -631,6 +747,21 @@ export class AccesoService {
       return resultado(
         'INVALIDO',
         `La entrada ${entrada.codigo} está ${entrada.estado.toLowerCase()} y ya no es válida.`,
+      );
+    }
+    if (
+      entrada.titularEstado !== TitularAsignacionEstado.ASIGNADA ||
+      !entrada.titular
+    ) {
+      return resultado(
+        'INVALIDO',
+        'Esta entrada aún no tiene un titular definitivo. No permite el ingreso.',
+      );
+    }
+    if (!entrada.titular.identidad) {
+      return resultado(
+        'INVALIDO',
+        'El titular no tiene identidad registrada. No se puede verificar el acceso.',
       );
     }
     if (entrada.fechaId && entrada.fechaId !== hoy.id) {
@@ -909,6 +1040,22 @@ export class AccesoService {
     return proximo
       ? `El evento no se realiza hoy; el próximo día es el ${formatDia(proximo.fecha)}.`
       : 'El evento ya terminó: no se puede registrar el acceso.';
+  }
+
+  private async assertIntentosSufijo(entradaId: string) {
+    const desde = new Date(Date.now() - VENTANA_INTENTOS_MS);
+    const fallidos = await this.prisma.verificacionIdentidadIntento.count({
+      where: {
+        entradaId,
+        coincidio: false,
+        createdAt: { gte: desde },
+      },
+    });
+    if (fallidos >= MAX_INTENTOS_SUFIJO) {
+      throw new BadRequestException(
+        'Demasiados intentos fallidos de verificación. Espere unos minutos e intente de nuevo.',
+      );
+    }
   }
 
   private hora(date: Date) {

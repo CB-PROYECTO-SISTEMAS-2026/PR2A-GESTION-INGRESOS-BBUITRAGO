@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Paginas } from '../sprint3/comun'
 import { Link, useSearchParams } from 'react-router-dom'
 import { getMisMovimientos, getMisSaldos } from '../../api/recargas.api'
-import { formatBs, formatDateTime, formatTime, getErrorMessage } from '../../utils/format'
+import { IconSearch } from '../../components/ui/icons'
+import { formatBs, formatTime, getErrorMessage } from '../../utils/format'
 import {
   TIPOS_MOVIMIENTO,
   estadoMovimientoBadge,
   estadoMovimientoLabel,
   montoConSigno,
 } from '../../utils/movimientos'
+
+const EVENTOS_PAGE_SIZE = 10
 
 /** HU-020 (cliente): historial de transacciones del saldo de un evento (Figma: Historial de Transacciones). */
 export default function MovimientosPage() {
@@ -19,7 +22,29 @@ export default function MovimientosPage() {
   const [eventos, setEventos] = useState(null)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [eventoQ, setEventoQ] = useState('')
+  const [eventosPage, setEventosPage] = useState(1)
   const ultimaPeticion = useRef(0)
+
+  const eventosFiltrados = useMemo(() => {
+    const lista = eventos ?? []
+    const q = eventoQ.trim().toLowerCase()
+    if (!q) return lista
+    return lista.filter((e) => e.titulo.toLowerCase().includes(q))
+  }, [eventos, eventoQ])
+
+  const eventosTotalPages = eventosFiltrados.length
+    ? Math.ceil(eventosFiltrados.length / EVENTOS_PAGE_SIZE)
+    : 0
+
+  const eventosPagina = useMemo(() => {
+    const start = (eventosPage - 1) * EVENTOS_PAGE_SIZE
+    return eventosFiltrados.slice(start, start + EVENTOS_PAGE_SIZE)
+  }, [eventosFiltrados, eventosPage])
+
+  useEffect(() => {
+    setEventosPage(1)
+  }, [eventoQ])
 
   const setFiltro = (key, value) =>
     setParams(
@@ -67,7 +92,6 @@ export default function MovimientosPage() {
           ← Volver a mi manilla
         </Link>
         <h1 className="mt-2 font-display text-3xl font-bold text-ink">Historial de Transacciones</h1>
-        <p className="text-sm text-muted">Consulta recargas, consumos, devoluciones y ajustes del evento seleccionado</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -75,22 +99,66 @@ export default function MovimientosPage() {
           <div className="card-surface p-4">
             <p className="label">Evento</p>
             {eventos ? (
-              <div className="mt-2 grid gap-1">
-                {eventos.map((e) => (
-                  <button
-                    key={e.eventoId}
-                    type="button"
-                    onClick={() => setFiltro('evento', e.eventoId)}
-                    aria-pressed={e.eventoId === eventoId}
-                    className={`min-w-0 truncate rounded-md px-3 py-2 text-left text-sm ${
-                      e.eventoId === eventoId ? 'bg-teal/10 font-semibold text-teal-dark' : 'text-muted hover:bg-page'
-                    }`}
+              <>
+                <label className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-page px-2.5 py-1.5">
+                  <IconSearch className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={eventoQ}
+                    onChange={(e) => setEventoQ(e.target.value)}
+                    placeholder="Buscar evento…"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="min-w-0 flex-1 border-0 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+                    aria-label="Buscar evento"
+                  />
+                </label>
+                <div className="mt-2 grid gap-1">
+                  {eventosPagina.map((e) => (
+                    <button
+                      key={e.eventoId}
+                      type="button"
+                      onClick={() => setFiltro('evento', e.eventoId)}
+                      aria-pressed={e.eventoId === eventoId}
+                      className={`min-w-0 truncate rounded-md px-3 py-2 text-left text-sm ${
+                        e.eventoId === eventoId ? 'bg-teal/10 font-semibold text-teal-dark' : 'text-muted hover:bg-page'
+                      }`}
+                    >
+                      {e.titulo}
+                    </button>
+                  ))}
+                  {!eventos.length && <p className="text-sm text-muted">No tienes eventos con saldo.</p>}
+                  {eventos.length > 0 && !eventosFiltrados.length && (
+                    <p className="text-sm text-muted">Ningún evento coincide.</p>
+                  )}
+                </div>
+                {eventosTotalPages > 1 ? (
+                  <nav
+                    aria-label="Eventos con saldo"
+                    className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2"
                   >
-                    {e.titulo}
-                  </button>
-                ))}
-                {!eventos.length && <p className="text-sm text-muted">No tienes eventos con saldo.</p>}
-              </div>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      disabled={eventosPage <= 1}
+                      onClick={() => setEventosPage((p) => p - 1)}
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-xs tabular-nums text-muted">
+                      {eventosPage} / {eventosTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      disabled={eventosPage >= eventosTotalPages}
+                      onClick={() => setEventosPage((p) => p + 1)}
+                    >
+                      Siguiente
+                    </button>
+                  </nav>
+                ) : null}
+              </>
             ) : (
               <p className="mt-2 text-sm text-muted">Cargando…</p>
             )}
@@ -100,12 +168,22 @@ export default function MovimientosPage() {
               <p className="text-xs text-muted">Saldo de {vigente.evento.titulo}</p>
               <p className="font-display text-3xl font-bold text-teal-dark">{formatBs(vigente.saldo)}</p>
               {vigente.actualizado && (
-                <p className="mt-1 text-xs text-muted">Última actualización: {formatDateTime(vigente.actualizado)}</p>
+                <div className="mt-2 text-xs text-muted">
+                  <p>Última actualización</p>
+                  <time
+                    className="mt-0.5 block font-medium tabular-nums text-ink"
+                    dateTime={vigente.actualizado}
+                  >
+                    {new Date(vigente.actualizado).toLocaleDateString('es-BO', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                    <span className="text-muted"> · </span>
+                    {formatTime(vigente.actualizado)}
+                  </time>
+                </div>
               )}
-              <p className="mt-3 rounded-md bg-page p-3 text-xs text-muted">
-                Los movimientos y el saldo corresponden solo al evento seleccionado. No se combinan ni transfieren entre
-                eventos.
-              </p>
             </div>
           )}
         </aside>

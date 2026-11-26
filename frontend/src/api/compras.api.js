@@ -4,15 +4,16 @@ const multipart = { headers: { 'Content-Type': 'multipart/form-data' } }
 
 // Comprador (HU-010, HU-011, HU-012)
 export const getCheckout = (eventoId) => api.get(`/compras/eventos/${eventoId}/checkout`)
-export const crearCompra = (eventoId, { items, referencia, comprobante, reembolsoHasta }) => {
+export const crearCompra = (eventoId, { items, referencia, comprobante, reembolsoHasta, idempotencyKey }) => {
   const fd = new FormData()
   fd.append('items', JSON.stringify(items))
   if (referencia) fd.append('referencia', referencia)
   if (reembolsoHasta) fd.append('reembolsoHasta', reembolsoHasta)
+  if (idempotencyKey) fd.append('idempotencyKey', idempotencyKey)
   if (comprobante) fd.append('comprobante', comprobante)
   return api.post(`/compras/eventos/${eventoId}`, fd, multipart)
 }
-export const getMisCompras = () => api.get('/compras/mias')
+export const getMisCompras = (params = {}) => api.get('/compras/mias', { params })
 export const cancelarCompra = (id) => api.patch(`/compras/${id}/cancelar`)
 
 // Administración (HU-012, HU-013)

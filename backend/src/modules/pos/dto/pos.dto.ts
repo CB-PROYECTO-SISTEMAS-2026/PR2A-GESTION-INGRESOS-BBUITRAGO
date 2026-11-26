@@ -124,6 +124,13 @@ export class SolicitarRetiroDto {
   @IsString()
   @IsNotEmpty()
   negocioId: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(IDEMPOTENCY_KEY_RE, {
+    message: 'La clave de idempotencia no es válida.',
+  })
+  idempotencyKey?: string;
 }
 
 export class FiltroRetirosDto {

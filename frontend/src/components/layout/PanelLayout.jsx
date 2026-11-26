@@ -34,7 +34,7 @@ export default function PanelLayout({ sidebar: Sidebar }) {
           <Outlet />
         </div>
       </div>
-      <Footer />
+      <Footer variant="compact" />
     </div>
   )
 }

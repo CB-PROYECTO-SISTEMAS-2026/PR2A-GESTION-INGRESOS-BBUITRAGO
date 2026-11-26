@@ -23,6 +23,7 @@ import {
   toStrictInt,
   trimString,
 } from '../../../common/validation/validators';
+import { IDEMPOTENCY_KEY_RE } from '../../pos/dto/pos.dto';
 
 export const MAX_ENTRADAS_POR_COMPRA = 20;
 const CANTIDAD_MESSAGE = `La cantidad debe ser un número entero entre 1 y ${MAX_ENTRADAS_POR_COMPRA}.`;
@@ -90,6 +91,18 @@ const parseItems = ({ value }: { value: unknown }) => {
 
 export class CreateCompraDto {
   @IsOptional() @IsString() @MaxLength(32) reembolsoHasta?: string;
+
+  /**
+   * Si el navegador reenvía la misma compra (doble click / red inestable), se reutiliza este id
+   * y no se crea una segunda compra pendiente.
+   */
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsString()
+  @Matches(IDEMPOTENCY_KEY_RE, {
+    message: 'La clave de idempotencia no es válida.',
+  })
+  idempotencyKey?: string;
 
   @Transform(parseItems)
   @IsArray({ message: 'Agrega al menos una entrada.' })

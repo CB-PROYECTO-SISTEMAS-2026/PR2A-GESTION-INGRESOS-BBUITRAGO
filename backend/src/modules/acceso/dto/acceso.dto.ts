@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  Matches,
   Max,
   Min,
   IsNotEmpty,
@@ -40,6 +41,27 @@ export class RegistroAccesoDto extends EscaneoDto {
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   fotoVerificada?: boolean;
+
+  /**
+   * Últimos 4 caracteres del documento del titular (obligatorio en ingresos).
+   * No se guarda en logs ni en base de datos.
+   */
+  @IsOptional()
+  @IsString()
+  @Transform(trimString)
+  @Matches(/^[A-Za-z0-9]{4}$/, {
+    message: 'Ingresa exactamente los últimos 4 caracteres del documento.',
+  })
+  documentSuffix?: string;
+}
+
+export class VerificarDocumentoDto extends EscaneoDto {
+  @IsString()
+  @Transform(trimString)
+  @Matches(/^[A-Za-z0-9]{4}$/, {
+    message: 'Ingresa exactamente los últimos 4 caracteres del documento.',
+  })
+  documentSuffix: string;
 }
 
 export const MOTIVO_RECHAZO_MAX = 300;

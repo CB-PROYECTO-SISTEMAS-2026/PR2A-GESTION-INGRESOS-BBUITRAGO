@@ -45,6 +45,8 @@ export default defineConfig(({ command, mode }) => {
       },
     }],
     define: { 'import.meta.env.EVENTIX_ROLES_DEMO': JSON.stringify(cuentas.map(cuenta => cuenta.label)) },
+    resolve: { dedupe: ['gsap'] },
+    optimizeDeps: { include: ['gsap', 'gsap/ScrollTrigger', '@gsap/react'] },
     server: { port: 5173 },
   }
 })

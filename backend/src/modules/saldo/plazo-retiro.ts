@@ -20,8 +20,9 @@ function sumarDias(day: string, dias: number) {
  * la medianoche (p. ej. 20:00–02:00), termina la madrugada del día siguiente. Null si el evento
  * no tiene fechas.
  *
- * No se usa el estado FINALIZADO del evento porque nadie lo marca al terminar; un evento
- * CANCELADO también usa la última fecha que tenía programada.
+ * El plazo se calcula por la última fecha/hora del evento (no por el estado). Así funciona
+ * igual si el admin ya marcó FINALIZADO o si el calendario ya terminó; CANCELADO también
+ * usa esa última fecha programada.
  */
 export function fechaFinEvento(
   fechas: FechaHorario[],

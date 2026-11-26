@@ -33,14 +33,22 @@ import { trimString, toStrictInt } from '../../common/validation/validators';
 import { IDEMPOTENCY_KEY_RE } from '../pos/dto/pos.dto';
 import { ReportesService } from './reportes.service';
 import { ExportacionVentas } from './exportacion';
-import { IncidenciasEventoService } from './incidencias.service';
+import {
+  IncidenciasEventoService,
+  PRIORIDADES_INCIDENCIA,
+  TIPOS_INCIDENCIA,
+} from './incidencias.service';
 
 class ExportarDto {
   @IsIn(['csv', 'xlsx']) formato: 'csv' | 'xlsx';
 }
 class IncidenciaDto {
   @Matches(IDEMPOTENCY_KEY_RE) idempotencyKey: string;
-  @Transform(trimString) @IsString() @Length(1, 500) descripcion: string;
+  @Transform(trimString) @IsString() @Length(1, 450) descripcion: string;
+  @IsOptional() @IsIn([...TIPOS_INCIDENCIA]) tipo?: (typeof TIPOS_INCIDENCIA)[number];
+  @IsOptional()
+  @IsIn([...PRIORIDADES_INCIDENCIA])
+  prioridad?: (typeof PRIORIDADES_INCIDENCIA)[number];
 }
 class ResolverDto {
   @Transform(trimString) @IsString() @Length(1, 500) resolucion: string;
@@ -71,7 +79,11 @@ export class ReportesController {
   @Roles('ADMIN', 'ORGANIZADOR')
   async resumen(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const evento = await this.reportes.evento(user, id);
-    return { evento, ...(await this.reportes.resumen(id)) };
+    const [resumen, incidencias] = await Promise.all([
+      this.reportes.resumen(id),
+      this.incidencias.resumen(id),
+    ]);
+    return { evento, ...resumen, incidencias };
   }
   @Get('evento/:id/ventas')
   @Roles('ADMIN', 'ORGANIZADOR')
@@ -105,6 +117,8 @@ export class ReportesController {
       user.id,
       dto.idempotencyKey,
       dto.descripcion,
+      dto.tipo ?? 'OTRO',
+      dto.prioridad ?? 'MEDIA',
     );
   }
   @Get('evento/:id/incidencias')

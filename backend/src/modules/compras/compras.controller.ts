@@ -12,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { ComprasService } from './compras.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -25,6 +26,9 @@ import {
   RechazarCompraDto,
   UpdatePagoEventoDto,
 } from './dto/compras.dto';
+import { MisComprasQueryDto } from './dto/mis-compras-query.dto';
+
+const MINUTE = 60_000;
 
 type AuthUser = { id: string; roles: Role[] };
 
@@ -42,6 +46,7 @@ export class ComprasController {
   @Post('eventos/:eventoId')
   @UseGuards(RolesGuard)
   @Roles(Role.CLIENTE)
+  @Throttle({ default: { limit: 8, ttl: MINUTE } })
   @UseInterceptors(FileInterceptor('comprobante', memoryUpload))
   crear(
     @CurrentUser() user: AuthUser,
@@ -55,8 +60,8 @@ export class ComprasController {
   @Get('mias')
   @UseGuards(RolesGuard)
   @Roles(Role.CLIENTE)
-  mias(@CurrentUser('id') userId: string) {
-    return this.comprasService.misCompras(userId);
+  mias(@CurrentUser('id') userId: string, @Query() query: MisComprasQueryDto) {
+    return this.comprasService.misCompras(userId, query);
   }
 
   @Patch(':id/cancelar')

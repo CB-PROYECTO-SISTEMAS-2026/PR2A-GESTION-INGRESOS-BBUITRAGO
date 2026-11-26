@@ -41,5 +41,20 @@ export function validateEnv(config: Record<string, unknown>) {
     throw new Error('MAIL_PORT debe ser numérico.');
   }
 
+  const identityVersion = Number(
+    config.IDENTITY_HMAC_CURRENT_VERSION || '1',
+  );
+  const suffixVersion = Number(config.SUFFIX_HMAC_CURRENT_VERSION || '1');
+  const identityKey = `IDENTITY_HMAC_SECRET_V${identityVersion}`;
+  const suffixKey = `SUFFIX_HMAC_SECRET_V${suffixVersion}`;
+  for (const key of [identityKey, suffixKey]) {
+    const value = config[key];
+    if (typeof value !== 'string' || value.trim().length < 32) {
+      throw new Error(
+        `${key} debe ser aleatorio y tener al menos 32 caracteres. Revisa backend/.env.example.`,
+      );
+    }
+  }
+
   return config;
 }

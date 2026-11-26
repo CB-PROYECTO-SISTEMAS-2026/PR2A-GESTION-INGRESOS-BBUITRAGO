@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -45,6 +46,7 @@ export class RecargasController {
   }
 
   @Post()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   recargar(@CurrentUser('id') userId: string, @Body() dto: CreateRecargaDto) {
     return this.recargasService.recargar(userId, dto);
   }

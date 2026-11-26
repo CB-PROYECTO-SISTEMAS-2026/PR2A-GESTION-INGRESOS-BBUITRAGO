@@ -1,8 +1,9 @@
 import { Transform } from 'class-transformer';
-import { Producto_categoria } from '@prisma/client';
+import { Producto_categoria, SolicitudNegocio_estado } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -19,6 +20,7 @@ import {
   MAX_PRECIO,
   toStrictInt,
   toStrictMoney,
+  trimString,
 } from '../../../common/validation/validators';
 
 /** Tope de unidades en stock por producto. */
@@ -160,4 +162,43 @@ export class CreateAyudanteDto {
 export class AsignarAyudanteDto {
   @IsString()
   negocioId: string;
+}
+
+export class SolicitarParticipacionDto {
+  @IsString()
+  @IsNotEmpty()
+  eventoId: string;
+
+  /** Opcional: el dueño solo tiene un negocio; se valida si llega. */
+  @IsOptional()
+  @IsString()
+  negocioId?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(1000)
+  mensaje?: string;
+}
+
+export class RevisarSolicitudNegocioDto {
+  @IsIn([
+    SolicitudNegocio_estado.ACEPTADA,
+    SolicitudNegocio_estado.RECHAZADA,
+  ])
+  estado:
+    | typeof SolicitudNegocio_estado.ACEPTADA
+    | typeof SolicitudNegocio_estado.RECHAZADA;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(1000)
+  respuesta?: string;
+}
+
+export class ListSolicitudesNegocioQuery {
+  @IsOptional()
+  @IsEnum(SolicitudNegocio_estado)
+  estado?: SolicitudNegocio_estado;
 }

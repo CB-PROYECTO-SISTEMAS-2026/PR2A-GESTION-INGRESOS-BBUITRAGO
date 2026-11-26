@@ -1,0 +1,227 @@
+[
+  {
+    "titulo": "La Casa del Perreo – Chencho Corleone y Dálmata - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "Chencho corleone.png"
+  },
+  {
+    "titulo": "Nonstop the Madness 2026 - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "non stop the madness 2026.png"
+  },
+  {
+    "titulo": "No Te Va Gustar – Florece en el Caos Tour - Alice Park",
+    "lugar": "Alice Park",
+    "imagen": "no te va gustar.png"
+  },
+  {
+    "titulo": "Sin Bandera – Escenas Tour - Estadio Félix Capriles",
+    "lugar": "Estadio Félix Capriles",
+    "imagen": "sin bandera.png"
+  },
+  {
+    "titulo": "Los Kjarkas – FEXCO FEST - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "kjarkas fexco fest.png"
+  },
+  {
+    "titulo": "Airbag – Cochabamba - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "airbag.png"
+  },
+  {
+    "titulo": "Marvel Sinfónico - Gran Hotel Cochabamba",
+    "lugar": "Gran Hotel Cochabamba",
+    "imagen": "marvel sinfonico.png"
+  },
+  {
+    "titulo": "Alex Ubago – Gira ¿Qué Pides Tú? 25.º Aniversario - Cochabamba",
+    "lugar": "Cochabamba",
+    "imagen": "alex ubago.png"
+  },
+  {
+    "titulo": "El Trap de la City – Lucho SSJ - Cochabamba",
+    "lugar": "Cochabamba",
+    "imagen": "luchossj.png"
+  },
+  {
+    "titulo": "XIX Feria Internacional del Libro de Cochabamba - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "xix feria del libro.png"
+  },
+  {
+    "titulo": "Festival Gastronómico Internacional MISKI - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "festival gastronomico miski.png"
+  },
+  {
+    "titulo": "FEXCO Café y Cacao 2026 - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "fexco cafe y cacao.png"
+  },
+  {
+    "titulo": "ExpoConstrucción e Inmobiliaria 2026 - Cochabamba",
+    "lugar": "Cochabamba",
+    "imagen": "expo construccion.png"
+  },
+  {
+    "titulo": "Chino & Nacho - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "chyno y nacho.png"
+  },
+  {
+    "titulo": "Cazzu – Latinaje en Vivo - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "cazzu latinaje.png"
+  },
+  {
+    "titulo": "Steve Aoki – Cochabamba - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "steve aoki.png"
+  },
+  {
+    "titulo": "6.º Aniversario HGW Bolivia - Coliseo Polideportivo UMSS",
+    "lugar": "Coliseo Polideportivo UMSS",
+    "imagen": "6.º Aniversario HGW Bolivia.png"
+  },
+  {
+    "titulo": "Frozen: Una Aventura Musical - Teatro Capitol",
+    "lugar": "Teatro Capitol",
+    "imagen": "frozen.png"
+  },
+  {
+    "titulo": "Mano a Mano – Willy Claure y El Papirri - Gran Hotel Cochabamba",
+    "lugar": "Gran Hotel Cochabamba",
+    "imagen": "mano a mano.png"
+  },
+  {
+    "titulo": "Cro - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "c.r.o.png"
+  },
+  {
+    "titulo": "Khea - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "khea.png"
+  },
+  {
+    "titulo": "Neo Pistea - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "neo pistea.png"
+  },
+  {
+    "titulo": "Stand Up Comedy: Irreverentes - La Troje",
+    "lugar": "La Troje",
+    "imagen": "sin verguenzas.png"
+  },
+  {
+    "titulo": "Velas Rock - La Troje",
+    "lugar": "La Troje",
+    "imagen": "velas rock.png"
+  },
+  {
+    "titulo": "Surfistas de Sistema - La Troje",
+    "lugar": "La Troje",
+    "imagen": "surfistas del sistema.png"
+  },
+  {
+    "titulo": "33 - La Troje",
+    "lugar": "La Troje",
+    "imagen": "33 la troje.png"
+  },
+  {
+    "titulo": "Octavia - La Troje",
+    "lugar": "La Troje",
+    "imagen": "octavia.png"
+  },
+  {
+    "titulo": "Llegas – Grillo Villegas - Teatro Achá",
+    "lugar": "Teatro Achá",
+    "imagen": "grillo villegas.png"
+  },
+  {
+    "titulo": "Saratoga – En Estado Puro Tour - Salón Avanti",
+    "lugar": "Salón Avanti",
+    "imagen": "saratoga.png"
+  },
+  {
+    "titulo": "Ruta de los Palacios - Palacio Portales",
+    "lugar": "Palacio Portales",
+    "imagen": "ruta de los palacios.png"
+  },
+  {
+    "titulo": "Ángela Leiva - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "angela leiva.png"
+  },
+  {
+    "titulo": "Los Auténticos Decadentes - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "autenticos decadentes.png"
+  },
+  {
+    "titulo": "Duki - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "duki.png"
+  },
+  {
+    "titulo": "Molotov – Tour Bolivia - Complejo Fabril",
+    "lugar": "Complejo Fabril",
+    "imagen": "molotov.png"
+  },
+  {
+    "titulo": "Abel Pintos - Gran Hotel Cochabamba",
+    "lugar": "Gran Hotel Cochabamba",
+    "imagen": "abel pintos.png"
+  },
+  {
+    "titulo": "Chaqueño Palavecino - Gran Hotel Cochabamba",
+    "lugar": "Gran Hotel Cochabamba",
+    "imagen": "chaqueño palavecino.png"
+  },
+  {
+    "titulo": "Miranda! – Tour 2025 - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "miranda!.png"
+  },
+  {
+    "titulo": "Rata Blanca – Tour Bolivia - Estadio Félix Capriles",
+    "lugar": "Estadio Félix Capriles",
+    "imagen": "rata blanca.png"
+  },
+  {
+    "titulo": "Yandel – Non Stop The Madness - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "yandel.png"
+  },
+  {
+    "titulo": "Arcángel – Non Stop The Madness - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "arcangel.png"
+  },
+  {
+    "titulo": "Los Fabulosos Cadillacs - Complejo Fabril",
+    "lugar": "Complejo Fabril",
+    "imagen": "fabulosos cadillacs.png"
+  },
+  {
+    "titulo": "Alcoholika La Christo - Proyecto Martadero",
+    "lugar": "Proyecto Martadero",
+    "imagen": "alcoholika la cristo.png"
+  },
+  {
+    "titulo": "Grupo Frontera - FEXCO Arena",
+    "lugar": "FEXCO Arena",
+    "imagen": "grupo frontera.png"
+  },
+  {
+    "titulo": "Bizarrap – Non Stop The Madness - FEXCO",
+    "lugar": "FEXCO",
+    "imagen": "bizarrap.png"
+  },
+  {
+    "titulo": "Ke Personajes – FEXCO 2023 - Recinto Ferial Alalay",
+    "lugar": "Recinto Ferial Alalay",
+    "imagen": "ke personajes.png"
+  }
+]

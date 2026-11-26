@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   createEvent,
+  finalizarEvento,
+  getCategoriasEvento,
   getEventAdminById,
   getOrganizadores,
   getSolicitudById,
@@ -15,6 +17,7 @@ import Field, { Section } from '../../components/form/Field'
 import { IntegerInput } from '../../components/form/NumberInputs'
 import ListEditor from '../../components/form/ListEditor'
 import CronogramaEditor, { toCronogramaPayload, toEditableActividades } from '../../components/form/CronogramaEditor'
+import CategoriaEventoPicker, { selectionIsMusical } from '../../components/form/CategoriaEventoPicker'
 import EventoHeader from './components/EventoHeader'
 import { useLeaveGuard } from '../../hooks/useLeaveGuard'
 import { DEFAULT_EVENT_IMAGE, asCronograma, asList, getErrorMessage, toDay } from '../../utils/format'
@@ -30,6 +33,7 @@ const emptyForm = {
   descripcion: '',
   ubicacion: '',
   ubicacionUrl: '',
+  spotifyUrl: '',
   tipoAcceso: 'QR_DIGITAL',
   estado: 'BORRADOR',
   reembolsoHoras: 48,
@@ -41,8 +45,19 @@ const emptyForm = {
   horaFin: '18:00',
 }
 
-function snapshotOf({ form, variosDias, servicios, cronograma, fotoFile }) {
-  return JSON.stringify({ form, variosDias, servicios, cronograma: toCronogramaPayload(cronograma), foto: Boolean(fotoFile) })
+function idsFromCategoriasEvento(rows) {
+  return (rows ?? []).map((r) => r.categoriaEvento?.id || r.categoriaEventoId || r.id).filter(Boolean)
+}
+
+function snapshotOf({ form, variosDias, servicios, cronograma, fotoFile, categoriaEventoIds }) {
+  return JSON.stringify({
+    form,
+    variosDias,
+    servicios,
+    cronograma: toCronogramaPayload(cronograma),
+    foto: Boolean(fotoFile),
+    categoriaEventoIds,
+  })
 }
 
 export default function EventoEditPage() {
@@ -58,6 +73,8 @@ export default function EventoEditPage() {
   const [servicios, setServicios] = useState([])
   const [servicioPendiente, setServicioPendiente] = useState('')
   const [cronograma, setCronograma] = useState([])
+  const [categoriaEventoIds, setCategoriaEventoIds] = useState([])
+  const [categoriasEventoOpts, setCategoriasEventoOpts] = useState([])
   const [existingDays, setExistingDays] = useState(null)
   const [solicitud, setSolicitud] = useState(null)
   const [organizadores, setOrganizadores] = useState([])
@@ -73,12 +90,14 @@ export default function EventoEditPage() {
 
   const fotoPreview = useMemo(() => (fotoFile ? URL.createObjectURL(fotoFile) : ''), [fotoFile])
   useEffect(() => () => fotoPreview && URL.revokeObjectURL(fotoPreview), [fotoPreview])
+  const showSpotify = selectionIsMusical(categoriasEventoOpts, categoriaEventoIds)
 
   const applyLoaded = (next) => {
     setForm(next.form)
     setVariosDias(next.variosDias)
     setServicios(next.servicios)
     setCronograma(next.cronograma)
+    setCategoriaEventoIds(next.categoriaEventoIds || [])
     setFotoFile(null)
     setSavedSnapshot(snapshotOf({ ...next, fotoFile: null }))
   }
@@ -94,6 +113,7 @@ export default function EventoEditPage() {
       descripcion: e.descripcion || '',
       ubicacion: e.ubicacion || '',
       ubicacionUrl: e.ubicacionUrl || '',
+      spotifyUrl: e.spotifyUrl || '',
       tipoAcceso: e.tipoAcceso || 'QR_DIGITAL',
       estado: e.estado || 'BORRADOR',
       reembolsoHoras: e.reembolsoHoras ?? 48,
@@ -109,6 +129,7 @@ export default function EventoEditPage() {
       variosDias: multi,
       servicios: asList(e.servicios),
       cronograma: toEditableActividades(asCronograma(e.cronograma)),
+      categoriaEventoIds: idsFromCategoriasEvento(e.categoriasEvento),
     })
     setExistingDays(new Set(fechas.map((f) => toDay(f.fecha))))
     setFotoActual(e.fotoUrl || '')
@@ -124,6 +145,11 @@ export default function EventoEditPage() {
     setSolicitud(null)
     ;(async () => {
       try {
+        const catsRes = await getCategoriasEvento()
+        if (alive) {
+          const list = Array.isArray(catsRes.data) ? catsRes.data : catsRes.data?.data ?? []
+          setCategoriasEventoOpts(list)
+        }
         if (!isNew) {
           const { data } = await getEventAdminById(id)
           if (alive) applyEvento(data?.data ?? data)
@@ -138,8 +164,9 @@ export default function EventoEditPage() {
             descripcion: s.descripcion || '',
             ubicacion: s.ubicacion || '',
             ubicacionUrl: s.ubicacionUrl || '',
+            spotifyUrl: s.spotifyUrl || '',
             reembolsoHoras: s.reembolsoHoras ?? 48,
-      capacidad: s.capacidad != null ? String(s.capacidad) : '',
+            capacidad: s.capacidad != null ? String(s.capacidad) : '',
             fechaInicio: toDay(s.fechaInicio),
             fechaFin: s.fechaFin ? toDay(s.fechaFin) : '',
             horaInicio: s.horaInicio || emptyForm.horaInicio,
@@ -150,12 +177,19 @@ export default function EventoEditPage() {
             variosDias: Boolean(s.fechaFin),
             servicios: [],
             cronograma: [],
+            categoriaEventoIds: idsFromCategoriasEvento(s.categoriasEvento),
           })
         } else {
           const { data } = await getOrganizadores()
           if (!alive) return
           setOrganizadores(Array.isArray(data) ? data : data?.data ?? [])
-          applyLoaded({ form: emptyForm, variosDias: false, servicios: [], cronograma: [] })
+          applyLoaded({
+            form: emptyForm,
+            variosDias: false,
+            servicios: [],
+            cronograma: [],
+            categoriaEventoIds: [],
+          })
         }
       } catch (err) {
         if (alive) setLoadError(getErrorMessage(err))
@@ -170,7 +204,10 @@ export default function EventoEditPage() {
   }, [id, isNew, solicitudId])
 
   const dirty =
-    !loading && !loadError && savedSnapshot !== '' && snapshotOf({ form, variosDias, servicios, cronograma, fotoFile }) !== savedSnapshot
+    !loading &&
+    !loadError &&
+    savedSnapshot !== '' &&
+    snapshotOf({ form, variosDias, servicios, cronograma, fotoFile, categoriaEventoIds }) !== savedSnapshot
 
   const { allowNavigation } = useLeaveGuard(dirty && !saving, async (blocker) => {
     const salir = await confirmDialog({
@@ -236,11 +273,27 @@ export default function EventoEditPage() {
     const cronogramaError = validateCronograma(cronograma, form)
     if (cronogramaError) next.cronograma = cronogramaError
     if (servicioPendiente) next.servicios = `Escribiste "${servicioPendiente}" pero no lo agregaste. Presiona Agregar o borra el texto.`
+    if (!categoriaEventoIds.length) {
+      next.categoriaEventoIds = 'Elige al menos una categoría del evento (temática).'
+    } else if (categoriaEventoIds.length > 3) {
+      next.categoriaEventoIds = 'Puedes elegir hasta 3 categorías del evento.'
+    }
     return next
   }
 
   const focusFirstError = (errs) => {
-    const order = ['titulo', 'descripcion', 'organizadorId', 'ubicacion', 'ubicacionUrl', 'capacidad', 'fechas', 'cronograma', 'servicios']
+    const order = [
+      'titulo',
+      'descripcion',
+      'categoriaEventoIds',
+      'organizadorId',
+      'ubicacion',
+      'ubicacionUrl',
+      'capacidad',
+      'fechas',
+      'cronograma',
+      'servicios',
+    ]
     const first = order.find((k) => errs[k])
     if (!first) return
     const el = document.getElementById(first === 'fechas' ? 'fechaInicio' : first)
@@ -253,6 +306,8 @@ export default function EventoEditPage() {
     descripcion: form.descripcion.trim(),
     ubicacion: form.ubicacion.trim(),
     ubicacionUrl: form.ubicacionUrl.trim(),
+    spotifyUrl: showSpotify ? form.spotifyUrl.trim() || null : null,
+    categoriaEventoIds,
     reembolsoHoras: Number(form.reembolsoHoras),
     capacidad: Number(form.capacidad),
     servicios,
@@ -473,6 +528,42 @@ export default function EventoEditPage() {
                 )}
               </div>
             </Field>
+            <Field
+              label="Categorías del evento"
+              htmlFor="categoriaEventoIds"
+              required
+              error={errors.categoriaEventoIds}
+              className="sm:col-span-2"
+            >
+              <CategoriaEventoPicker
+                options={categoriasEventoOpts}
+                value={categoriaEventoIds}
+                onChange={(ids) => {
+                  setCategoriaEventoIds(ids)
+                  clearError('categoriaEventoIds')
+                  if (!selectionIsMusical(categoriasEventoOpts, ids)) {
+                    setField('spotifyUrl', '')
+                  }
+                }}
+              />
+            </Field>
+            {showSpotify && (
+              <Field label="Spotify del artista (opcional)" htmlFor="spotifyUrl" className="sm:col-span-2">
+                <input
+                  id="spotifyUrl"
+                  className="input"
+                  name="spotifyUrl"
+                  type="url"
+                  value={form.spotifyUrl}
+                  onChange={onChange}
+                  maxLength={500}
+                  placeholder="https://open.spotify.com/artist/..."
+                />
+                <p className="mt-1 text-xs text-muted">
+                  Enlace open.spotify.com de artista, álbum o playlist. Se muestra en la ficha pública.
+                </p>
+              </Field>
+            )}
             <label className="label">Plazo de reembolso (horas antes del inicio)
               <input className="input" type="number" required min="0" max="8760" step="1" value={form.reembolsoHoras} onChange={e => setField('reembolsoHoras', e.target.value)} />
             </label>
@@ -626,6 +717,47 @@ export default function EventoEditPage() {
                   ))}
                 </select>
               </Field>
+            )}
+            {!isNew && form.estado === 'PUBLICADO' && (
+              <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4">
+                <p className="text-sm text-indigo-950">
+                  Cuando el evento terminó, finalízalo. Eso cierra la venta en POS, deja el resumen de
+                  liquidación de negocios y mantiene abiertas las devoluciones de saldo hasta 30 días
+                  después de la última fecha.
+                </p>
+                <button
+                  type="button"
+                  className="btn-secondary mt-3"
+                  disabled={saving}
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: 'Finalizar evento',
+                      message:
+                        'El evento pasará a Finalizado. Los negocios dejarán de cobrar en POS y se generará el resumen de liquidación.',
+                      confirmText: 'Finalizar evento',
+                    })
+                    if (!ok) return
+                    setSaving(true)
+                    try {
+                      const { data } = await finalizarEvento(id)
+                      setForm((f) => ({ ...f, estado: 'FINALIZADO' }))
+                      setGuardado((g) => ({ ...g, estado: 'FINALIZADO' }))
+                      toast(
+                        data?.yaFinalizado
+                          ? 'El evento ya estaba finalizado; se actualizó la liquidación.'
+                          : 'Evento finalizado. Revisa retiros y devoluciones de saldo.',
+                        'success',
+                      )
+                    } catch (err) {
+                      toast(getErrorMessage(err), 'error')
+                    } finally {
+                      setSaving(false)
+                    }
+                  }}
+                >
+                  Finalizar evento ahora
+                </button>
+              </div>
             )}
           </div>
         </Section>

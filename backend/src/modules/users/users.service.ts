@@ -10,7 +10,6 @@ import { StorageService } from '../../common/storage/storage.service';
 import {
   DATA_IN_USE_MESSAGE,
   assertIdentityAvailable,
-  normalizeDocument,
   normalizePhone,
   rethrowUniqueViolation,
 } from '../../common/security/user-identity';
@@ -34,7 +33,18 @@ export class UsersService {
   async me(userId: string) {
     const user = await this.prisma.usuario.findUnique({
       where: { id: userId },
-      include: { roles: true },
+      include: {
+        roles: true,
+        identidad: {
+          select: {
+            documentType: true,
+            documentCountry: true,
+            documentMask: true,
+            tieneComplemento: true,
+            createdAt: true,
+          },
+        },
+      },
     });
     if (!user) throw new NotFoundException('Usuario no encontrado');
     return this.toPublic(user);
@@ -82,13 +92,9 @@ export class UsersService {
   async updateMe(userId: string, dto: UpdateProfileDto) {
     const telefono =
       dto.telefono === undefined ? undefined : normalizePhone(dto.telefono);
-    const documento =
-      dto.documento === undefined
-        ? undefined
-        : normalizeDocument(dto.documento);
     await assertIdentityAvailable(
       this.prisma,
-      { telefono, documento },
+      { telefono },
       DATA_IN_USE_MESSAGE,
       userId,
     );
@@ -105,17 +111,35 @@ export class UsersService {
       fechaNac = dayToDate(day);
     }
 
+    let nombreProductora: string | null | undefined;
+    if (dto.nombreProductora === null || dto.nombreProductora === '') {
+      nombreProductora = null;
+    } else if (dto.nombreProductora !== undefined) {
+      nombreProductora = dto.nombreProductora.trim();
+    }
+
     const user = await this.prisma.usuario
       .update({
         where: { id: userId },
         data: {
           nombre: dto.nombre,
           apellido: dto.apellido,
+          nombreProductora,
           telefono,
-          documento,
           fechaNac,
         },
-        include: { roles: true },
+        include: {
+          roles: true,
+          identidad: {
+            select: {
+              documentType: true,
+              documentCountry: true,
+              documentMask: true,
+              tieneComplemento: true,
+              createdAt: true,
+            },
+          },
+        },
       })
       .catch((err) => rethrowUniqueViolation(err, DATA_IN_USE_MESSAGE));
     return this.toPublic(user);
@@ -160,9 +184,30 @@ export class UsersService {
       passwordHash: string;
       fotoPublicId: string | null;
       roles: { role: string }[];
+      identidad?: {
+        documentType: string;
+        documentCountry: string;
+        documentMask: string;
+        tieneComplemento: boolean;
+        createdAt: Date;
+      } | null;
     },
   >(user: T) {
-    const { passwordHash, fotoPublicId, ...rest } = user;
-    return { ...rest, roles: user.roles.map((r) => r.role) };
+    const { passwordHash, fotoPublicId, identidad, ...rest } = user;
+    return {
+      ...rest,
+      roles: user.roles.map((r) => r.role),
+      identidad: identidad
+        ? {
+            registrada: true,
+            documentType: identidad.documentType,
+            documentCountry: identidad.documentCountry,
+            documentMask: identidad.documentMask,
+            tieneComplemento: identidad.tieneComplemento,
+            etiqueta: `${identidad.documentType} ${identidad.documentCountry}: ${identidad.documentMask}`,
+            createdAt: identidad.createdAt,
+          }
+        : { registrada: false },
+    };
   }
 }

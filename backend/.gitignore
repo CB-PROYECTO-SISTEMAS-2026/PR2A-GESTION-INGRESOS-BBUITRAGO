@@ -5,3 +5,6 @@ mysql-data/
 .env
 prisma/ca.pem
 *.log
+prisma/seed-show/CREDENCIALES.local.md
+prisma/seed-show/credenciales.local.json
+prisma/seed-produccion/seed-credenciales.local.json

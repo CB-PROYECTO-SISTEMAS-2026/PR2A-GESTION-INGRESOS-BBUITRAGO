@@ -5,12 +5,14 @@ const multipart = { headers: { 'Content-Type': 'multipart/form-data' } }
 // Supervisor en la puerta (HU-016, HU-017, HU-046)
 export const getMisEventosAcceso = () => api.get('/acceso/mis-eventos')
 export const verificarAcceso = (data) => api.post('/acceso/verificar', data)
-export const registrarAcceso = ({ eventoId, codigo, sentido, foto, fotoVerificada }) => {
+export const verificarDocumento = (data) => api.post('/acceso/verificar-documento', data)
+export const registrarAcceso = ({ eventoId, codigo, sentido, foto, fotoVerificada, documentSuffix }) => {
   const fd = new FormData()
   fd.append('eventoId', eventoId)
   fd.append('codigo', codigo)
   fd.append('sentido', sentido)
   if (fotoVerificada) fd.append('fotoVerificada', 'true')
+  if (documentSuffix) fd.append('documentSuffix', documentSuffix)
   if (foto) fd.append('foto', foto, 'ingreso.jpg')
   return api.post('/acceso/registrar', fd, multipart)
 }

@@ -11,7 +11,7 @@ const SIZES = {
 
 let openCount = 0
 
-export default function Modal({ open, onClose, title, children, footer, size = 'md', labelledBy }) {
+export default function Modal({ open, onClose, title, description, children, footer, size = 'md', labelledBy }) {
   const panelRef = useRef(null)
   const onCloseRef = useRef(onClose)
   useLayoutEffect(() => {
@@ -56,9 +56,14 @@ export default function Modal({ open, onClose, title, children, footer, size = '
       >
         {title && (
           <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-            <h2 id={labelledBy} className="font-display text-xl font-bold text-ink">
-              {title}
-            </h2>
+            <div className="min-w-0 flex-1">
+              <h2 id={labelledBy} className="font-display text-xl font-bold text-ink">
+                {title}
+              </h2>
+              {description ? (
+                <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={onClose}

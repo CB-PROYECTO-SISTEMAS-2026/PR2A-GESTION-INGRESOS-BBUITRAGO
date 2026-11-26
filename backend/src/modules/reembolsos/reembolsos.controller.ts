@@ -11,6 +11,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import {
   IsIn,
   IsInt,
@@ -35,7 +36,9 @@ class SolicitudDto {
 }
 class DecisionDto {
   @IsIn(['APROBADO', 'RECHAZADO', 'PAGADO']) estado:
-    'APROBADO' | 'RECHAZADO' | 'PAGADO';
+    | 'APROBADO'
+    | 'RECHAZADO'
+    | 'PAGADO';
 }
 class PaginaDto {
   @IsOptional()
@@ -45,6 +48,8 @@ class PaginaDto {
   @Max(1000000)
   page?: number;
 }
+
+const MINUTE = 60_000;
 
 @Controller('api')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -56,6 +61,7 @@ export class ReembolsosController {
 
   @Post('devoluciones/:id/comprobante')
   @Roles('DEVOLUCIONES')
+  @Throttle({ default: { limit: 30, ttl: MINUTE } })
   @UseInterceptors(FileInterceptor('foto', memoryUpload))
   comprobante(
     @CurrentUser('id') operador: string,
@@ -67,6 +73,7 @@ export class ReembolsosController {
 
   @Post('entradas/:id/reembolso')
   @Roles('CLIENTE')
+  @Throttle({ default: { limit: 10, ttl: MINUTE } })
   solicitar(
     @CurrentUser('id') usuario: string,
     @Param('id') id: string,
@@ -89,7 +96,14 @@ export class ReembolsosController {
 
   @Patch('admin/reembolsos/:id')
   @Roles('ADMIN')
-  resolver(@Param('id') id: string, @Body() dto: DecisionDto) {
-    return this.entradas.resolver(id, dto.estado);
+  @Throttle({ default: { limit: 40, ttl: MINUTE } })
+  @UseInterceptors(FileInterceptor('evidencia', memoryUpload))
+  resolver(
+    @CurrentUser('id') adminId: string,
+    @Param('id') id: string,
+    @Body() dto: DecisionDto,
+    @UploadedFile() evidencia?: Express.Multer.File,
+  ) {
+    return this.entradas.resolver(id, dto.estado, adminId, evidencia);
   }
 }

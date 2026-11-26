@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+    <defs>
+      <linearGradient id="app-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#040714" />
+        <stop offset="50%" stop-color="#0B132B" />
+        <stop offset="100%" stop-color="#111C3D" />
+      </linearGradient>
+    </defs>
+    <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#app-bg)" />
+    <rect x="16" y="16" width="480" height="480" rx="112" stroke="#2563EB" stroke-width="4" opacity="0.4" />
+    <g transform="translate(76, 76) scale(3.6)">
+      
+    <defs>
+      <!-- Ticket Gradient: Electric Cyan (#38BDF8) down to Royal Cobalt (#1D4ED8) -->
+      <linearGradient id="app-ticket-grad" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#38BDF8" />
+        <stop offset="35%" stop-color="#2563EB" />
+        <stop offset="100%" stop-color="#1E3A8A" />
+      </linearGradient>
+      <linearGradient id="app-ticket-light" x1="15%" y1="0%" x2="85%" y2="100%">
+        <stop offset="0%" stop-color="#0284C7" />
+        <stop offset="50%" stop-color="#1D4ED8" />
+        <stop offset="100%" stop-color="#1E3A8A" />
+      </linearGradient>
+
+      <!-- Orbital Ring Gradient: Brilliant Cyan highlight at apex, deep royal in background -->
+      <linearGradient id="app-ring-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#1D4ED8" stop-opacity="0.7" />
+        <stop offset="45%" stop-color="#2563EB" />
+        <stop offset="85%" stop-color="#38BDF8" />
+        <stop offset="100%" stop-color="#00F2FE" />
+      </linearGradient>
+      <linearGradient id="app-ring-light" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#1E3A8A" />
+        <stop offset="50%" stop-color="#2563EB" />
+        <stop offset="100%" stop-color="#0284C7" />
+      </linearGradient>
+
+      <!-- Ambient Glow for Stage & Dark Mode -->
+      <filter id="app-glow" x="-25%" y="-25%" width="150%" height="150%">
+        <feGaussianBlur stdDeviation="3.5" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+
+    <g id="app-group" transform="translate(50, 50) rotate(-22) translate(-50, -50)">
+      <!-- 1. BACK PORTION OF ORBITAL RING (Passes behind ticket) -->
+      <path d="M 5 50
+               C 5 35, 25 24, 50 24
+               C 75 24, 95 35, 95 50
+               C 95 51.5, 94.5 53, 93.5 54.5
+               L 88.5 53.5
+               C 89.5 52, 90 51, 90 50
+               C 90 38, 72 28.5, 50 28.5
+               C 28 28.5, 10 38, 10 50
+               C 10 51, 10.5 52, 11.5 53.5
+               L 6.5 54.5
+               C 5.5 53, 5 51.5, 5 50 Z"
+            fill="url(#app-ring-grad)"
+            opacity="0.75" />
+
+      <!-- 2. TICKET BODY (Precision Rounded Rect with Circular Notches on Left & Right) -->
+      <!-- Center: (50, 50). Size: 56 x 34. Bounds: x: 22 to 78, y: 33 to 67 -->
+      <path d="M 28 33
+               L 72 33
+               A 6 6 0 0 1 78 39
+               L 78 44.5
+               A 5.5 5.5 0 0 0 78 55.5
+               L 78 61
+               A 6 6 0 0 1 72 67
+               L 28 67
+               A 6 6 0 0 1 22 61
+               L 22 55.5
+               A 5.5 5.5 0 0 0 22 44.5
+               L 22 39
+               A 6 6 0 0 1 28 33 Z"
+            fill="url(#app-ticket-grad)"
+            filter="url(#app-glow)" />
+
+      <!-- 3. CENTER ASTROID STAR SPARK (4-pointed parabolic diamond) -->
+      <path d="M 50 38
+               Q 50 50, 62 50
+               Q 50 50, 50 62
+               Q 50 50, 38 50
+               Q 50 50, 50 38 Z"
+            fill="#FFFFFF" />
+
+      <!-- 4. FRONT PORTION OF ORBITAL RING (Sweeps in front of ticket with 3D depth) -->
+      <path d="M 5 50
+               C 5 65, 25 76, 50 76
+               C 75 76, 95 65, 95 50
+               L 90 48.5
+               C 89.5 61.5, 72 71.5, 50 71.5
+               C 28 71.5, 10.5 61.5, 10 48.5
+               L 5 50 Z"
+            fill="url(#app-ring-grad)" />
+    </g>
+  
+    </g>
+  </svg>

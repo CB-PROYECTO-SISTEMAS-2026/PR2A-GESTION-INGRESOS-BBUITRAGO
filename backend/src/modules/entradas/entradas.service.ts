@@ -4,6 +4,22 @@ import * as QRCode from 'qrcode';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ACCESO_CON_MANILLA, emitirEntradasDeCompra, EMISION_TX_OPTIONS, ENTRADA_INVALIDA } from './entradas-emision';
 import { asignarEntradasDeTerceros } from '../compras/entradas-terceros';
+import { MisEntradasQueryDto } from './dto/mis-entradas-query.dto';
+
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function parseDayUtc(ymd: string): Date {
+  const m = DAY_RE.exec(ymd);
+  if (!m) throw new BadRequestException(`Fecha inválida: ${ymd}`);
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+    throw new BadRequestException(`Fecha inválida: ${ymd}`);
+  }
+  return dt;
+}
 
 type Tx = Prisma.TransactionClient;
 
@@ -14,7 +30,9 @@ const miEntradaSelect = {
   codigo: true,
   codigoQr: true,
   estado: true,
+  titularEstado: true,
   createdAt: true,
+  compra: { select: { reembolsoHasta: true } },
   categoria: { select: { nombre: true } },
   fecha: { select: { fecha: true, horaInicio: true, horaFin: true } },
   credencial: { select: { codigoQr: true, activa: true } },
@@ -32,8 +50,11 @@ const miEntradaSelect = {
       titulo: true,
       fotoUrl: true,
       ubicacion: true,
+      ubicacionUrl: true,
       tipoAcceso: true,
       estado: true,
+      permiteTransferencias: true,
+      transferenciaHasta: true,
       fechas: { orderBy: { fecha: 'asc' }, select: { fecha: true, horaInicio: true, horaFin: true } },
       puntosRetiro: {
         where: { activo: true },
@@ -130,14 +151,72 @@ export class EntradasService {
   }
 
   /** HU-055: entradas a nombre del usuario, con el QR que debe mostrar según el tipo de acceso. */
-  async misEntradas(usuarioId: string) {
+  async misEntradas(usuarioId: string, query: MisEntradasQueryDto = {}) {
     await asignarEntradasDeTerceros(this.prisma, usuarioId);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const q = query.q?.trim();
+
+    let desde = query.desde?.trim();
+    let hasta = query.hasta?.trim();
+    if (desde && !hasta) hasta = desde;
+    if (hasta && !desde) desde = hasta;
+    if (desde && hasta) {
+      const d0 = parseDayUtc(desde);
+      const d1 = parseDayUtc(hasta);
+      if (d0.getTime() > d1.getTime()) {
+        throw new BadRequestException('La fecha de inicio no puede ser posterior a la fecha de fin.');
+      }
+    }
+
+    const where: Prisma.EntradaWhereInput = { titularId: usuarioId };
+
+    if (q) {
+      where.OR = [
+        { codigo: { contains: q } },
+        { categoria: { nombre: { contains: q } } },
+        { evento: { titulo: { contains: q } } },
+        { evento: { ubicacion: { contains: q } } },
+      ];
+    }
+
+    if (desde && hasta) {
+      const gte = parseDayUtc(desde);
+      const lte = parseDayUtc(hasta);
+      const fechaRango = { gte, lte };
+      const prevAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+      where.AND = [
+        ...prevAnd,
+        {
+          OR: [
+            { fecha: { fecha: fechaRango } },
+            {
+              fechaId: null,
+              evento: { fechas: { some: { fecha: fechaRango } } },
+            },
+          ],
+        },
+      ];
+    }
+
+    const total = await this.prisma.entrada.count({ where });
     const entradas = await this.prisma.entrada.findMany({
-      where: { titularId: usuarioId },
+      where,
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
       select: miEntradaSelect,
     });
-    return { entradas: await Promise.all(entradas.map((e) => this.presentar(e))) };
+
+    const totalPages = total ? Math.ceil(total / limit) : 0;
+
+    return {
+      entradas: await Promise.all(entradas.map((e) => this.presentar(e))),
+      page,
+      pageSize: limit,
+      total,
+      totalPages,
+    };
   }
 
   private async presentar(e: MiEntrada) {
@@ -163,6 +242,8 @@ export class EntradasService {
       id: e.id,
       codigo: e.codigo,
       estado: e.estado,
+      titularEstado: e.titularEstado,
+      reembolsoHasta: e.compra?.reembolsoHasta ?? null,
       emitidaAt: e.createdAt,
       categoria: e.categoria.nombre,
       fecha: e.fecha,

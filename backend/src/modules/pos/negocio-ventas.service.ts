@@ -332,13 +332,44 @@ export class NegocioVentasService {
   }
 
   /** Solicita el retiro de todo lo disponible del negocio. */
-  async solicitarRetiro(duenoId: string, negocioId: string) {
+  async solicitarRetiro(
+    duenoId: string,
+    negocioId: string,
+    idempotencyKey?: string,
+  ) {
     await this.resolveNegocios(duenoId, negocioId);
+    if (idempotencyKey) {
+      const previa = await this.prisma.retiroGanancias.findUnique({
+        where: { id: idempotencyKey },
+        select: { id: true, monto: true, estado: true, createdAt: true, negocioId: true },
+      });
+      if (previa) {
+        if (previa.negocioId !== negocioId) {
+          throw new BadRequestException(
+            'La clave de retiro ya fue usada en otro negocio.',
+          );
+        }
+        return {
+          id: previa.id,
+          monto: money(previa.monto),
+          estado: previa.estado,
+          fecha: previa.createdAt,
+          repetido: true,
+        };
+      }
+    }
     const retiro = await this.prisma.$transaction(async (tx) => {
       // Bloquea el negocio para que dos solicitudes simultáneas no retiren el mismo saldo.
       await tx.$queryRaw(
         Prisma.sql`SELECT id FROM Negocio WHERE id = ${negocioId} FOR UPDATE`,
       );
+      if (idempotencyKey) {
+        const race = await tx.retiroGanancias.findUnique({
+          where: { id: idempotencyKey },
+          select: { id: true, monto: true, estado: true, createdAt: true },
+        });
+        if (race) return { ...race, repetido: true as const };
+      }
       const balance = (await this.calcularBalances(tx, [negocioId])).get(
         negocioId,
       )!;
@@ -347,8 +378,22 @@ export class NegocioVentasService {
           'No hay ventas de eventos cerrados disponibles para retirar.',
         );
       }
+      // Evita dos SOLICITADO abiertos concurrentes sin clave: solo uno a la vez.
+      const abierta = await tx.retiroGanancias.findFirst({
+        where: {
+          negocioId,
+          estado: { in: [RETIRO_SOLICITADO, 'APROBADO'] },
+        },
+        select: { id: true },
+      });
+      if (abierta) {
+        throw new BadRequestException(
+          'Ya tienes un retiro en curso. Espera a que se pague o rechace antes de pedir otro.',
+        );
+      }
       return tx.retiroGanancias.create({
         data: {
+          ...(idempotencyKey ? { id: idempotencyKey } : {}),
           negocioId,
           monto: balance.disponible,
           estado: RETIRO_SOLICITADO,
@@ -361,6 +406,7 @@ export class NegocioVentasService {
       monto: money(retiro.monto),
       estado: retiro.estado,
       fecha: retiro.createdAt,
+      ...('repetido' in retiro && retiro.repetido ? { repetido: true } : {}),
     };
   }
 

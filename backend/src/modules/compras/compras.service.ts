@@ -20,6 +20,7 @@ import {
 } from '../../common/security/user-identity';
 import { EntradasService } from '../entradas/entradas.service';
 import { EMISION_TX_OPTIONS } from '../entradas/entradas-emision';
+import { AsignacionesService } from '../asignaciones/asignaciones.service';
 import { claveDia } from '../tickets/cupos';
 import { dateToDay, todayIn } from '../events/event-schedule';
 import { nombreCompleto } from '../manillas/manillas-helpers';
@@ -30,6 +31,7 @@ import {
   RechazarCompraDto,
   UpdatePagoEventoDto,
 } from './dto/compras.dto';
+import { MisComprasQueryDto } from './dto/mis-compras-query.dto';
 import { vincularEntradasDeTerceros } from './entradas-terceros';
 
 type AuthUser = { id: string };
@@ -37,6 +39,17 @@ type AuthUser = { id: string };
 /** Compras sin revisar que un usuario puede tener a la vez en un mismo evento. */
 const MAX_PENDIENTES_POR_EVENTO = 5;
 const MAX_LISTADO = 200;
+
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function parseDayUtc(ymd: string): Date {
+  const m = DAY_RE.exec(ymd);
+  if (!m) throw new BadRequestException(`Fecha inválida: ${ymd}`);
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  return new Date(Date.UTC(y, mo - 1, d));
+}
 
 const personaSelect = {
   id: true,
@@ -191,6 +204,7 @@ export class ComprasService {
     private storage: StorageService,
     private mail: MailService,
     private entradas: EntradasService,
+    private asignaciones: AsignacionesService,
     config: ConfigService,
   ) {
     this.timeZone = config.get<string>('APP_TIMEZONE', 'America/La_Paz');
@@ -375,12 +389,12 @@ export class ComprasService {
       let tercero: {
         paraNombre: string;
         paraEmail: string;
-        paraTelefono: string;
+        paraTelefono: string | null;
       } | null = null;
       if (esTercero) {
-        if (!item.paraNombre || !item.paraEmail || !item.paraTelefono) {
+        if (!item.paraEmail) {
           throw new BadRequestException(
-            `Completa el nombre, correo y celular de la persona de la entrada ${n}.`,
+            `Indica el correo de la persona de la entrada ${n}.`,
           );
         }
         if (item.cantidad !== 1) {
@@ -394,10 +408,16 @@ export class ComprasService {
             `La entrada ${n} está a tu nombre: agrégala como entrada personal.`,
           );
         }
+        const derivedName =
+          item.paraNombre?.trim() ||
+          paraEmail.split('@')[0] ||
+          'Invitado';
         tercero = {
-          paraNombre: item.paraNombre,
+          paraNombre: derivedName,
           paraEmail,
-          paraTelefono: normalizePhone(item.paraTelefono)!,
+          paraTelefono: item.paraTelefono
+            ? normalizePhone(item.paraTelefono)
+            : null,
         };
       }
 
@@ -438,6 +458,22 @@ export class ComprasService {
       );
     }
 
+    if (dto.idempotencyKey) {
+      const previa = await this.prisma.compraEntrada.findUnique({
+        where: { id: dto.idempotencyKey },
+        select: compraSelect,
+      });
+      if (previa) {
+        if (previa.usuario.id !== user.id || previa.evento.id !== eventoId) {
+          throw new ConflictException(
+            'La clave de compra ya fue usada en otra operación.',
+          );
+        }
+        const [presentada] = await this.presentar([previa]);
+        return { ...presentada, repetido: true };
+      }
+    }
+
     let stored: StoredFile | null = null;
     if (comprobante)
       stored = await this.storage.upload(
@@ -448,6 +484,7 @@ export class ComprasService {
     try {
       const compra = await this.prisma.compraEntrada.create({
         data: {
+          ...(dto.idempotencyKey ? { id: dto.idempotencyKey } : {}),
           usuarioId: user.id,
           reembolsoHasta: this.limiteReembolso(evento),
           eventoId,
@@ -478,18 +515,99 @@ export class ComprasService {
       const [presentada] = await this.presentar([compra]);
       return presentada;
     } catch (err) {
+      if (
+        dto.idempotencyKey &&
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const previa = await this.prisma.compraEntrada.findUnique({
+          where: { id: dto.idempotencyKey },
+          select: compraSelect,
+        });
+        if (previa && previa.usuario.id === user.id) {
+          await this.storage.remove(stored?.publicId);
+          const [presentada] = await this.presentar([previa]);
+          return { ...presentada, repetido: true };
+        }
+      }
       await this.storage.remove(stored?.publicId);
       throw err;
     }
   }
 
-  async misCompras(usuarioId: string) {
+  async misCompras(usuarioId: string, query: MisComprasQueryDto = {}) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const q = query.q?.trim();
+
+    let desde = query.desde?.trim();
+    let hasta = query.hasta?.trim();
+    if (desde && !hasta) hasta = desde;
+    if (hasta && !desde) desde = hasta;
+    if (desde && hasta) {
+      const d0 = parseDayUtc(desde);
+      const d1 = parseDayUtc(hasta);
+      if (d0.getTime() > d1.getTime()) {
+        throw new BadRequestException(
+          'La fecha de inicio no puede ser posterior a la fecha de fin.',
+        );
+      }
+    }
+
+    const where: Prisma.CompraEntradaWhereInput = { usuarioId };
+
+    if (q) {
+      where.OR = [
+        { evento: { titulo: { contains: q } } },
+        { evento: { ubicacion: { contains: q } } },
+        { items: { some: { categoria: { nombre: { contains: q } } } } },
+        { entradas: { some: { codigo: { contains: q } } } },
+      ];
+    }
+
+    if (desde && hasta) {
+      const gte = parseDayUtc(desde);
+      const lte = parseDayUtc(hasta);
+      const fechaRango = { gte, lte };
+      const fechasEnRango = await this.prisma.fechaEvento.findMany({
+        where: { fecha: fechaRango },
+        select: { id: true },
+      });
+      const fechaIds = fechasEnRango.map((f) => f.id);
+      const prevAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+      where.AND = [
+        ...prevAnd,
+        {
+          OR: [
+            ...(fechaIds.length
+              ? [{ items: { some: { fechaId: { in: fechaIds } } } }]
+              : []),
+            {
+              items: { some: { fechaId: null } },
+              evento: { fechas: { some: { fecha: fechaRango } } },
+            },
+          ],
+        },
+      ];
+    }
+
+    const total = await this.prisma.compraEntrada.count({ where });
     const compras = await this.prisma.compraEntrada.findMany({
-      where: { usuarioId },
+      where,
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
       select: compraSelect,
     });
-    return { compras: await this.presentar(compras) };
+    const totalPages = total ? Math.ceil(total / limit) : 0;
+
+    return {
+      compras: await this.presentar(compras),
+      page,
+      pageSize: limit,
+      total,
+      totalPages,
+    };
   }
 
   async cancelar(usuarioId: string, id: string) {
@@ -572,7 +690,13 @@ export class ComprasService {
    * si no hay códigos suficientes, la compra sigue pendiente.
    */
   async aprobar(adminId: string, id: string) {
+    let invitaciones: Awaited<
+      ReturnType<AsignacionesService['crearInvitacionesPostEmision']>
+    > = [];
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM CompraEntrada WHERE id = ${id} FOR UPDATE`,
+      );
       const { count } = await tx.compraEntrada.updateMany({
         where: {
           id,
@@ -586,10 +710,37 @@ export class ComprasService {
           observaciones: null,
         },
       });
-      if (!count) await this.motivoNoRevisable(tx, id);
+      if (!count) {
+        const ya = await tx.compraEntrada.findUnique({
+          where: { id },
+          select: { estado: true },
+        });
+        if (ya?.estado === CompraEstado.APROBADA) return;
+        await this.motivoNoRevisable(tx, id);
+      }
+      const compra = await tx.compraEntrada.findUniqueOrThrow({
+        where: { id },
+        select: { usuarioId: true },
+      });
       const emision = await this.entradas.emitirParaCompra(id, tx);
       await vincularEntradasDeTerceros(tx, id, emision);
+      invitaciones = await this.asignaciones.crearInvitacionesPostEmision(
+        tx,
+        id,
+        compra.usuarioId,
+      );
     }, EMISION_TX_OPTIONS);
+
+    for (const inv of invitaciones) {
+      await this.notify(() =>
+        this.mail.sendInvitacionEntrada(inv.email, {
+          evento: inv.evento,
+          categoria: inv.categoria,
+          comprador: inv.comprador,
+          url: inv.url,
+        }),
+      );
+    }
 
     const compra = await this.detalle(id);
     const correoEnviado = await this.notificarAprobacion(compra);
@@ -830,24 +981,7 @@ export class ComprasService {
         },
       ),
     );
-    for (const item of compra.items) {
-      if (!item.paraEmail) continue;
-      await this.notify(() =>
-        this.mail.sendEntradaParaTercero(
-          item.paraEmail!,
-          item.paraNombre ?? '',
-          {
-            evento: compra.evento.titulo,
-            comprador: compra.comprador.nombre ?? compra.comprador.email,
-            categoria: item.categoria,
-            dia: item.fecha
-              ? formatDia(item.fecha)
-              : 'todos los días del evento',
-            tieneCuenta: item.entregadaATitular,
-          },
-        ),
-      );
-    }
+    // Las invitaciones de titular se envían en aprobar() con token seguro (anti-enumeración).
     return enviado;
   }
 

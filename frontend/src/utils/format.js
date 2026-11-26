@@ -85,6 +85,23 @@ export function lowestPrice(evento) {
   return Math.min(...prices)
 }
 
+export function highestPrice(evento) {
+  const cats = evento?.categorias ?? []
+  if (!cats.length) return null
+  const prices = cats.map((c) => Number(c.precio)).filter((n) => !Number.isNaN(n))
+  if (!prices.length) return null
+  return Math.max(...prices)
+}
+
+/** Texto corto de rango de precios para detalle de evento. */
+export function priceRangeLabel(evento) {
+  const min = lowestPrice(evento)
+  const max = highestPrice(evento)
+  if (min == null) return null
+  if (max == null || min === max) return `Entradas desde ${formatBs(min)}`
+  return `Entradas desde los ${Number(min).toLocaleString('es-BO')} Bs hasta los ${Number(max).toLocaleString('es-BO')} Bs`
+}
+
 export function getErrorMessage(error, fallback = 'Ocurrió un error') {
   const status = error?.response?.status
   if (status === 429) return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'

@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" width="360" height="80" fill="none">
+    <g transform="translate(10, 0)">
+    <defs>
+      <linearGradient id="cB-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#3B82F6" />
+        <stop offset="50%" stop-color="#1D4ED8" />
+        <stop offset="100%" stop-color="#0A1128" />
+      </linearGradient>
+      <linearGradient id="cB-grad-2" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#00F2FE" />
+        <stop offset="70%" stop-color="#2563EB" />
+        <stop offset="100%" stop-color="#1E3A8A" />
+      </linearGradient>
+      <linearGradient id="cB-edge" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#00F2FE" />
+        <stop offset="100%" stop-color="#60A5FA" />
+      </linearGradient>
+    </defs>
+
+    <g id="concept-B-vortex">
+      <!-- Outer Dynamic Sonic Blade (E-Curve) -->
+      <path d="M 12 16
+               C 22 10, 48 8, 64 16
+               C 70 19, 72 25, 68 30
+               L 48 54
+               C 44 59, 38 60, 32 58
+               L 16 52
+               C 10 50, 8 44, 12 38
+               L 26 22
+               Z"
+            fill="url(#cB-grad-2)" />
+
+      <!-- Crossing Accelerating Blade (The X-Thrust) -->
+      <path d="M 68 64
+               C 58 70, 32 72, 16 64
+               C 10 61, 8 55, 12 50
+               L 32 26
+               C 36 21, 42 20, 48 22
+               L 64 28
+               C 70 30, 72 36, 68 42
+               L 54 58
+               Z"
+            fill="url(#cB-grad-1)" />
+
+      <!-- Central Kinetic Aperture (Precision Diamond) -->
+      <polygon points="40,32 50,40 40,48 30,40"
+               fill="#00F2FE"
+               stroke="#FFFFFF"
+               stroke-width="1.5" />
+
+      <!-- High-Speed Accent Winglets -->
+      <path d="M 66 18 L 72 26 L 68 32" stroke="url(#cB-edge)" stroke-width="3" stroke-linecap="round" fill="none" />
+      <path d="M 14 62 L 8 54 L 12 48" stroke="url(#cB-edge)" stroke-width="3" stroke-linecap="round" fill="none" />
+    </g>
+  </g>
+    <g transform="translate(95, 12)">
+      <!-- E -->
+      <path d="M 0 10 L 28 10 C 31 10 33 12 33 15 L 30 20 L 10 20 L 10 29 L 24 29 L 24 35 L 10 35 L 10 44 L 32 44 L 29 54 L 0 54 Z" fill="#0F172A" />
+      <!-- V -->
+      <path d="M 36 10 L 46 10 L 56 46 L 66 10 L 76 10 L 61 54 L 51 54 Z" fill="#0F172A" />
+      <!-- E -->
+      <path d="M 81 10 L 109 10 C 112 10 114 12 114 15 L 111 20 L 91 20 L 91 29 L 105 29 L 105 35 L 91 35 L 91 44 L 113 44 L 110 54 L 81 54 Z" fill="#0F172A" />
+      <!-- N -->
+      <path d="M 119 10 L 129 10 L 149 42 L 149 10 L 158 10 L 158 54 L 148 54 L 128 22 L 128 54 L 119 54 Z" fill="#0F172A" />
+      <!-- T -->
+      <path d="M 163 10 L 195 10 L 193 18 L 183 18 L 183 54 L 174 54 L 174 18 L 165 18 Z" fill="#0F172A" />
+      <!-- I -->
+      <g>
+        <path d="M 201 10 L 209 10 L 209 54 L 201 54 Z" fill="#1D4ED8" />
+        <circle cx="205" cy="4" r="4" fill="#0284C7" />
+      </g>
+      <!-- X -->
+      <g>
+        <path d="M 215 10 L 226 10 L 236 29 L 246 10 L 257 10 L 242 32 L 258 54 L 247 54 L 236 36 L 225 54 L 214 54 L 230 32 Z" fill="#0284C7" />
+      </g>
+    </g>
+  </svg>

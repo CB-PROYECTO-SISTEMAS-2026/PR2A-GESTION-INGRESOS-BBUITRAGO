@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getLiquidacion, solicitarRetiro } from '../../api/pos.api'
+import { nuevaClave } from '../../utils/storage'
 import { toast } from '../../components/Toast'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import { formatBs, formatDateTime, formatDay, getErrorMessage } from '../../utils/format'
@@ -45,7 +46,7 @@ export default function LiquidacionPage() {
     if (!ok) return
     setEnviando(negocio.id)
     try {
-      await solicitarRetiro(negocio.id)
+      await solicitarRetiro(negocio.id, nuevaClave())
       toast('Solicitud de retiro enviada', 'success')
       await cargar()
     } catch (err) {

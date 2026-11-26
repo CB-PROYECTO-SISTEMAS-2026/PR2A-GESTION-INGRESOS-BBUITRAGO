@@ -1,6 +1,8 @@
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -29,6 +31,32 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const CAPACIDAD_MESSAGE = `La capacidad máxima debe ser un número entero entre 1 y ${MAX_CAPACIDAD.toLocaleString('es-BO')}.`;
 export const MAX_SERVICIOS = 30;
 export const MAX_ACTIVIDADES = 30;
+/** Temáticas del evento (CategoriaEvento). No confundir con CategoriaEntrada. */
+export const MAX_CATEGORIAS_EVENTO = 3;
+
+/** FormData / JSON: array, CSV o JSON string → string[]. */
+function toIdList({ value }: { value: unknown }): string[] | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    const raw = value.trim();
+    if (!raw) return undefined;
+    if (raw.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.map((v) => String(v).trim()).filter(Boolean);
+        }
+      } catch {
+        /* CSV abajo */
+      }
+    }
+    return raw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  }
+  return undefined;
+}
 
 class ScheduleFields {
   @IsOptional() @Transform(toStrictInt) @IsInt() @Min(0) @Max(8760)
@@ -119,6 +147,25 @@ export class CreateSolicitudDto extends ScheduleFields {
   @IsString()
   @MaxLength(191)
   empresa?: string;
+
+  /** IDs de CategoriaEvento (temática). 1 a 3. No son categorías de entrada. */
+  @Transform(toIdList)
+  @IsArray({ message: 'Elige entre 1 y 3 categorías del evento.' })
+  @ArrayMinSize(1, { message: 'Elige al menos una categoría del evento.' })
+  @ArrayMaxSize(MAX_CATEGORIAS_EVENTO, {
+    message: `Puedes elegir hasta ${MAX_CATEGORIAS_EVENTO} categorías del evento.`,
+  })
+  @IsString({ each: true })
+  categoriaEventoIds: string[];
+
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsString()
+  @MaxLength(500)
+  @Matches(/^(https:\/\/open\.spotify\.com\/|spotify:)/i, {
+    message: 'Usa un enlace válido de Spotify (open.spotify.com).',
+  })
+  spotifyUrl?: string | null;
 }
 
 export class RevisarSolicitudDto {
@@ -203,6 +250,29 @@ export class CreateEventoDto extends ScheduleFields {
   @Min(1, { message: CAPACIDAD_MESSAGE })
   @Max(MAX_CAPACIDAD, { message: CAPACIDAD_MESSAGE })
   capacidad: number;
+
+  /**
+   * IDs de CategoriaEvento (temática). 1 a 3. No son categorías de entrada.
+   * Opcional solo si viene de una solicitud que ya trae temáticas.
+   */
+  @ValidateIf((o: CreateEventoDto) => !o.solicitudId || o.categoriaEventoIds != null)
+  @Transform(toIdList)
+  @IsArray({ message: 'Elige entre 1 y 3 categorías del evento.' })
+  @ArrayMinSize(1, { message: 'Elige al menos una categoría del evento.' })
+  @ArrayMaxSize(MAX_CATEGORIAS_EVENTO, {
+    message: `Puedes elegir hasta ${MAX_CATEGORIAS_EVENTO} categorías del evento.`,
+  })
+  @IsString({ each: true })
+  categoriaEventoIds?: string[];
+
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsString()
+  @MaxLength(500)
+  @Matches(/^(https:\/\/open\.spotify\.com\/|spotify:)/i, {
+    message: 'Usa un enlace válido de Spotify (open.spotify.com).',
+  })
+  spotifyUrl?: string | null;
 }
 
 export class UpdateEventoDto {
@@ -286,6 +356,38 @@ export class UpdateEventoDto {
   @IsOptional()
   @Matches(TIME, { message: 'Indica una hora de fin válida.' })
   horaFin?: string;
+
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsString()
+  @MaxLength(500)
+  @Matches(/^(https:\/\/open\.spotify\.com\/|spotify:)/i, {
+    message: 'Usa un enlace válido de Spotify (open.spotify.com).',
+  })
+  spotifyUrl?: string | null;
+
+  /** IDs de CategoriaEvento (temática). 1 a 3. No son categorías de entrada. */
+  @IsOptional()
+  @Transform(toIdList)
+  @IsArray({ message: 'Elige entre 1 y 3 categorías del evento.' })
+  @ArrayMinSize(1, { message: 'Elige al menos una categoría del evento.' })
+  @ArrayMaxSize(MAX_CATEGORIAS_EVENTO, {
+    message: `Puedes elegir hasta ${MAX_CATEGORIAS_EVENTO} categorías del evento.`,
+  })
+  @IsString({ each: true })
+  categoriaEventoIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  permiteTransferencias?: boolean;
+
+  /** ISO datetime o null para quitar el límite. */
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsString()
+  @MaxLength(40)
+  transferenciaHasta?: string | null;
 }
 
 export class UpdateMapaDto {

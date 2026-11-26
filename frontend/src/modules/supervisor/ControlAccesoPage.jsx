@@ -6,6 +6,7 @@ import {
   rechazarAcceso,
   registrarAcceso,
   verificarAcceso,
+  verificarDocumento,
 } from '../../api/acceso.api'
 import QrScanner from '../../components/acceso/QrScanner'
 import FotoCaptura from '../../components/acceso/FotoCaptura'
@@ -35,13 +36,34 @@ function tituloResultado(r) {
   return 'Acceso inválido'
 }
 
-function Resultado({ resultado, foto, setFoto, coincide, setCoincide, onRegistrar, onRechazar, onSiguiente, registrando }) {
+function Resultado({
+  resultado,
+  foto,
+  setFoto,
+  coincide,
+  setCoincide,
+  documentSuffix,
+  setDocumentSuffix,
+  docVerif,
+  verificandoDoc,
+  onVerificarDocumento,
+  onRegistrar,
+  onRechazar,
+  onSiguiente,
+  registrando,
+}) {
   const banner = BANNERS[resultado.estado]
   const Icon = banner.icon
   const valido = resultado.estado === 'VALIDO'
   const debeComparar = valido && !resultado.requiereFoto && Boolean(resultado.fotoIngreso)
-  const listo = valido && (resultado.requiereFoto ? Boolean(foto) : !debeComparar || coincide)
+  const requiereDoc = valido && Boolean(resultado.requiereVerificacionDocumento)
+  const docOk = !requiereDoc || docVerif?.coincidio === true
+  const listo =
+    valido &&
+    docOk &&
+    (resultado.requiereFoto ? Boolean(foto) : !debeComparar || coincide)
   const { persona, entrada } = resultado
+  const suffixValido = /^[A-Za-z0-9]{4}$/.test(documentSuffix.trim())
 
   return (
     <section className="card-surface space-y-5 p-5">
@@ -142,6 +164,54 @@ function Resultado({ resultado, foto, setFoto, coincide, setCoincide, onRegistra
         </div>
       )}
 
+      {requiereDoc && (
+        <div className="rounded-md border border-border bg-page p-4">
+          <p className="text-sm font-semibold text-ink">Verificación de documento en puerta</p>
+          <p className="mt-1 text-xs text-muted">
+            Pide el documento físico y escribe los últimos 4 caracteres. Esto no es una consulta a registros
+            oficiales: solo comprueba coincidencia con la identidad registrada en Eventix.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="label" htmlFor="document-suffix">
+                Últimos 4 caracteres
+              </label>
+              <input
+                id="document-suffix"
+                className="input w-28 font-mono uppercase tracking-widest"
+                value={documentSuffix}
+                maxLength={4}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(e) => setDocumentSuffix(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 4))}
+              />
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={!suffixValido || verificandoDoc || registrando}
+              onClick={onVerificarDocumento}
+            >
+              {verificandoDoc ? 'Comprobando…' : 'Comprobar documento'}
+            </button>
+          </div>
+          {docVerif && (
+            <div
+              className={`mt-3 rounded-md border-2 p-3 text-sm font-bold ${
+                docVerif.coincidio
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                  : 'border-red-300 bg-red-50 text-red-900'
+              }`}
+              role="status"
+            >
+              <p>{docVerif.titulo}</p>
+              {docVerif.mensaje && <p className="mt-0.5 text-sm font-normal">{docVerif.mensaje}</p>}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3 border-t border-border pt-4">
         {valido && (
           <button type="button" className="btn-primary" onClick={onRegistrar} disabled={!listo || registrando}>
@@ -173,6 +243,9 @@ export default function ControlAccesoPage() {
   const [codigo, setCodigo] = useState('')
   const [foto, setFoto] = useState(null)
   const [coincide, setCoincide] = useState(false)
+  const [documentSuffix, setDocumentSuffix] = useState('')
+  const [docVerif, setDocVerif] = useState(null)
+  const [verificandoDoc, setVerificandoDoc] = useState(false)
   const [verificando, setVerificando] = useState(false)
   const [registrando, setRegistrando] = useState(false)
   const [aforo, setAforo] = useState(null)
@@ -229,6 +302,8 @@ export default function ControlAccesoPage() {
     setCodigo('')
     setFoto(null)
     setCoincide(false)
+    setDocumentSuffix('')
+    setDocVerif(null)
     setManual('')
     busyRef.current = false
     manualRef.current?.focus()
@@ -245,6 +320,8 @@ export default function ControlAccesoPage() {
       setResultado(data)
       setFoto(null)
       setCoincide(false)
+      setDocumentSuffix('')
+      setDocVerif(null)
       if (navigator.vibrate) navigator.vibrate(data.estado === 'VALIDO' ? 80 : [80, 60, 80])
     } catch (err) {
       toast(getErrorMessage(err), 'error')
@@ -254,7 +331,35 @@ export default function ControlAccesoPage() {
     }
   }
 
+  const onVerificarDocumento = async () => {
+    const suffix = documentSuffix.trim()
+    if (!/^[A-Za-z0-9]{4}$/.test(suffix)) {
+      toast('Ingresa exactamente los últimos 4 caracteres del documento.', 'error')
+      return
+    }
+    setVerificandoDoc(true)
+    try {
+      const { data } = await verificarDocumento({
+        eventoId,
+        codigo,
+        sentido,
+        documentSuffix: suffix,
+      })
+      setDocVerif(data)
+      if (!data.coincidio) setDocumentSuffix('')
+    } catch (err) {
+      setDocVerif(null)
+      toast(getErrorMessage(err), 'error')
+    } finally {
+      setVerificandoDoc(false)
+    }
+  }
+
   const registrar = async () => {
+    if (resultado.requiereVerificacionDocumento && docVerif?.coincidio !== true) {
+      toast('Debes comprobar el documento y obtener coincidencia antes de registrar el ingreso.', 'error')
+      return
+    }
     setRegistrando(true)
     try {
       const { data } = await registrarAcceso({
@@ -263,6 +368,7 @@ export default function ControlAccesoPage() {
         sentido,
         foto: resultado.requiereFoto ? foto : null,
         fotoVerificada: Boolean(resultado.fotoIngreso) && coincide,
+        documentSuffix: resultado.requiereVerificacionDocumento ? documentSuffix.trim() : undefined,
       })
       toast(`${movimientoLabel(data.registro.tipo)} registrado: ${resultado.persona?.nombre ?? resultado.entrada.codigo}`, 'success')
       setAforo(data.aforo)
@@ -426,6 +532,14 @@ export default function ControlAccesoPage() {
                 setFoto={setFoto}
                 coincide={coincide}
                 setCoincide={setCoincide}
+                documentSuffix={documentSuffix}
+                setDocumentSuffix={(v) => {
+                  setDocumentSuffix(v)
+                  setDocVerif(null)
+                }}
+                docVerif={docVerif}
+                verificandoDoc={verificandoDoc}
+                onVerificarDocumento={onVerificarDocumento}
                 onRegistrar={registrar}
                 onRechazar={rechazar}
                 onSiguiente={siguiente}

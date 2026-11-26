@@ -85,6 +85,12 @@ export class EventsController {
     return this.eventsService.updateMapaSolicitud(id, user, file, dto);
   }
 
+  /** Catálogo de temáticas del evento (no son categorías de entrada). */
+  @Get('categorias-evento')
+  listCategoriasEvento() {
+    return this.eventsService.listCategoriasEvento();
+  }
+
   @Post('eventos')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -97,6 +103,23 @@ export class EventsController {
   @Roles(Role.ADMIN)
   updateEvento(@Param('id') id: string, @Body() dto: UpdateEventoDto) {
     return this.eventsService.updateEvento(id, dto);
+  }
+
+  @Post('eventos/:id/finalizar')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  finalizar(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.eventsService.finalizarEvento(id, userId);
+  }
+
+  @Get('eventos/:id/liquidacion')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  liquidacion(@Param('id') id: string) {
+    return this.eventsService.liquidacionDelEvento(id);
   }
 
   @Post('eventos/:id/foto')

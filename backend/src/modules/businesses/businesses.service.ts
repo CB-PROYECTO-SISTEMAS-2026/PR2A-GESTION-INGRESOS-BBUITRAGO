@@ -9,7 +9,6 @@ import {
   AyudanteNegocio_estado,
   InvitacionEstado,
   Role,
-  SolicitudNegocio_estado,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -39,14 +38,13 @@ export class BusinessesService {
   ) {}
 
   async createNegocio(duenoId: string, dto: CreateNegocioDto) {
-    await this.ensureEventoExiste(dto.eventoId);
+    // La participación en un evento se pide aparte (SolicitudNegocio). No usar eventoId aquí.
     return this.prisma.negocio
       .create({
         data: {
           duenoId,
           nombre: dto.nombre.trim(),
           descripcion: dto.descripcion?.trim() || null,
-          eventoId: dto.eventoId || null,
         },
         include: { productos: true, ayudantes: true },
       })
@@ -54,16 +52,6 @@ export class BusinessesService {
         // Negocio.duenoId es único: cada jefe de negocio tiene un solo negocio.
         rethrowUniqueViolation(err, 'Ya tienes un negocio registrado.'),
       );
-  }
-
-  private async ensureEventoExiste(eventoId?: string) {
-    if (!eventoId) return;
-    const evento = await this.prisma.evento.findUnique({
-      where: { id: eventoId },
-      select: { id: true },
-    });
-    if (!evento)
-      throw new NotFoundException('El evento seleccionado no existe');
   }
 
   misNegocios(duenoId: string) {
@@ -79,10 +67,19 @@ export class BusinessesService {
             },
           },
         },
-        evento: { select: { id: true, titulo: true } },
         solicitudes: {
-          where: { estado: SolicitudNegocio_estado.ACEPTADA },
-          select: { evento: { select: { id: true, titulo: true } } },
+          select: {
+            id: true,
+            estado: true,
+            mensaje: true,
+            respuesta: true,
+            createdAt: true,
+            respondidoAt: true,
+            evento: {
+              select: { id: true, titulo: true, estado: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -91,7 +88,6 @@ export class BusinessesService {
 
   async updateNegocio(id: string, duenoId: string, dto: UpdateNegocioDto) {
     await this.ensureOwner(id, duenoId);
-    await this.ensureEventoExiste(dto.eventoId);
     return this.prisma.negocio.update({
       where: { id },
       data: {
@@ -100,9 +96,19 @@ export class BusinessesService {
           dto.descripcion === undefined
             ? undefined
             : dto.descripcion.trim() || null,
-        eventoId: dto.eventoId === undefined ? undefined : dto.eventoId || null,
       },
-      include: { productos: true, ayudantes: true },
+      include: {
+        productos: true,
+        ayudantes: true,
+        solicitudes: {
+          select: {
+            id: true,
+            estado: true,
+            evento: { select: { id: true, titulo: true, estado: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
     });
   }
 

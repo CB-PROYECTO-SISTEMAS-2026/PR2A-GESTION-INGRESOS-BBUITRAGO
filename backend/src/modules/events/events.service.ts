@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   EventoEstado,
+  LiquidacionEstado,
   MapChangeTipo,
   Prisma,
   Role,
@@ -25,6 +26,7 @@ import {
 import {
   CreateEventoDto,
   CreateSolicitudDto,
+  MAX_CATEGORIAS_EVENTO,
   RevisarSolicitudDto,
   UpdateEventoDto,
   UpdateMapaDto,
@@ -49,6 +51,7 @@ const organizadorSelect = {
   id: true,
   nombre: true,
   apellido: true,
+  nombreProductora: true,
   email: true,
   telefono: true,
 };
@@ -71,6 +74,57 @@ export class EventsService {
     return todayIn(this.timeZone);
   }
 
+  /** Catálogo público/admin de temáticas (CategoriaEvento ≠ CategoriaEntrada). */
+  listCategoriasEvento() {
+    return this.prisma.categoriaEvento.findMany({
+      where: { activa: true },
+      orderBy: { orden: 'asc' },
+      select: {
+        id: true,
+        nombre: true,
+        slug: true,
+        esMusical: true,
+        orden: true,
+      },
+    });
+  }
+
+  /**
+   * Valida IDs de CategoriaEvento (1–3). Si exige Spotify musical, limpia o
+   * rechaza según haya categoría con esMusical.
+   */
+  private async resolveCategoriasEvento(
+    ids: string[],
+    spotifyUrl?: string | null,
+  ) {
+    const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    if (unique.length < 1 || unique.length > MAX_CATEGORIAS_EVENTO) {
+      throw new BadRequestException(
+        `Elige entre 1 y ${MAX_CATEGORIAS_EVENTO} categorías del evento.`,
+      );
+    }
+    const rows = await this.prisma.categoriaEvento.findMany({
+      where: { id: { in: unique }, activa: true },
+      select: { id: true, esMusical: true, nombre: true },
+    });
+    if (rows.length !== unique.length) {
+      throw new BadRequestException(
+        'Una o más categorías del evento no son válidas.',
+      );
+    }
+    const musical = rows.some((r) => r.esMusical);
+    const spotify =
+      musical && spotifyUrl && String(spotifyUrl).trim()
+        ? String(spotifyUrl).trim()
+        : null;
+    if (spotifyUrl && String(spotifyUrl).trim() && !musical) {
+      throw new BadRequestException(
+        'El enlace de Spotify solo aplica si eliges una categoría musical (Conciertos, Urbano, Electrónica o Folclore).',
+      );
+    }
+    return { ids: unique, spotifyUrl: spotify, musical };
+  }
+
   // Solicitudes
 
   async createSolicitud(
@@ -83,7 +137,21 @@ export class EventsService {
         'Adjunta el mapa de la zona del evento (imagen o PDF).',
       );
     const schedule = buildSchedule(dto, { today: this.today() });
+    const cats = await this.resolveCategoriasEvento(
+      dto.categoriaEventoIds,
+      dto.spotifyUrl,
+    );
     const stored = await this.storage.upload(mapa, 'mapas', 'imageOrPdf');
+    const empresaTrim = dto.empresa?.trim() || '';
+    let empresa: string | null = empresaTrim || null;
+    if (!empresa) {
+      const org = await this.prisma.usuario.findUnique({
+        where: { id: organizadorId },
+        select: { nombreProductora: true },
+      });
+      const fromProfile = org?.nombreProductora?.trim();
+      if (fromProfile) empresa = fromProfile;
+    }
 
     try {
       return await this.prisma.solicitudEvento.create({
@@ -95,20 +163,40 @@ export class EventsService {
           ubicacion: dto.ubicacion,
           ubicacionUrl: dto.ubicacionUrl,
           capacidad: dto.capacidad,
-          empresa: dto.empresa?.trim() || null,
+          empresa,
           fechaInicio: dayToDate(schedule.fechaInicio),
           fechaFin: schedule.fechaFin ? dayToDate(schedule.fechaFin) : null,
           horaInicio: schedule.horaInicio,
           horaFin: schedule.horaFin,
           mapaUrl: stored.url,
           mapaNombre: stored.nombre,
+          spotifyUrl: cats.spotifyUrl,
           estado: SolicitudEstado.PENDIENTE,
+          categoriasEvento: {
+            create: cats.ids.map((categoriaEventoId) => ({
+              categoriaEventoId,
+            })),
+          },
           mapHistory: {
             create: {
               mapaUrl: stored.url,
               mapaNombre: stored.nombre,
               tipo: MapChangeTipo.CREACION,
               nota: 'Mapa enviado con la solicitud',
+            },
+          },
+        },
+        include: {
+          categoriasEvento: {
+            include: {
+              categoriaEvento: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  slug: true,
+                  esMusical: true,
+                },
+              },
             },
           },
         },
@@ -119,6 +207,22 @@ export class EventsService {
     }
   }
 
+  private readonly categoriasEventoInclude = {
+    categoriasEvento: {
+      include: {
+        categoriaEvento: {
+          select: {
+            id: true,
+            nombre: true,
+            slug: true,
+            esMusical: true,
+            orden: true,
+          },
+        },
+      },
+    },
+  } as const;
+
   misSolicitudes(organizadorId: string) {
     return this.prisma.solicitudEvento.findMany({
       where: { organizadorId },
@@ -126,6 +230,7 @@ export class EventsService {
       include: {
         evento: { select: { id: true, titulo: true, estado: true } },
         mapHistory: { orderBy: { createdAt: 'desc' } },
+        ...this.categoriasEventoInclude,
       },
     });
   }
@@ -137,6 +242,7 @@ export class EventsService {
       include: {
         organizador: { select: organizadorSelect },
         evento: { select: { id: true, titulo: true, estado: true } },
+        ...this.categoriasEventoInclude,
       },
     });
   }
@@ -145,6 +251,7 @@ export class EventsService {
     const solicitud = await this.prisma.solicitudEvento.findUnique({
       where: { id },
       include: {
+        ...this.categoriasEventoInclude,
         organizador: { select: { ...organizadorSelect, documento: true } },
         evento: { select: { id: true, titulo: true, estado: true } },
         mapHistory: { orderBy: { createdAt: 'desc' } },
@@ -261,19 +368,24 @@ export class EventsService {
     const cronograma = buildCronograma(dto.cronograma, schedule);
     if (dto.estado && dto.estado !== EventoEstado.BORRADOR) {
       throw new BadRequestException(
-        'El evento se crea como borrador. Podrás publicarlo después de subir su imagen y crear sus categorías.',
+        'El evento se crea como borrador. Podrás publicarlo después de subir su imagen y crear sus categorías de entrada.',
       );
     }
     let organizadorId = dto.organizadorId;
     let horas = dto.reembolsoHoras;
     let mapaUrl: string | null = null;
     let mapaNombre: string | null = null;
+    let spotifyFromSolicitud: string | null | undefined;
     const solicitudId = dto.solicitudId;
+    let categoriaIds = dto.categoriaEventoIds;
 
     if (solicitudId) {
       const solicitud = await this.prisma.solicitudEvento.findUnique({
         where: { id: solicitudId },
-        include: { evento: { select: { id: true } } },
+        include: {
+          evento: { select: { id: true } },
+          categoriasEvento: { select: { categoriaEventoId: true } },
+        },
       });
       if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
       if (solicitud.evento)
@@ -289,9 +401,27 @@ export class EventsService {
       organizadorId = solicitud.organizadorId;
       mapaUrl = solicitud.mapaUrl;
       mapaNombre = solicitud.mapaNombre;
+      if (!categoriaIds?.length) {
+        categoriaIds = solicitud.categoriasEvento.map(
+          (c) => c.categoriaEventoId,
+        );
+      }
+      if (dto.spotifyUrl === undefined) {
+        spotifyFromSolicitud = solicitud.spotifyUrl;
+      }
     } else {
       await this.ensureOrganizador(organizadorId);
     }
+
+    if (!categoriaIds?.length) {
+      throw new BadRequestException(
+        'Elige al menos una categoría del evento (temática).',
+      );
+    }
+    const cats = await this.resolveCategoriasEvento(
+      categoriaIds,
+      dto.spotifyUrl !== undefined ? dto.spotifyUrl : spotifyFromSolicitud,
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const evento = await tx.evento.create({
@@ -309,11 +439,17 @@ export class EventsService {
           estado: EventoEstado.BORRADOR,
           mapaUrl,
           capacidad: dto.capacidad,
+          spotifyUrl: cats.spotifyUrl,
           fechas: {
             create: schedule.days.map((day) => ({
               fecha: dayToDate(day),
               horaInicio: schedule.horaInicio,
               horaFin: schedule.horaFin,
+            })),
+          },
+          categoriasEvento: {
+            create: cats.ids.map((categoriaEventoId) => ({
+              categoriaEventoId,
             })),
           },
         },
@@ -344,6 +480,7 @@ export class EventsService {
         include: {
           fechas: { orderBy: { fecha: 'asc' } },
           categorias: true,
+          ...this.categoriasEventoInclude,
           solicitud: true,
         },
       });
@@ -388,8 +525,39 @@ export class EventsService {
       horaFin,
       servicios,
       cronograma: cronogramaDto,
+      transferenciaHasta,
+      categoriaEventoIds,
+      spotifyUrl,
       ...fields
     } = dto;
+
+    let catsResolved: Awaited<
+      ReturnType<EventsService['resolveCategoriasEvento']>
+    > | null = null;
+    if (categoriaEventoIds !== undefined || spotifyUrl !== undefined) {
+      const currentIds = (
+        await this.prisma.eventoCategoriaEvento.findMany({
+          where: { eventoId: id },
+          select: { categoriaEventoId: true },
+        })
+      ).map((r) => r.categoriaEventoId);
+      catsResolved = await this.resolveCategoriasEvento(
+        categoriaEventoIds ?? currentIds,
+        spotifyUrl !== undefined ? spotifyUrl : evento.spotifyUrl,
+      );
+    }
+    let transferenciaHastaDate: Date | null | undefined;
+    if (transferenciaHasta === null || transferenciaHasta === '') {
+      transferenciaHastaDate = null;
+    } else if (transferenciaHasta !== undefined) {
+      const parsed = new Date(transferenciaHasta);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException(
+          'La fecha límite de transferencia no es válida.',
+        );
+      }
+      transferenciaHastaDate = parsed;
+    }
     const touchesSchedule = [fechaInicio, fechaFin, horaInicio, horaFin].some(
       (v) => v !== undefined,
     );
@@ -450,6 +618,16 @@ export class EventsService {
           'Crea al menos una categoría de entrada antes de publicar el evento.',
         );
       }
+      const tematicasCount = catsResolved
+        ? catsResolved.ids.length
+        : await this.prisma.eventoCategoriaEvento.count({
+            where: { eventoId: id },
+          });
+      if (!tematicasCount) {
+        throw new BadRequestException(
+          'Asigna al menos una categoría del evento (temática) antes de publicarlo.',
+        );
+      }
       if (!(fields.ubicacionUrl ?? evento.ubicacionUrl)) {
         throw new BadRequestException(
           'Agrega el enlace de Google Maps de la ubicación antes de publicar el evento.',
@@ -459,17 +637,32 @@ export class EventsService {
 
     const data: Prisma.EventoUpdateInput = {
       ...fields,
+      ...(transferenciaHastaDate !== undefined
+        ? { transferenciaHasta: transferenciaHastaDate }
+        : {}),
       ...(servicios !== undefined
         ? { servicios: normalizeList(servicios) }
         : {}),
       ...(cronograma
         ? { cronograma: cronograma as unknown as Prisma.InputJsonObject }
         : {}),
+      ...(catsResolved ? { spotifyUrl: catsResolved.spotifyUrl } : {}),
     };
 
     const result = await this.prisma.$transaction(
       async (tx) => {
         await tx.evento.update({ where: { id }, data });
+        if (catsResolved) {
+          await tx.eventoCategoriaEvento.deleteMany({
+            where: { eventoId: id },
+          });
+          await tx.eventoCategoriaEvento.createMany({
+            data: catsResolved.ids.map((categoriaEventoId) => ({
+              eventoId: id,
+              categoriaEventoId,
+            })),
+          });
+        }
         if (
           schedule &&
           (await this.syncFechas(tx, id, evento.fechas, schedule))
@@ -485,6 +678,7 @@ export class EventsService {
           include: {
             fechas: { orderBy: { fecha: 'asc' } },
             categorias: true,
+            ...this.categoriasEventoInclude,
             organizador: { select: organizadorSelect },
           },
         });
@@ -507,7 +701,102 @@ export class EventsService {
         ),
       );
     }
+    if (
+      evento.estado !== EventoEstado.FINALIZADO &&
+      result.estado === EventoEstado.FINALIZADO
+    ) {
+      await this.asegurarLiquidacionEvento(result.id, null);
+    }
     return result;
+  }
+
+  /**
+   * Cierra el ciclo operativo del evento: pasa a FINALIZADO y deja el resumen de
+   * liquidación (ventas de negocios) listo para seguimiento admin.
+   */
+  async finalizarEvento(id: string, adminId: string) {
+    const evento = await this.prisma.evento.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        titulo: true,
+        estado: true,
+        organizador: { select: organizadorSelect },
+      },
+    });
+    if (!evento) throw new NotFoundException('Evento no encontrado');
+    if (evento.estado === EventoEstado.FINALIZADO) {
+      const liquidacion = await this.asegurarLiquidacionEvento(id, adminId);
+      return { ...evento, liquidacion, yaFinalizado: true };
+    }
+    if (evento.estado === EventoEstado.CANCELADO) {
+      throw new BadRequestException(
+        'Un evento cancelado no se puede finalizar; ya está cerrado.',
+      );
+    }
+    if (evento.estado === EventoEstado.BORRADOR) {
+      throw new BadRequestException(
+        'Publica el evento antes de finalizarlo.',
+      );
+    }
+    const actualizado = await this.prisma.evento.update({
+      where: { id },
+      data: { estado: EventoEstado.FINALIZADO },
+      include: {
+        fechas: { orderBy: { fecha: 'asc' } },
+        organizador: { select: organizadorSelect },
+      },
+    });
+    const liquidacion = await this.asegurarLiquidacionEvento(id, adminId);
+    return { ...actualizado, liquidacion, yaFinalizado: false };
+  }
+
+  async liquidacionDelEvento(eventoId: string) {
+    await this.ensureEvento(eventoId);
+    return this.asegurarLiquidacionEvento(eventoId, null);
+  }
+
+  /**
+   * Snapshot de lo recaudado por negocios en el evento. No paga nada: el pago al
+   * puesto sigue el flujo de retiros; esto solo deja trazabilidad al cerrar.
+   */
+  private async asegurarLiquidacionEvento(
+    eventoId: string,
+    adminId: string | null,
+  ) {
+    const ventas = await this.prisma.venta.aggregate({
+      where: { eventoId },
+      _sum: { total: true },
+      _count: { _all: true },
+    });
+    const montoTotal = ventas._sum.total ?? new Prisma.Decimal(0);
+    const nota = `${ventas._count._all} venta(s) de negocio al cierre. El pago a cada puesto se gestiona con retiros de ganancias.`;
+    const existente = await this.prisma.liquidacionEvento.findUnique({
+      where: { eventoId },
+    });
+    if (existente) {
+      return this.prisma.liquidacionEvento.update({
+        where: { eventoId },
+        data: {
+          montoTotal,
+          nota,
+          ...(adminId && existente.estado === LiquidacionEstado.PENDIENTE
+            ? { aprobadoPorId: adminId, aprobadoAt: new Date() }
+            : {}),
+        },
+      });
+    }
+    return this.prisma.liquidacionEvento.create({
+      data: {
+        eventoId,
+        montoTotal,
+        estado: LiquidacionEstado.PENDIENTE,
+        nota,
+        ...(adminId
+          ? { aprobadoPorId: adminId, aprobadoAt: new Date() }
+          : {}),
+      },
+    });
   }
 
   /**
@@ -643,13 +932,20 @@ export class EventsService {
       orderBy: { createdAt: 'desc' },
       include: {
         organizador: {
-          select: { id: true, nombre: true, apellido: true, email: true },
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true,
+            nombreProductora: true,
+            email: true,
+          },
         },
         fechas: { orderBy: { fecha: 'asc' } },
         categorias: {
           select: { id: true, nombre: true, precio: true, cupo: true },
           orderBy: { precio: 'asc' },
         },
+        ...this.categoriasEventoInclude,
         solicitud: { select: { id: true, estado: true } },
       },
     });
@@ -680,12 +976,30 @@ export class EventsService {
       fotoUrl: true,
       ubicacion: true,
       ubicacionUrl: true,
+      mapaUrl: true,
       servicios: true,
       cronograma: true,
       tipoAcceso: true,
       estado: true,
       capacidad: true,
+      spotifyUrl: true,
+      organizador: {
+        select: { id: true, nombreProductora: true },
+      },
       fechas: { orderBy: { fecha: 'asc' as const } },
+      categoriasEvento: {
+        include: {
+          categoriaEvento: {
+            select: {
+              id: true,
+              nombre: true,
+              slug: true,
+              esMusical: true,
+              orden: true,
+            },
+          },
+        },
+      },
       categorias: {
         orderBy: { precio: 'asc' as const },
         select: {
@@ -720,9 +1034,13 @@ export class EventsService {
             _count: { select: { ticketsPool: true } },
           },
         },
+        ...this.categoriasEventoInclude,
         organizador: { select: organizadorSelect },
         solicitud: {
-          include: { mapHistory: { orderBy: { createdAt: 'desc' } } },
+          include: {
+            mapHistory: { orderBy: { createdAt: 'desc' } },
+            ...this.categoriasEventoInclude,
+          },
         },
         mapHistory: { orderBy: { createdAt: 'desc' } },
       },
@@ -775,7 +1093,13 @@ export class EventsService {
     return this.prisma.usuario.findMany({
       where: { activo: true, roles: { some: { role: Role.ORGANIZADOR } } },
       orderBy: { nombre: 'asc' },
-      select: { id: true, nombre: true, apellido: true, email: true },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        nombreProductora: true,
+        email: true,
+      },
     });
   }
 

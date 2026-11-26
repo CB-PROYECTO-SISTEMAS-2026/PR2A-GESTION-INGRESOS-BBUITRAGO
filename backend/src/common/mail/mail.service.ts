@@ -5,6 +5,16 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  MAIL_MAX_ATTEMPTS,
+  MAIL_OUTBOX_TIPO,
+  MAIL_URL_FAILED,
+  MAIL_URL_PENDING,
+  MAIL_URL_SENT,
+  nextAttemptAt,
+  type MailOutboxMeta,
+} from './mail-outbox';
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
@@ -29,8 +39,8 @@ function layout(title: string, body: string) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px;">
       <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr><td style="background:#0b1b33;padding:20px 28px;color:#ffffff;font-size:22px;font-weight:bold;">
-            Even<span style="color:#00c9d4;">Tix</span>
+          <tr><td style="background:#0B132B;padding:20px 28px;color:#ffffff;font-size:22px;font-weight:bold;">
+            Even<span style="color:#3B82F6;">Tix</span>
           </td></tr>
           <tr><td style="padding:28px;">
             <h1 style="margin:0 0 16px;font-size:20px;">${title}</h1>
@@ -48,7 +58,7 @@ function layout(title: string, body: string) {
 
 function button(url: string, label: string) {
   return `<p style="margin:24px 0;">
-    <a href="${url}" style="display:inline-block;background:#00c9d4;color:#0b1b33;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;">${label}</a>
+    <a href="${url}" style="display:inline-block;background:#1E40AF;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;">${label}</a>
   </p>
   <p style="font-size:12px;color:#64748b;">Si el botón no funciona, copia este enlace en tu navegador:<br>
     <span style="word-break:break-all;">${url}</span>
@@ -61,8 +71,12 @@ export class MailService {
   private readonly transporter: Transporter;
   private readonly from: string;
   private readonly frontendUrl: string;
+  private readonly contactoInbox: string;
 
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    private prisma: PrismaService,
+  ) {
     this.transporter = createTransport({
       host: config.getOrThrow<string>('MAIL_HOST'),
       port: Number(config.getOrThrow<string>('MAIL_PORT')),
@@ -76,6 +90,11 @@ export class MailService {
     this.frontendUrl = config
       .getOrThrow<string>('FRONTEND_URL')
       .replace(/\/+$/, '');
+    const inbox =
+      config.get<string>('CONTACT_INBOX')?.trim() ||
+      config.get<string>('MAIL_USER')?.trim() ||
+      this.from;
+    this.contactoInbox = inbox;
   }
 
   buildUrl(path: string, token: string) {
@@ -132,7 +151,9 @@ export class MailService {
       `La invitación vence en ${expiresInHours} horas.`,
       'Si no esperabas este correo, ignóralo y no se creará ninguna cuenta.',
     ].join('\n\n');
-    await this.send(to, 'Confirma tu cuenta de EvenTix', html, text);
+    await this.send(to, 'Confirma tu cuenta de EvenTix', html, text, {
+      immediate: true,
+    });
   }
 
   async sendSolicitudRevisada(
@@ -245,6 +266,85 @@ export class MailService {
     await this.send(to, `Compra ${estado}: ${compra.evento}`, html, text);
   }
 
+  async sendParticipacionNegocioRevisada(
+    to: string,
+    nombre: string,
+    datos: {
+      negocio: string;
+      evento: string;
+      aceptada: boolean;
+      respuesta?: string | null;
+    },
+  ) {
+    const url = `${this.frontendUrl}/negocio`;
+    const estado = datos.aceptada ? 'aceptada' : 'rechazada';
+    const detalle = datos.aceptada
+      ? 'Tu puesto ya puede vender con puntos en ese evento desde el POS de tus ayudantes.'
+      : 'Revisa la respuesta del administrador y vuelve a solicitar si corresponde.';
+    const respuesta = datos.respuesta?.trim();
+    const html = layout(
+      `Participación ${estado}`,
+      `<p>Hola ${escapeHtml(nombre)},</p>
+       <p>Tu solicitud para que <strong>${escapeHtml(datos.negocio)}</strong> participe en <strong>${escapeHtml(datos.evento)}</strong> fue <strong>${estado}</strong>.</p>
+       ${respuesta ? `<p style="margin:16px 0;padding:12px 16px;background:#f8fafc;border-left:3px solid #00c9d4;">${escapeHtml(respuesta).replace(/\n/g, '<br>')}</p>` : ''}
+       <p>${detalle}</p>
+       ${button(url, 'Ir a mi negocio')}`,
+    );
+    const text = [
+      `Hola ${nombre},`,
+      `Tu solicitud para que ${datos.negocio} participe en ${datos.evento} fue ${estado}.`,
+      ...(respuesta ? [`Respuesta: ${respuesta}`] : []),
+      detalle,
+      url,
+    ].join('\n\n');
+    await this.send(
+      to,
+      `Participación ${estado}: ${datos.evento}`,
+      html,
+      text,
+    );
+  }
+
+  async sendReembolsoEntradaActualizado(
+    to: string,
+    nombre: string,
+    datos: {
+      evento: string;
+      codigo: string;
+      estado: 'APROBADO' | 'RECHAZADO' | 'PAGADO';
+      monto: string;
+    },
+  ) {
+    const url = `${this.frontendUrl}/mis-reembolsos`;
+    const copy = {
+      APROBADO:
+        'Aprobamos tu reembolso. La entrada y su QR ya no sirven para ingresar. El administrador te entregará el efectivo en caja.',
+      RECHAZADO:
+        'No pudimos aprobar el reembolso de esta entrada. Si crees que es un error, responde con una nueva solicitud solo si aún está dentro del plazo.',
+      PAGADO:
+        'Registramos la entrega del efectivo correspondiente a tu reembolso. Conserva tu comprobante o referencia del pago.',
+    }[datos.estado];
+    const html = layout(
+      `Reembolso ${datos.estado.toLowerCase()}`,
+      `<p>Hola ${escapeHtml(nombre)},</p>
+       <p>Tu solicitud de reembolso de la entrada <strong>${escapeHtml(datos.codigo)}</strong> del evento <strong>${escapeHtml(datos.evento)}</strong> (Bs ${escapeHtml(datos.monto)}) quedó en estado <strong>${escapeHtml(datos.estado)}</strong>.</p>
+       <p>${copy}</p>
+       ${button(url, 'Ver mis reembolsos')}`,
+    );
+    const text = [
+      `Hola ${nombre},`,
+      `Tu reembolso de la entrada ${datos.codigo} (${datos.evento}, Bs ${datos.monto}) quedó ${datos.estado}.`,
+      copy,
+      url,
+    ].join('\n\n');
+    await this.send(
+      to,
+      `Reembolso ${datos.estado.toLowerCase()}: ${datos.evento}`,
+      html,
+      text,
+    );
+  }
+
   async sendEntradaParaTercero(
     to: string,
     nombre: string,
@@ -276,25 +376,183 @@ export class MailService {
     await this.send(to, `Tienes una entrada para ${datos.evento}`, html, text);
   }
 
-  private async send(to: string, subject: string, html: string, text: string) {
+  /**
+   * Invitación / transferencia de titular. El mensaje es genérico: no indica si el
+   * destinatario ya tiene cuenta (anti-enumeración).
+   */
+  async sendInvitacionEntrada(
+    to: string,
+    datos: {
+      evento: string;
+      categoria: string;
+      comprador: string;
+      url: string;
+      esTransferencia?: boolean;
+    },
+  ) {
+    const titulo = datos.esTransferencia
+      ? 'Te transfieren una entrada'
+      : 'Te asignaron una entrada';
+    const accion = datos.esTransferencia
+      ? 'te transfirió'
+      : 'te asignó';
+    const html = layout(
+      titulo,
+      `<p>Hola,</p>
+       <p>${escapeHtml(datos.comprador)} ${accion} una entrada <strong>${escapeHtml(datos.categoria)}</strong> del evento <strong>${escapeHtml(datos.evento)}</strong>.</p>
+       <p>Inicia sesión o crea una cuenta con este correo, registra tu identidad si aún no lo hiciste y acepta la entrada para convertirte en titular.</p>
+       ${button(datos.url, 'Revisar invitación')}`,
+    );
+    const text = [
+      titulo,
+      `${datos.comprador} ${accion} una entrada ${datos.categoria} del evento ${datos.evento}.`,
+      'Inicia sesión o crea una cuenta con este correo, registra tu identidad y acepta la entrada.',
+      datos.url,
+    ].join('\n\n');
+    await this.send(to, `${titulo}: ${datos.evento}`, html, text);
+  }
+
+  /** Formulario público de contacto (promotoras / público general). */
+  async sendContactoPromotora(fromEmail: string, mensaje: string) {
+    const subject = 'Contacto promotora — Eventix';
+    const html = layout(
+      'Nuevo mensaje de contacto',
+      `<p><strong>Remitente:</strong> ${escapeHtml(fromEmail)}</p>
+       <p style="margin:16px 0;padding:12px 16px;background:#f8fafc;border-left:3px solid #1E40AF;white-space:pre-wrap;">${escapeHtml(mensaje).replace(/\n/g, '<br>')}</p>
+       <p style="font-size:12px;color:#64748b;">Responde directamente a este correo (Reply-To = remitente).</p>`,
+    );
+    const text = [
+      'Nuevo mensaje de contacto',
+      `Remitente: ${fromEmail}`,
+      '',
+      mensaje,
+    ].join('\n');
+    await this.send(this.contactoInbox, subject, html, text, {
+      immediate: true,
+      replyTo: fromEmail,
+    });
+  }
+
+  /**
+   * Invitaiones: si falla el SMTP hay que abortar (el caller hace rollback).
+   * El resto de correos usa reintento en cola.
+   */
+  private async send(
+    to: string,
+    subject: string,
+    html: string,
+    text: string,
+    opts: { immediate?: boolean; replyTo?: string } = {},
+  ) {
     try {
-      const info = await this.transporter.sendMail({
-        from: this.from,
-        to,
-        subject,
-        html,
-        text,
+      await this.deliver(to, subject, html, text, {
+        replyTo: opts.replyTo,
       });
-      this.logger.log(
-        `Correo "${subject}" enviado a ${to} (${info.messageId})`,
-      );
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `No se pudo enviar el correo "${subject}" a ${to}: ${(err as Error).message}`,
+        `No se pudo enviar el correo "${subject}" a ${to}: ${message}`,
       );
-      throw new ServiceUnavailableException(
-        'No se pudo enviar el correo. Intenta nuevamente en unos minutos.',
-      );
+      if (opts.immediate) {
+        throw new ServiceUnavailableException(
+          'No se pudo enviar el correo. Intenta nuevamente en unos minutos.',
+        );
+      }
+      await this.enqueue(to, subject, html, text, message);
     }
+  }
+
+  async deliver(
+    to: string,
+    subject: string,
+    html: string,
+    text: string,
+    opts: { replyTo?: string } = {},
+  ) {
+    const info = await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      html,
+      text,
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+    });
+    this.logger.log(`Correo "${subject}" enviado a ${to} (${info.messageId})`);
+  }
+
+  async enqueue(
+    to: string,
+    subject: string,
+    html: string,
+    text: string,
+    lastError?: string,
+  ) {
+    const meta: MailOutboxMeta = {
+      to,
+      subject,
+      html,
+      text,
+      attempts: 0,
+      nextAttemptAt: new Date().toISOString(),
+      lastError,
+    };
+    await this.prisma.archivo.create({
+      data: {
+        tipo: MAIL_OUTBOX_TIPO,
+        url: MAIL_URL_PENDING,
+        nombre: subject.slice(0, 180),
+        meta,
+      },
+    });
+    this.logger.warn(
+      `Correo "${subject}" a ${to} quedó en cola para reintento.`,
+    );
+  }
+
+  /** Worker: reintenta pendientes. Devuelve cuántos procesó. */
+  async flushOutbox(limit = 20) {
+    const now = new Date();
+    const pendientes = await this.prisma.archivo.findMany({
+      where: { tipo: MAIL_OUTBOX_TIPO, url: MAIL_URL_PENDING },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+    let enviados = 0;
+    for (const row of pendientes) {
+      const meta = row.meta as MailOutboxMeta | null;
+      if (!meta?.to || !meta.subject) continue;
+      if (meta.nextAttemptAt && new Date(meta.nextAttemptAt) > now) continue;
+      try {
+        await this.deliver(meta.to, meta.subject, meta.html, meta.text);
+        await this.prisma.archivo.update({
+          where: { id: row.id },
+          data: {
+            url: MAIL_URL_SENT,
+            meta: { ...meta, attempts: meta.attempts + 1, lastError: undefined },
+          },
+        });
+        enviados += 1;
+      } catch (err) {
+        const attempts = (meta.attempts ?? 0) + 1;
+        const lastError = err instanceof Error ? err.message : String(err);
+        const failed = attempts >= MAIL_MAX_ATTEMPTS;
+        await this.prisma.archivo.update({
+          where: { id: row.id },
+          data: {
+            url: failed ? MAIL_URL_FAILED : MAIL_URL_PENDING,
+            meta: {
+              ...meta,
+              attempts,
+              lastError,
+              nextAttemptAt: nextAttemptAt(attempts).toISOString(),
+            },
+          },
+        });
+        this.logger.warn(
+          `Reintento ${attempts}/${MAIL_MAX_ATTEMPTS} falló para "${meta.subject}" → ${meta.to}`,
+        );
+      }
+    }
+    return enviados;
   }
 }

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" width="240" height="180" fill="none">
+    <g transform="translate(80, 15)">
+    <defs>
+      <linearGradient id="cC-shield-base" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1E3A8A" />
+        <stop offset="50%" stop-color="#1D4ED8" />
+        <stop offset="100%" stop-color="#0F172A" />
+      </linearGradient>
+      <linearGradient id="cC-star-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFFF" />
+        <stop offset="50%" stop-color="#38BDF8" />
+        <stop offset="100%" stop-color="#00F2FE" />
+      </linearGradient>
+    </defs>
+
+    <g id="concept-C-shield">
+      <!-- Outer Precision Ticket Shield with 4 Security Notches -->
+      <path d="M 22 10
+               L 58 10
+               C 64 10, 70 16, 70 22
+               L 70 34
+               C 65 36, 62 40, 62 44
+               C 62 48, 65 52, 70 54
+               L 70 66
+               C 70 72, 64 78, 58 78
+               L 22 78
+               C 16 78, 10 72, 10 66
+               L 10 54
+               C 15 52, 18 48, 18 44
+               C 18 40, 15 36, 10 34
+               L 10 22
+               C 10 16, 16 10, 22 10 Z"
+            fill="url(#cC-shield-base)"
+            stroke="#2563EB"
+            stroke-width="2" />
+
+      <!-- Geometric 8-Point Quantum Nexus / Ticket Matrix -->
+      <!-- Facet 1: Diagonal Crossbars -->
+      <path d="M 22 22 L 58 58 M 58 22 L 22 58" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" opacity="0.6" />
+
+      <!-- Center Prismatic Quantum Star -->
+      <polygon points="40,18 45,35 62,40 45,45 40,62 35,45 18,40 35,35"
+               fill="url(#cC-star-grad)" />
+
+      <!-- Micro Laser Core -->
+      <circle cx="40" cy="40" r="4" fill="#0A1128" />
+      <circle cx="40" cy="40" r="2" fill="#00F2FE" />
+    </g>
+  </g>
+    <g transform="translate(-10, 105)">
+      <!-- E -->
+      <path d="M 0 10 L 28 10 L 28 18 L 10 18 L 10 28 L 24 28 L 24 36 L 10 36 L 10 46 L 28 46 L 28 54 L 0 54 Z" fill="#FFFFFF" />
+      <!-- V -->
+      <path d="M 33 10 L 44 10 L 54 44 L 64 10 L 75 10 L 60 54 L 48 54 Z" fill="#FFFFFF" />
+      <!-- E -->
+      <path d="M 80 10 L 108 10 L 108 18 L 90 18 L 90 28 L 104 28 L 104 36 L 90 36 L 90 46 L 108 46 L 108 54 L 80 54 Z" fill="#FFFFFF" />
+      <!-- N -->
+      <path d="M 113 10 L 123 10 L 143 42 L 143 10 L 153 10 L 153 54 L 143 54 L 123 22 L 123 54 L 113 54 Z" fill="#FFFFFF" />
+      <!-- T -->
+      <path d="M 158 10 L 190 10 L 190 18 L 179 18 L 179 54 L 169 54 L 169 18 L 158 18 Z" fill="#FFFFFF" />
+      <!-- I -->
+      <path d="M 197 10 L 207 10 L 207 54 L 197 54 Z" fill="#38BDF8" />
+      <!-- X -->
+      <g>
+        <path d="M 213 10 L 225 10 L 236 30 L 247 10 L 259 10 L 243 32 L 260 54 L 248 54 L 236 35 L 224 54 L 212 54 L 229 32 Z" fill="#00F2FE" />
+      </g>
+    </g>
+  </svg>

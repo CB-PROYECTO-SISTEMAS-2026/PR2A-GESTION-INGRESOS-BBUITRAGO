@@ -3,6 +3,7 @@ import {
   EntradaEstado,
   Prisma,
   PrismaClient,
+  TitularAsignacionEstado,
 } from '@prisma/client';
 import { normalizeEmail } from '../../common/security/user-identity';
 import {
@@ -41,8 +42,8 @@ export async function vincularEntradasDeTerceros(
 }
 
 /**
- * HU-011: una entrada comprada para alguien que aún no tenía cuenta se emite sin titular. Cuando esa
- * persona entra con el mismo correo, la entrada pasa a su perfil (y recibe su QR digital si el evento lo usa).
+ * Compatibilidad: entradas antiguas emitidas para un correo sin AsignacionEntrada.
+ * Solo asigna si el usuario ya registró identidad. El flujo nuevo usa invitaciones con aceptación.
  */
 export async function asignarEntradasDeTerceros(
   prisma: PrismaClient,
@@ -54,11 +55,28 @@ export async function asignarEntradasDeTerceros(
   });
   if (!usuario?.activo || usuario.eliminadoAt) return 0;
 
+  const identidad = await prisma.identidadUsuario.findUnique({
+    where: { usuarioId },
+    select: { id: true },
+  });
+  if (!identidad) return 0;
+
   const pendientes = await prisma.compraEntradaItem.findMany({
     where: {
       paraEmail: normalizeEmail(usuario.email),
       compra: { estado: CompraEstado.APROBADA },
-      entrada: { is: { titularId: null } },
+      entrada: {
+        is: {
+          titularId: null,
+          titularEstado: {
+            in: [
+              TitularAsignacionEstado.SIN_ASIGNAR,
+              TitularAsignacionEstado.INVITACION_PENDIENTE,
+            ],
+          },
+          asignaciones: { none: {} },
+        },
+      },
     },
     select: {
       entrada: {
@@ -82,6 +100,7 @@ export async function asignarEntradasDeTerceros(
         where: { id: entrada.id, titularId: null },
         data: {
           titularId: usuarioId,
+          titularEstado: TitularAsignacionEstado.ASIGNADA,
           ...(digital && entrada.estado === EntradaEstado.GENERADA
             ? { estado: EntradaEstado.ASIGNADA }
             : {}),

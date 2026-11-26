@@ -21,16 +21,17 @@ export class UpdateProfileDto {
   @MaxLength(100)
   apellido?: string;
 
+  /** Marca pública del organizador. Vacío o null la quita. */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @IsString()
+  @MaxLength(120)
+  nombreProductora?: string | null;
+
   @IsOptional()
   @IsString()
   @Matches(/^[\d+\s()-]{7,20}$/, { message: 'Teléfono inválido' })
   telefono?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(5)
-  @MaxLength(30)
-  documento?: string;
 
   /** Día (AAAA-MM-DD); vacío o null quita la fecha. */
   @IsOptional()

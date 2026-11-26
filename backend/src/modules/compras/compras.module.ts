@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EntradasModule } from '../entradas/entradas.module';
+import { AsignacionesModule } from '../asignaciones/asignaciones.module';
 import { ComprasService } from './compras.service';
 import {
   ComprasAdminController,
@@ -8,7 +9,7 @@ import {
 
 /** Al aprobar una compra se emiten sus entradas con EntradasService.emitirParaCompra (Módulo B). */
 @Module({
-  imports: [EntradasModule],
+  imports: [EntradasModule, AsignacionesModule],
   controllers: [ComprasController, ComprasAdminController],
   providers: [ComprasService],
 })

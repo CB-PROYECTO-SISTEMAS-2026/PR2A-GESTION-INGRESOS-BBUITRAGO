@@ -1,6 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { CompraEstado, EntradaEstado, Prisma, TipoAcceso } from '@prisma/client';
-import { normalizeEmail } from '../../common/security/user-identity';
+import { CompraEstado, EntradaEstado, Prisma, TipoAcceso, TitularAsignacionEstado } from '@prisma/client';
 import { claveDia, completarPool } from '../tickets/cupos';
 import { TICKET_ESTADO_ASIGNADO, TICKET_ESTADO_DISPONIBLE } from '../tickets/ticket-codes';
 
@@ -108,7 +107,6 @@ export async function emitirEntradasDeCompra(tx: Tx, compraId: string): Promise<
   });
 
   await verificarCupoPorDia(tx, unidades);
-  const titulares = await resolverTitulares(tx, unidades);
   const porCategoria = new Map<string, { nombre: string; cantidad: number }>();
   for (const u of unidades) {
     const acc = porCategoria.get(u.categoriaId) ?? { nombre: u.categoria.nombre, cantidad: 0 };
@@ -121,9 +119,18 @@ export async function emitirEntradasDeCompra(tx: Tx, compraId: string): Promise<
   }
 
   const digital = ACCESO_CON_QR_DIGITAL.includes(tipoAcceso);
+  // Titular definitivo solo si es para el comprador y ya tiene identidad registrada.
+  const compradorConIdentidad = await tx.identidadUsuario.findUnique({
+    where: { usuarioId: compra.usuarioId },
+    select: { id: true },
+  });
   const creadas: EntradaEmitida[] = [];
   for (const u of unidades) {
-    const titularId = u.paraEmail ? (titulares.get(normalizeEmail(u.paraEmail)) ?? null) : compra.usuarioId;
+    // Terceros: quedan sin titular hasta que acepten la invitación (AsignacionEntrada).
+    // Propias: se asignan al comprador solo si ya registró su identidad.
+    const paraTercero = Boolean(u.paraEmail);
+    const titularId =
+      !paraTercero && compradorConIdentidad ? compra.usuarioId : null;
     const asignar = digital && Boolean(titularId);
     for (let i = 0; i < u.cantidad; i++) {
       const codigo = codigos.get(u.categoriaId)!.shift()!;
@@ -135,6 +142,11 @@ export async function emitirEntradasDeCompra(tx: Tx, compraId: string): Promise<
             categoriaId: u.categoriaId,
             fechaId: u.fechaId,
             titularId,
+            titularEstado: asignar
+              ? TitularAsignacionEstado.ASIGNADA
+              : paraTercero
+                ? TitularAsignacionEstado.INVITACION_PENDIENTE
+                : TitularAsignacionEstado.SIN_ASIGNAR,
             ticketPoolId: codigo.id,
             codigo: codigo.codigo,
             codigoQr: codigo.codigoQr,
@@ -209,6 +221,7 @@ async function verificarCupoPorDia(
     where: {
       categoriaId: { in: [...new Set(lista.map((p) => p.categoriaId))] },
       fechaId: { in: [...new Set(lista.map((p) => p.fechaId))] },
+      estado: { notIn: ENTRADA_INVALIDA },
     },
     _count: { _all: true },
   });
@@ -221,22 +234,6 @@ async function verificarCupoPorDia(
       );
     }
   }
-}
-
-/**
- * Las entradas para terceros (HU-011) quedan a nombre de la cuenta con ese correo, si existe.
- * Si la persona aún no tiene cuenta, la entrada se emite sin titular y no se asigna a ningún perfil.
- */
-async function resolverTitulares(tx: Tx, unidades: Array<{ paraEmail: string | null }>) {
-  const emails = [...new Set(unidades.filter((u) => u.paraEmail).map((u) => normalizeEmail(u.paraEmail!)))];
-  const titulares = new Map<string, string>();
-  if (!emails.length) return titulares;
-  const usuarios = await tx.usuario.findMany({
-    where: { email: { in: emails }, activo: true, eliminadoAt: null },
-    select: { id: true, email: true },
-  });
-  for (const u of usuarios) titulares.set(normalizeEmail(u.email), u.id);
-  return titulares;
 }
 
 /** Toma `cantidad` códigos libres del pool de la categoría y los marca como asignados en el mismo paso. */

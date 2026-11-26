@@ -3,7 +3,8 @@ import PanelSidebar from './PanelSidebar'
 const items = [
   { to: '/admin', label: 'Resumen', end: true },
   { to: '/admin/eventos', label: 'Eventos' },
-  { to: '/admin/solicitudes', label: 'Solicitudes' },
+  { to: '/admin/solicitudes', label: 'Solicitudes de eventos' },
+  { to: '/admin/negocios/solicitudes', label: 'Participación de negocios' },
   { to: '/admin/compras', label: 'Pagos' },
   { to: '/admin/usuarios', label: 'Usuarios' },
   { to: '/admin/accesos', label: 'Accesos' },

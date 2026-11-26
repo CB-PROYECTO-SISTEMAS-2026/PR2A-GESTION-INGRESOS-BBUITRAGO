@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -55,6 +56,7 @@ export class PosController {
   }
 
   @Post('cobros')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   cobrar(@CurrentUser('id') userId: string, @Body() dto: CreateCobroDto) {
     return this.posService.cobrar(userId, dto);
   }
@@ -112,11 +114,16 @@ export class NegocioPanelController {
   }
 
   @Post('retiros')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   solicitarRetiro(
     @CurrentUser('id') userId: string,
     @Body() dto: SolicitarRetiroDto,
   ) {
-    return this.ventasService.solicitarRetiro(userId, dto.negocioId);
+    return this.ventasService.solicitarRetiro(
+      userId,
+      dto.negocioId,
+      dto.idempotencyKey,
+    );
   }
 }
 

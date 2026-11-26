@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" width="240" height="180" fill="none">
+    <g transform="translate(80, 15)">
+    <defs>
+      <!-- Depth Gradients -->
+      <linearGradient id="cA-grad-left" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0A1128" />
+        <stop offset="50%" stop-color="#1E3A8A" />
+        <stop offset="100%" stop-color="#2563EB" />
+      </linearGradient>
+      <linearGradient id="cA-grad-right" x1="100%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#00F2FE" />
+        <stop offset="50%" stop-color="#0284C7" />
+        <stop offset="100%" stop-color="#1D4ED8" />
+      </linearGradient>
+      <linearGradient id="cA-grad-top" x1="0%" y1="50%" x2="100%" y2="50%">
+        <stop offset="0%" stop-color="#38BDF8" />
+        <stop offset="100%" stop-color="#00F2FE" />
+      </linearGradient>
+      <linearGradient id="cA-grad-beam" x1="50%" y1="0%" x2="50%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFFF" />
+        <stop offset="60%" stop-color="#00F2FE" />
+        <stop offset="100%" stop-color="transparent" stop-opacity="0" />
+      </linearGradient>
+      <filter id="cA-glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="4" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+
+    <!-- Isometric Crystal Ticket Gateway Structure (80x80) -->
+    <g id="concept-A-portal">
+      <!-- Ambient Backglow -->
+      <circle cx="40" cy="40" r="28" fill="#00F2FE" opacity="0.15" filter="url(#cA-glow)" />
+
+      <!-- Left Facet: Ascending Ticket Blade with stylized entry aperture -->
+      <path d="M 20 18
+               C 14 18, 10 22, 10 28
+               L 10 38
+               C 15 39.5, 18 43, 18 47
+               C 18 51, 15 54.5, 10 56
+               L 10 66
+               C 10 72, 14 76, 20 76
+               L 34 76
+               L 52 48
+               L 38 26
+               L 20 18 Z"
+            fill="url(#cA-grad-left)" />
+
+      <!-- Right Facet: Descending Laser Beam crossing to form the Portal 'X' -->
+      <path d="M 60 18
+               C 66 18, 70 22, 70 28
+               L 70 38
+               C 65 39.5, 62 43, 62 47
+               C 62 51, 65 54.5, 70 56
+               L 70 66
+               C 70 72, 66 76, 60 76
+               L 46 76
+               L 28 48
+               L 42 26
+               L 60 18 Z"
+            fill="url(#cA-grad-right)" />
+
+      <!-- Center Prismatic Keystone: The Floating Hologram / Stadium Stage Light -->
+      <polygon points="40,24 54,40 40,56 26,40"
+               fill="#0A1128"
+               stroke="url(#cA-grad-top)"
+               stroke-width="3" />
+
+      <!-- Inner Sacred Core: Pulsating Stage Spotlight Laser -->
+      <polygon points="40,31 49,40 40,49 31,40"
+               fill="#00F2FE"
+               filter="url(#cA-glow)" />
+
+      <!-- Inner White Apex -->
+      <circle cx="40" cy="40" r="3.5" fill="#FFFFFF" />
+    </g>
+  </g>
+    <g transform="translate(-10, 105)">
+      <!-- E -->
+      <path d="M 0 10 L 26 10 L 29 17 L 9 17 L 9 29 L 23 29 L 23 35 L 9 35 L 9 47 L 29 47 L 26 54 L 0 54 Z" fill="#FFFFFF" />
+      <!-- V -->
+      <path d="M 34 10 L 44 10 L 53 43 L 62 10 L 72 10 L 58 54 L 48 54 Z" fill="#FFFFFF" />
+      <!-- E -->
+      <path d="M 77 10 L 103 10 L 106 17 L 86 17 L 86 29 L 100 29 L 100 35 L 86 35 L 86 47 L 106 47 L 103 54 L 77 54 Z" fill="#FFFFFF" />
+      <!-- N -->
+      <path d="M 112 10 L 121 10 L 140 40 L 140 10 L 149 10 L 149 54 L 140 54 L 121 24 L 121 54 L 112 54 Z" fill="#FFFFFF" />
+      <!-- T -->
+      <path d="M 154 10 L 186 10 L 183 17 L 174 17 L 174 54 L 165 54 L 165 17 L 157 17 Z" fill="#FFFFFF" />
+      <!-- I -->
+      <g>
+        <polygon points="196,10 203,3 210,10 203,17" fill="#00F2FE" />
+        <rect x="199" y="21" width="8" height="33" rx="1.5" fill="#38BDF8" />
+      </g>
+      <!-- X -->
+      <g>
+        <!-- Back diagonal (Cobalt) -->
+        <path d="M 216 10 L 227 10 L 253 54 L 242 54 Z" fill="#38BDF8" />
+        <!-- Front diagonal with negative gap (Cyan) -->
+        <path d="M 242 10 L 253 10 L 216 54 L 205 54 Z" fill="#00F2FE" />
+        <!-- Glowing intersection diamond -->
+        <polygon points="234.5,29 238.5,32 234.5,35 230.5,32" fill="#FFFFFF" />
+      </g>
+    </g>
+  </svg>

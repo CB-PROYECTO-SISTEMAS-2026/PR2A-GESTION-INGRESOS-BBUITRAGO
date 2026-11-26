@@ -27,7 +27,9 @@ import {
   HistorialAccesoQuery,
   RechazoAccesoDto,
   RegistroAccesoDto,
+  VerificarDocumentoDto,
 } from './dto/acceso.dto';
+import { Throttle } from '@nestjs/throttler';
 
 type AuthUser = { id: string; roles: Role[] };
 
@@ -54,8 +56,20 @@ export class AccesoController {
     return this.accesoService.verificar(user, dto);
   }
 
+  /** Comprueba los últimos 4 caracteres del documento sin registrar el ingreso. */
+  @Post('verificar-documento')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  verificarDocumento(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VerificarDocumentoDto,
+  ) {
+    return this.accesoService.verificarDocumento(user, dto);
+  }
+
   @Post('registrar')
   @UseInterceptors(FileInterceptor('foto', memoryUpload))
+  @Throttle({ default: { limit: 40, ttl: 60_000 } })
   registrar(
     @CurrentUser() user: AuthUser,
     @Body() dto: RegistroAccesoDto,

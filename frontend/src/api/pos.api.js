@@ -12,7 +12,11 @@ export const getVentasNegocio = (params) => api.get('/negocio-panel/ventas', { p
 export const exportarVentas = (params) =>
   api.get('/negocio-panel/ventas/export', { params, responseType: 'blob' })
 export const getLiquidacion = (params) => api.get('/negocio-panel/liquidacion', { params })
-export const solicitarRetiro = (negocioId) => api.post('/negocio-panel/retiros', { negocioId })
+export const solicitarRetiro = (negocioId, idempotencyKey) =>
+  api.post('/negocio-panel/retiros', {
+    negocioId,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
+  })
 
 // Retiros de los negocios (administrador)
 export const getRetirosAdmin = (params) => api.get('/admin/retiros', { params })

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eventix — Showcase de Identidad Visual</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    .font-display { font-family: 'Outfit', sans-serif; }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 sm:p-8">
+
+  <div class="max-w-6xl mx-auto space-y-10">
+
+    <!-- HERO HEADER -->
+    <header class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-slate-800">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-3">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+          Identidad Visual Oficial 2.0
+        </div>
+        <h1 class="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+          EVENTIX <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-cyan-300">— Brand System</span>
+        </h1>
+        <p class="text-slate-400 text-sm sm:text-base mt-2 max-w-2xl">
+          Rediseño integral de identidad corporativa. Construido sobre principios de geometría euclidiana, semiótica de eventos en vivo y máxima versatilidad digital y física.
+        </p>
+      </div>
+
+      <!-- CONTROLES GLOBALES -->
+      <div class="flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-xl p-1.5 self-stretch md:self-auto justify-center">
+        <button id="btn-theme-dark" onclick="setTheme('dark')" class="px-4 py-2 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-lg">
+          Fondo Oscuro (App)
+        </button>
+        <button id="btn-theme-light" onclick="setTheme('light')" class="px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+          Fondo Claro (Editorial)
+        </button>
+      </div>
+    </header>
+
+    <!-- LOGO MASTER DISPLAY STAGE -->
+    <section class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="font-display text-xl font-bold text-white flex items-center gap-2">
+          <span>01.</span> Logotipo Maestro (Versión Horizontal)
+        </h2>
+        <span class="text-xs text-slate-500 font-mono-code">320 × 80 px (Escalable SVG)</span>
+      </div>
+
+      <div id="master-stage" class="relative rounded-2xl border border-slate-800 bg-[#0B132B] p-8 sm:p-14 flex flex-col items-center justify-center transition-colors duration-300 min-h-[220px]">
+        <!-- MASTER SVG LOGO -->
+        <div id="master-logo-container" class="w-full max-w-md flex justify-center">
+          <svg viewBox="0 0 320 80" class="w-full h-auto max-h-24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="main-grad-pass" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1D4ED8" />
+                <stop offset="60%" stop-color="#2563EB" />
+                <stop offset="100%" stop-color="#3B82F6" />
+              </linearGradient>
+              <linearGradient id="main-grad-beam" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#2563EB" />
+                <stop offset="55%" stop-color="#0284C7" />
+                <stop offset="100%" stop-color="#00F2FE" />
+              </linearGradient>
+              <filter id="main-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- ISOTIPO -->
+            <g id="master-isotype">
+              <path d="M 19 12 C 13 12, 9 16, 9 22 L 9 33 C 13.5 35, 16 38.5, 16 42 C 16 45.5, 13.5 49, 9 51 L 9 62 C 9 68, 13 72, 19 72 L 33 72 C 37 72, 40.5 69, 43 65.5 L 67 27 C 69 24, 67 20, 63 20 L 50 20 C 46.5 20, 43.5 22, 41.5 25 L 26.5 49 C 25.5 50.5, 23.5 49.5, 23.5 47.5 L 23.5 19 C 23.5 15, 21 12, 19 12 Z" fill="url(#main-grad-pass)" />
+              <path d="M 27 67 C 24 70.5, 27 75, 31.5 75 L 45 75 C 49 75, 52 73, 54.5 69 L 73 37 C 75 33.5, 73.5 29.5, 70 27 L 59 18.5 C 56 16.5, 52 17.5, 50 20.5 L 36.5 43.5 C 35.5 45, 37.5 47, 39 46 L 48.5 31 C 50 28.5, 53 28.5, 55 30 L 61.5 36.5 C 63.5 38.5, 63 41.5, 61 44 L 44.5 71 Z" fill="url(#main-grad-beam)" />
+              <polygon points="43.5,37 51.5,43.5 43.5,50 35.5,43.5" fill="#00F2FE" filter="url(#main-glow)" />
+            </g>
+
+            <!-- WORDMARK -->
+            <g transform="translate(94, 52)">
+              <text id="master-wordmark-text" font-family="'Outfit', sans-serif" font-weight="800" font-size="40" letter-spacing="-0.03em" fill="#FFFFFF">EVENT<tspan id="tspan-i" fill="#38BDF8">I</tspan><tspan id="tspan-x" fill="#00F2FE">X</tspan></text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-blue-600"></span>
+            <span>Corporate Royal (#1D4ED8)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-sky-400"></span>
+            <span>Electric Azure (#38BDF8)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+            <span>Cyber Cyan (#00F2FE)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE VARIANTS MATRIX -->
+    <section class="space-y-4">
+      <h2 class="font-display text-xl font-bold text-white flex items-center gap-2">
+        <span>02.</span> Variantes del Sistema de Identidad
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <!-- VAR 1: ISOTIPO COLOR -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col items-center text-center">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4">Isotipo Solo (Color)</span>
+          <div class="h-28 flex items-center justify-center">
+            <svg viewBox="0 0 84 84" class="w-20 h-20" fill="none">
+              <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+              <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+              <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+            </svg>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">Para avatares, favicon, estampados de pulseras RFID y sellos de agua.</p>
+        </div>
+
+        <!-- VAR 2: APP ICON (SQUIRCLE) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col items-center text-center">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4">Icono de App Móvil</span>
+          <div class="h-28 flex items-center justify-center">
+            <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#0A1128] via-[#0B132B] to-[#111C3D] border border-blue-500/30 shadow-xl flex items-center justify-center">
+              <svg viewBox="0 0 84 84" class="w-14 h-14" fill="none">
+                <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+                <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+                <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+              </svg>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">Icono oficial para apps iOS, Android, PWA e instaladores.</p>
+        </div>
+
+        <!-- VAR 3: VERSIÓN VERTICAL APILADA -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col items-center text-center">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4">Versión Apilada (Vertical)</span>
+          <div class="h-28 flex items-center justify-center">
+            <div class="flex flex-col items-center">
+              <svg viewBox="0 0 84 84" class="w-12 h-12" fill="none">
+                <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+                <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+                <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+              </svg>
+              <span class="font-display font-extrabold text-sm tracking-tight text-white mt-1">EVENT<span class="text-sky-400">I</span><span class="text-cyan-400">X</span></span>
+              <span class="text-[8px] font-semibold tracking-widest text-slate-500 uppercase">TICKETING</span>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">Para banners verticales, tótems de acceso y pantallas de carga.</p>
+        </div>
+
+        <!-- VAR 4: MONOCROMO (1 TINTA) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col items-center text-center">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4">Monocromo (1 Tinta)</span>
+          <div class="h-28 flex items-center justify-center gap-4">
+            <!-- White on dark -->
+            <div class="p-2 rounded bg-slate-800 border border-slate-700">
+              <svg viewBox="0 0 84 84" class="w-9 h-9" fill="#FFFFFF">
+                <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" />
+                <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" />
+              </svg>
+            </div>
+            <!-- Black on white -->
+            <div class="p-2 rounded bg-white">
+              <svg viewBox="0 0 84 84" class="w-9 h-9" fill="#0F172A">
+                <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" />
+                <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" />
+              </svg>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-3">Para impresoras térmicas POS, sellos oficiales y troqueles.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ESCALABILIDAD ÓPTICA (SCALE LAB) -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="font-display text-xl font-bold text-white flex items-center gap-2">
+          <span>03.</span> Laboratorio de Escalabilidad Óptica (16px a 256px)
+        </h2>
+        <span class="text-xs text-slate-400 font-mono-code">Fidelidad Vectorial Garantizada</span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 items-end justify-items-center py-6 border-y border-slate-800">
+
+        <!-- 16px -->
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+            <svg viewBox="0 0 84 84" class="w-4 h-4" fill="none">
+              <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="#2563EB" />
+              <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-mono-code text-slate-400">16 px (Favicon)</span>
+        </div>
+
+        <!-- 24px -->
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center">
+            <svg viewBox="0 0 84 84" class="w-6 h-6" fill="none">
+              <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+              <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+              <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-mono-code text-slate-400">24 px (Móvil)</span>
+        </div>
+
+        <!-- 32px -->
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-14 h-14 rounded-lg bg-slate-800 flex items-center justify-center">
+            <svg viewBox="0 0 84 84" class="w-8 h-8" fill="none">
+              <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+              <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+              <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-mono-code text-slate-400">32 px (Navbar)</span>
+        </div>
+
+        <!-- 48px -->
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-16 h-16 rounded-lg bg-slate-800 flex items-center justify-center">
+            <svg viewBox="0 0 84 84" class="w-12 h-12" fill="none">
+              <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+              <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+              <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-mono-code text-slate-400">48 px (Header)</span>
+        </div>
+
+        <!-- 64px -->
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-20 h-20 rounded-lg bg-slate-800 flex items-center justify-center">
+            <svg viewBox="0 0 84 84" class="w-16 h-16" fill="none">
+              <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+              <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+              <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-mono-code text-slate-400">64 px (Icono)</span>
+        </div>
+
+        <!-- 128px -->
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-24 h-24 rounded-lg bg-slate-800 flex items-center justify-center">
+            <svg viewBox="0 0 84 84" class="w-20 h-20" fill="none">
+              <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+              <path d="M 29 69 C 26 72.5, 29 77, 33.5 77 L 47 77 C 51 77, 54 75, 56.5 71 L 75 39 C 77 35.5, 75.5 31.5, 72 29 L 61 20.5 C 58 18.5, 54 19.5, 52 22.5 L 38.5 45.5 C 37.5 47, 39.5 49, 41 48 L 50.5 33 C 52 30.5, 55 30.5, 57 32 L 63.5 38.5 C 65.5 40.5, 65 43.5, 63 46 L 46.5 73 Z" fill="url(#main-grad-beam)" />
+              <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+            </svg>
+          </div>
+          <span class="text-[11px] font-mono-code text-slate-400">128 px (Splash)</span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- REAL-WORLD MOCKUPS SECTION -->
+    <section class="space-y-4">
+      <h2 class="font-display text-xl font-bold text-white flex items-center gap-2">
+        <span>04.</span> Aplicaciones en el Mundo Real (Mockups de Producto)
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- MOCKUP 1: TICKET VIP CON QR -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+          <div class="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-3">
+            <span class="font-semibold uppercase tracking-wider text-blue-400">Boleto Digital & Credencial VIP</span>
+            <span class="font-mono-code">ENTRADA #EV-88492</span>
+          </div>
+
+          <!-- Ticket Card Container -->
+          <div class="bg-gradient-to-br from-[#0B132B] via-[#0F172A] to-[#1E293B] rounded-xl p-5 border border-blue-500/30 relative overflow-hidden shadow-2xl">
+            <!-- Background light flare -->
+            <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div class="flex items-center justify-between">
+              <!-- Eventix Logo Small -->
+              <div class="flex items-center gap-2">
+                <svg viewBox="0 0 84 84" class="w-7 h-7" fill="none">
+                  <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+                  <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+                </svg>
+                <span class="font-display font-extrabold text-base tracking-tight text-white">EVENT<span class="text-sky-400">I</span><span class="text-cyan-400">X</span></span>
+              </div>
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold tracking-widest bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase">
+                ACCESO VÁLIDO
+              </span>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
+              <div>
+                <p class="text-xs text-slate-400">Evento</p>
+                <h3 class="font-display font-bold text-lg text-white">Illimani Electronic Fest 2026</h3>
+                <p class="text-xs text-slate-300 mt-1">Zona VIP Lounge • Sector A • Puerta 3</p>
+              </div>
+              <!-- Simulated QR Code -->
+              <div class="bg-white p-2 rounded-lg shrink-0 shadow-md">
+                <div class="w-16 h-16 bg-slate-900 grid grid-cols-4 gap-1 p-1">
+                  <div class="bg-white col-span-2 row-span-2"></div>
+                  <div class="bg-white col-span-1"></div>
+                  <div class="bg-white col-span-1"></div>
+                  <div class="bg-white col-span-2 row-span-2 col-start-3 row-start-3"></div>
+                  <div class="bg-cyan-400 col-span-1"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-dashed border-slate-700/60 flex justify-between text-[11px] text-slate-400">
+              <span>Titular: Mateo Siles V.</span>
+              <span>Saldo Manilla: <strong>Bs. 250.00</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- MOCKUP 2: MANILLA CASHLESS RFID -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+          <div class="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-3">
+            <span class="font-semibold uppercase tracking-wider text-cyan-400">Manilla Inteligente RFID Cashless</span>
+            <span class="font-mono-code">NFC 13.56 MHz</span>
+          </div>
+
+          <!-- Wristband Graphic -->
+          <div class="h-44 flex flex-col justify-center items-center relative overflow-hidden bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-xl border border-slate-800 p-4">
+            <!-- Simulated Fabric Band -->
+            <div class="w-full h-12 bg-gradient-to-r from-blue-900 via-blue-950 to-blue-900 border-y border-blue-500/30 flex items-center justify-between px-6 shadow-lg relative">
+              <span class="text-[10px] font-mono-code tracking-widest text-blue-400/50">EVENTIX SECURE PAY</span>
+              <span class="text-[10px] font-mono-code tracking-widest text-blue-400/50">CASHLESS WALLET</span>
+
+              <!-- Central RFID Chip Token -->
+              <div class="absolute left-1/2 -translate-x-1/2 w-16 h-16 rounded-xl bg-[#0B132B] border-2 border-cyan-400 shadow-[0_0_20px_rgba(0,242,254,0.3)] flex flex-col items-center justify-center">
+                <svg viewBox="0 0 84 84" class="w-8 h-8" fill="none">
+                  <path d="M 21 14 C 15 14, 11 18, 11 24 L 11 35 C 15.5 37, 18 40.5, 18 44 C 18 47.5, 15.5 51, 11 53 L 11 64 C 11 70, 15 74, 21 74 L 35 74 C 39 74, 42.5 71, 45 67.5 L 69 29 C 71 26, 69 22, 65 22 L 52 22 C 48.5 22, 45.5 24, 43.5 27 L 28.5 51 C 27.5 52.5, 25.5 51.5, 25.5 49.5 L 25.5 21 C 25.5 17, 23 14, 21 14 Z" fill="url(#main-grad-pass)" />
+                  <polygon points="45.5,39 53.5,45.5 45.5,52 37.5,45.5" fill="#00F2FE" />
+                </svg>
+                <span class="text-[7px] font-bold text-cyan-300 font-mono-code tracking-tighter mt-0.5">TAP TO PAY</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-4 text-center">Fidelidad nítida incluso estampada en micro-inyección de silicona o serigrafía textil.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- GUÍA DE ENTREGABLES Y RUTAS -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="font-display text-xl font-bold text-white flex items-center gap-2">
+        <span>05.</span> Suite Completa de Archivos Entregables en el Repositorio
+      </h2>
+      <p class="text-sm text-slate-400">
+        Todos los archivos fueron creados y sincronizados en las carpetas oficiales del proyecto:
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs font-mono-code pt-2">
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+          <p class="text-blue-400 font-bold mb-1">SVG Vectorial Primario:</p>
+          <p class="text-slate-300 break-all">brand/eventix-logo-horizontal-dark.svg</p>
+          <span class="text-[10px] text-slate-500">Navbar, Header, Banners</span>
+        </div>
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+          <p class="text-blue-400 font-bold mb-1">SVG Versión Clara:</p>
+          <p class="text-slate-300 break-all">brand/eventix-logo-horizontal-light.svg</p>
+          <span class="text-[10px] text-slate-500">Papelería, facturas, PDF</span>
+        </div>
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+          <p class="text-blue-400 font-bold mb-1">SVG Versión Apilada:</p>
+          <p class="text-slate-300 break-all">brand/eventix-logo-vertical-dark.svg</p>
+          <span class="text-[10px] text-slate-500">Pósters, cartelería, splash</span>
+        </div>
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+          <p class="text-cyan-400 font-bold mb-1">Isotipo Solo (Color):</p>
+          <p class="text-slate-300 break-all">brand/eventix-symbol-color.svg</p>
+          <span class="text-[10px] text-slate-500">Favicon, avatares, chips RFID</span>
+        </div>
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+          <p class="text-cyan-400 font-bold mb-1">App Icon 512x512:</p>
+          <p class="text-slate-300 break-all">brand/app-icon-512x512.png</p>
+          <span class="text-[10px] text-slate-500">Icono nativo iOS / Android / PWA</span>
+        </div>
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+          <p class="text-cyan-400 font-bold mb-1">Favicons Navegador:</p>
+          <p class="text-slate-300 break-all">brand/favicon-32x32.png (y 48/192)</p>
+          <span class="text-[10px] text-slate-500">Pestaña web y accesos directos</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function setTheme(mode) {
+      const stage = document.getElementById('master-stage');
+      const text = document.getElementById('master-wordmark-text');
+      const tspanI = document.getElementById('tspan-i');
+      const tspanX = document.getElementById('tspan-x');
+      const btnDark = document.getElementById('btn-theme-dark');
+      const btnLight = document.getElementById('btn-theme-light');
+
+      if (mode === 'light') {
+        stage.style.backgroundColor = '#FFFFFF';
+        stage.style.borderColor = '#CBD5E1';
+        text.setAttribute('fill', '#0F172A');
+        tspanI.setAttribute('fill', '#1D4ED8');
+        tspanX.setAttribute('fill', '#0284C7');
+
+        btnLight.className = 'px-4 py-2 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-lg';
+        btnDark.className = 'px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+      } else {
+        stage.style.backgroundColor = '#0B132B';
+        stage.style.borderColor = '#1E293B';
+        text.setAttribute('fill', '#FFFFFF');
+        tspanI.setAttribute('fill', '#38BDF8');
+        tspanX.setAttribute('fill', '#00F2FE');
+
+        btnDark.className = 'px-4 py-2 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-lg';
+        btnLight.className = 'px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+      }
+    }
+  </script>
+</body>
+</html>
