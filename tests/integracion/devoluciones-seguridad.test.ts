@@ -240,6 +240,26 @@ describe('Flujo completo por HTTP', () => {
     });
     expect(registradas).toBe(1);
   });
+
+  it('al escanear otra entrada suya sin ingreso propio, usa la foto que tenga en el evento', async () => {
+    // La foto quedó en la entrada de la manilla (prueba anterior); el QR es de otra entrada suya.
+    await setSaldo(api.prisma, esc, 60);
+    const consulta = await api.pedir(
+      'GET',
+      `/api/devoluciones/clientes?eventoId=${esc.eventos.abierto}&codigo=${esc.codigos.qr}`,
+      { token: tokens.devoluciones },
+    );
+    expect(consulta.status).toBe(200);
+    expect(consulta.body).toMatchObject({ puedeDevolver: true, montoDevolvible: '60.00' });
+    expect(consulta.body.fotoIngreso?.url).toBe('https://example.invalid/ingreso.jpg');
+
+    const r = await api.pedir('POST', '/api/devoluciones', {
+      token: tokens.devoluciones,
+      body: cuerpoDevolucion(60, { codigo: esc.codigos.qr }),
+    });
+    expect(r.status).toBe(201);
+    expect(await getSaldo(api.prisma, esc)).toBe('0.00');
+  });
 });
 
 it('reembolsa una entrada sin usar una sola vez y desactiva su QR al aprobar', async () => {

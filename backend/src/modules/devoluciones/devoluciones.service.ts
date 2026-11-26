@@ -22,6 +22,7 @@ import {
   nombreCompleto,
 } from '../pos/pos-helpers';
 import { CodigoClienteService } from '../saldo/codigo-cliente.service';
+import { fotoPrimerIngreso } from '../saldo/foto-ingreso';
 import { plazoRetiroEvento, type PlazoRetiro } from '../saldo/plazo-retiro';
 import { estadoTemporal } from '../saldo/saldo-helpers';
 import {
@@ -153,7 +154,12 @@ export class DevolucionesService {
         where: { id: cliente.usuarioId },
         select: { documento: true },
       }),
-      this.fotoIngreso(cliente.usuarioId, dto.eventoId, cliente.entradaId),
+      fotoPrimerIngreso(
+        this.prisma,
+        cliente.usuarioId,
+        dto.eventoId,
+        cliente.entradaId,
+      ),
       this.prisma.transaccionSaldo.findFirst({
         where: {
           usuarioId: cliente.usuarioId,
@@ -315,31 +321,6 @@ export class DevolucionesService {
       saldoAnterior: money(monto),
       saldoResultante: money(0),
     };
-  }
-
-  /**
-   * Foto del primer ingreso del cliente al evento. Se prefiere la de la entrada escaneada; si con
-   * esa entrada nunca ingresó (evento de varios días), se usa la de otra entrada suya del evento.
-   */
-  private async fotoIngreso(
-    usuarioId: string,
-    eventoId: string,
-    entradaId: string,
-  ) {
-    const fotos = await this.prisma.accesoEvento.findMany({
-      where: {
-        eventoId,
-        fotoIngresoUrl: { not: null },
-        entrada: { titularId: usuarioId },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: 20,
-      select: { entradaId: true, fotoIngresoUrl: true, createdAt: true },
-    });
-    const foto = fotos.find((f) => f.entradaId === entradaId) ?? fotos[0];
-    return foto
-      ? { url: foto.fotoIngresoUrl!, tomadaAt: foto.createdAt }
-      : null;
   }
 
   /**

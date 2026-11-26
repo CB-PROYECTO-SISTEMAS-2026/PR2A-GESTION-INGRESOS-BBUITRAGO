@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CodigoClienteService } from '../saldo/codigo-cliente.service';
+import { fotoPrimerIngreso } from '../saldo/foto-ingreso';
 import { StorageService } from '../../common/storage/storage.service';
 
 @Injectable()
@@ -34,17 +35,13 @@ export class IdentidadService {
   async consultar(operadorId: string, eventoId: string, codigo: string) {
     await this.asignacion(operadorId, eventoId);
     const cliente = await this.codigos.resolver(eventoId, codigo);
-    const [foto, movimientos] = await Promise.all([
-      this.db.accesoEvento.findFirst({
-        where: {
-          eventoId,
-          entradaId: cliente.entradaId,
-          tipo: 'INGRESO',
-          fotoIngresoUrl: { not: null },
-        },
-        orderBy: { createdAt: 'asc' },
-        select: { fotoIngresoUrl: true, createdAt: true },
-      }),
+    const [fotoIngreso, movimientos] = await Promise.all([
+      fotoPrimerIngreso(
+        this.db,
+        cliente.usuarioId,
+        eventoId,
+        cliente.entradaId,
+      ),
       this.db.transaccionSaldo.findMany({
         where: { eventoId, usuarioId: cliente.usuarioId },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -55,9 +52,7 @@ export class IdentidadService {
     return {
       usuarioId: cliente.usuarioId,
       nombre: cliente.nombre,
-      fotoIngreso: foto?.fotoIngresoUrl
-        ? { url: foto.fotoIngresoUrl, tomadaAt: foto.createdAt }
-        : null,
+      fotoIngreso,
       movimientos,
     };
   }
