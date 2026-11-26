@@ -475,7 +475,7 @@ describe('HU-020 · Historiales', () => {
 
   it('el cliente ve sus movimientos del evento con el signo correcto, del más reciente al más antiguo', async () => {
     const m = await movimientos.misMovimientos(esc.usuarios.cliente, { eventoId: esc.eventos.abierto });
-    expect(m.evento.id).toBe(esc.eventos.abierto);
+    expect(m.evento?.id).toBe(esc.eventos.abierto);
     const fechas = m.movimientos.map((x) => new Date(x.fecha).getTime());
     expect(fechas).toEqual([...fechas].sort((a, b) => b - a));
     for (const x of m.movimientos) {
@@ -498,6 +498,19 @@ describe('HU-020 · Historiales', () => {
     const m = await movimientos.misMovimientos(esc.usuarios.cliente2, { eventoId: esc.eventos.abierto });
     const propios = await transaccionesDe(esc.usuarios.cliente2);
     expect(m.movimientos.map((x) => x.id).sort()).toEqual(propios.map((t) => t.id).sort());
+  });
+
+  it('HU-038: sin evento, el cliente ve todos sus movimientos con el evento de cada uno', async () => {
+    const m = await movimientos.misMovimientos(esc.usuarios.cliente, {});
+    expect(m.evento).toBeNull();
+    expect(m.saldo).toBeNull();
+    const propios = await prisma.transaccionSaldo.findMany({ where: { usuarioId: esc.usuarios.cliente } });
+    expect(m.cantidad).toBe(propios.length);
+    expect(m.movimientos.map((x) => x.id).sort()).toEqual(propios.map((t) => t.id).sort());
+    for (const x of m.movimientos) {
+      expect(x.evento.id).toBe(propios.find((t) => t.id === x.id)!.eventoId);
+      expect(x.evento.titulo).toContain(esc.sufijo.toUpperCase());
+    }
   });
 
   it('el organizador del evento y el administrador ven los movimientos del evento; otro organizador no', async () => {

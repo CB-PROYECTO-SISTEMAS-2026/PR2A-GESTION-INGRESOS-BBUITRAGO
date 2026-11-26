@@ -28,7 +28,18 @@ export class HistorialPorEventoDto {
   eventoId: string;
 }
 
-export class MisMovimientosDto extends HistorialPorEventoDto {
+/** HU-038: sin `eventoId` se listan los movimientos de todos los eventos del cliente. */
+export class MisMovimientosDto {
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @IsString()
+  eventoId?: string;
+
+  @IsOptional()
+  @Transform(toStrictInt)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Transform(emptyToUndefined)

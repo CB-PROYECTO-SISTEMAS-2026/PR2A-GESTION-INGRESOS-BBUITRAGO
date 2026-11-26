@@ -25,6 +25,13 @@ export function montoConSigno(monto, formatBs) {
   return `${n < 0 ? '−' : '+'}${formatBs(Math.abs(n))}`
 }
 
+/** Plazo para pedir la devolución del saldo que sobró (30 días desde el fin del evento). */
+export function plazoTexto(plazo, formatDay) {
+  if (!plazo) return 'Evento finalizado con saldo pendiente'
+  if (plazo.vencido) return `El plazo para retirar este saldo venció el ${formatDay(plazo.fechaLimite)}`
+  return `Puedes pedir la devolución de este saldo hasta el ${formatDay(plazo.fechaLimite)}`
+}
+
 /** Momento del evento para las tarjetas de saldo del cliente. */
 export const MOMENTO_EVENTO = {
   EN_CURSO: { label: 'En curso', badge: 'bg-emerald-50 text-emerald-700' },

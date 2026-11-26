@@ -2,15 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { Paginas } from '../sprint3/comun'
 import { Link, useSearchParams } from 'react-router-dom'
 import { getMisMovimientos, getMisSaldos } from '../../api/recargas.api'
-import { formatBs, formatDateTime, formatTime, getErrorMessage } from '../../utils/format'
+import { formatBs, formatDateTime, formatDay, formatTime, getErrorMessage } from '../../utils/format'
 import {
   TIPOS_MOVIMIENTO,
   estadoMovimientoBadge,
   estadoMovimientoLabel,
   montoConSigno,
+  plazoTexto,
 } from '../../utils/movimientos'
 
-/** HU-020 (cliente): historial de transacciones del saldo de un evento (Figma: Historial de Transacciones). */
+/**
+ * HU-020 / HU-038 (cliente): historial de transacciones de todos los eventos o de uno solo
+ * (Figma: Historial de Transacciones).
+ */
 export default function MovimientosPage() {
   const [params, setParams] = useSearchParams()
   const eventoId = params.get('evento') || ''
@@ -35,21 +39,14 @@ export default function MovimientosPage() {
 
   useEffect(() => {
     getMisSaldos()
-      .then(({ data }) => {
-        setEventos(data.saldos)
-        // Sin evento en la URL se muestra el primero (el que está en curso o el más próximo).
-        if (!eventoId && data.saldos[0]) setFiltro('evento', data.saldos[0].eventoId)
-      })
+      .then(({ data }) => setEventos(data.saldos))
       .catch((err) => setError(getErrorMessage(err)))
-    // Solo al abrir la pantalla.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    if (!eventoId) return
     const peticion = ++ultimaPeticion.current
     setData(null)
-    getMisMovimientos({ eventoId, page, tipo: tipo || undefined })
+    getMisMovimientos({ eventoId: eventoId || undefined, page, tipo: tipo || undefined })
       .then(({ data }) => {
         if (peticion !== ultimaPeticion.current) return
         setData(data)
@@ -58,7 +55,9 @@ export default function MovimientosPage() {
       .catch((err) => peticion === ultimaPeticion.current && setError(getErrorMessage(err)))
   }, [eventoId, tipo,page])
 
-  const vigente = data && data.evento.id === eventoId ? data : null
+  const vigente = data && (data.evento?.id ?? '') === eventoId ? data : null
+  const saldoElegido = eventos?.find((e) => e.eventoId === eventoId)
+  const pendientes = eventos?.filter((e) => Number(e.saldo) > 0) ?? []
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-10">
@@ -67,7 +66,7 @@ export default function MovimientosPage() {
           ← Volver a mi manilla
         </Link>
         <h1 className="mt-2 font-display text-3xl font-bold text-ink">Historial de Transacciones</h1>
-        <p className="text-sm text-muted">Consulta recargas, consumos, devoluciones y ajustes del evento seleccionado</p>
+        <p className="text-sm text-muted">Consulta recargas, consumos, devoluciones y ajustes de tus eventos</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -76,9 +75,9 @@ export default function MovimientosPage() {
             <p className="label">Evento</p>
             {eventos ? (
               <div className="mt-2 grid gap-1">
-                {eventos.map((e) => (
+                {[{ eventoId: '', titulo: 'Todos los eventos' }, ...eventos].map((e) => (
                   <button
-                    key={e.eventoId}
+                    key={e.eventoId || 'todos'}
                     type="button"
                     onClick={() => setFiltro('evento', e.eventoId)}
                     aria-pressed={e.eventoId === eventoId}
@@ -95,16 +94,42 @@ export default function MovimientosPage() {
               <p className="mt-2 text-sm text-muted">Cargando…</p>
             )}
           </div>
-          {vigente && (
+          {vigente?.evento && (
             <div className="card-surface p-4">
               <p className="text-xs text-muted">Saldo de {vigente.evento.titulo}</p>
               <p className="font-display text-3xl font-bold text-teal-dark">{formatBs(vigente.saldo)}</p>
               {vigente.actualizado && (
                 <p className="mt-1 text-xs text-muted">Última actualización: {formatDateTime(vigente.actualizado)}</p>
               )}
+              {Number(vigente.saldo) > 0 && saldoElegido?.plazoRetiro && (
+                <p className="mt-2 text-xs font-medium">{plazoTexto(saldoElegido.plazoRetiro, formatDay)}</p>
+              )}
               <p className="mt-3 rounded-md bg-page p-3 text-xs text-muted">
                 Los movimientos y el saldo corresponden solo al evento seleccionado. No se combinan ni transfieren entre
                 eventos.
+              </p>
+            </div>
+          )}
+          {!eventoId && eventos && (
+            <div className="card-surface p-4">
+              <p className="text-sm font-semibold">Saldos pendientes de retiro</p>
+              {pendientes.length ? (
+                <ul className="mt-2 divide-y divide-border">
+                  {pendientes.map((e) => (
+                    <li key={e.eventoId} className="py-2">
+                      <div className="flex justify-between gap-2 text-sm">
+                        <span className="min-w-0 truncate">{e.titulo}</span>
+                        <span className="shrink-0 font-semibold text-teal-dark">{formatBs(e.saldo)}</span>
+                      </div>
+                      {e.plazoRetiro && <p className="text-xs text-muted">{plazoTexto(e.plazoRetiro, formatDay)}</p>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted">No tienes saldo pendiente.</p>
+              )}
+              <p className="mt-3 rounded-md bg-page p-3 text-xs text-muted">
+                Cada saldo pertenece solo a su evento. No se combinan ni transfieren entre eventos.
               </p>
             </div>
           )}
@@ -152,6 +177,7 @@ export default function MovimientosPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{m.operacion}</p>
                         <p className="text-xs text-muted">{m.codigo}</p>
+                        {!eventoId && <p className="truncate text-xs font-medium text-teal-dark">{m.evento.titulo}</p>}
                       </div>
                       <div className="w-28 text-right">
                         <p
@@ -173,7 +199,7 @@ export default function MovimientosPage() {
               </ul>
             </>
           )}
-          {!vigente && !error && eventoId && <p className="mt-6 text-sm text-muted">Cargando…</p>}
+          {!vigente && !error && <p className="mt-6 text-sm text-muted">Cargando…</p>}
         </section>
       </div>
     </div>

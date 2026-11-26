@@ -184,10 +184,11 @@ describe('AnularRecargaDto (POST /api/admin/recargas/:id/anular)', () => {
 });
 
 describe('Filtros de historiales', () => {
-  it('MisMovimientosDto exige el evento y acepta solo tipos existentes', async () => {
+  it('MisMovimientosDto tiene el evento opcional y acepta solo tipos existentes', async () => {
     expect(await errores({ eventoId: 'e1', tipo: 'RECARGA' }, MisMovimientosDto, 'query')).toEqual([]);
     expect(await errores({ eventoId: 'e1', tipo: '' }, MisMovimientosDto, 'query')).toEqual([]);
-    expect(await errores({ tipo: 'RECARGA' }, MisMovimientosDto, 'query')).toEqual(['Selecciona un evento.']);
+    expect(await errores({ tipo: 'RECARGA' }, MisMovimientosDto, 'query')).toEqual([]);
+    expect(await errores({ eventoId: '', page: '2' }, MisMovimientosDto, 'query')).toEqual([]);
     expect(await errores({ eventoId: 'e1', tipo: 'REGALO' }, MisMovimientosDto, 'query')).toEqual([
       'Tipo de movimiento no válido.',
     ]);

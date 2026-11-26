@@ -186,41 +186,56 @@ export class MovimientosService {
     return { saldos };
   }
 
-  /** Historial del cliente en un evento, del más reciente al más antiguo. */
+  /**
+   * HU-038: historial del cliente, del más reciente al más antiguo. Con `eventoId` es el de ese
+   * evento y su saldo; sin él, reúne todos sus eventos y cada movimiento indica a cuál
+   * pertenece. En ese caso no hay un saldo total: cada evento tiene el suyo.
+   */
   async misMovimientos(usuarioId: string, dto: MisMovimientosDto) {
+    const { eventoId } = dto;
     const where: Prisma.TransaccionSaldoWhereInput = {
       usuarioId,
-      eventoId: dto.eventoId,
+      ...(eventoId ? { eventoId } : {}),
       ...(dto.tipo ? { tipo: dto.tipo } : {}),
     };
     const [evento, saldo, movimientos, cantidad] = await Promise.all([
-      this.prisma.evento.findUnique({
-        where: { id: dto.eventoId },
-        select: { id: true, titulo: true },
-      }),
-      this.prisma.saldoEvento.findUnique({
-        where: { usuarioId_eventoId: { usuarioId, eventoId: dto.eventoId } },
-        select: { saldo: true, updatedAt: true },
-      }),
+      eventoId
+        ? this.prisma.evento.findUnique({
+            where: { id: eventoId },
+            select: { id: true, titulo: true },
+          })
+        : null,
+      eventoId
+        ? this.prisma.saldoEvento.findUnique({
+            where: { usuarioId_eventoId: { usuarioId, eventoId } },
+            select: { saldo: true, updatedAt: true },
+          })
+        : null,
       this.prisma.transaccionSaldo.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: ((dto.page ?? 1) - 1) * MIS_MOVIMIENTOS_LIMIT,
         take: MIS_MOVIMIENTOS_LIMIT,
-        select: MOVIMIENTO_SELECT,
+        select: {
+          ...MOVIMIENTO_SELECT,
+          evento: { select: { id: true, titulo: true } },
+        },
       }),
       this.prisma.transaccionSaldo.count({ where }),
     ]);
-    if (!evento) throw new NotFoundException('Evento no encontrado');
+    if (eventoId && !evento) throw new NotFoundException('Evento no encontrado');
 
     return {
       evento,
-      saldo: money(saldo?.saldo),
+      saldo: eventoId ? money(saldo?.saldo) : null,
       actualizado: saldo?.updatedAt ?? null,
       cantidad,
       page: dto.page ?? 1,
       pageSize: MIS_MOVIMIENTOS_LIMIT,
-      movimientos: movimientos.map(toMovimiento),
+      movimientos: movimientos.map((m) => ({
+        ...toMovimiento(m),
+        evento: m.evento,
+      })),
     };
   }
 

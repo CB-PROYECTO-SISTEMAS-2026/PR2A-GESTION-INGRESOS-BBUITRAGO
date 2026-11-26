@@ -4,14 +4,7 @@ import { getMisSaldos } from '../../api/recargas.api'
 import { IconWallet } from '../../components/ui/icons'
 import { useAuth } from '../../context/AuthContext'
 import { formatBs, formatDateTime, formatDay, formatDayRange, getErrorMessage } from '../../utils/format'
-import { MOMENTO_EVENTO } from '../../utils/movimientos'
-
-/** Plazo para pedir la devolución del saldo que sobró (30 días desde el fin del evento). */
-function plazoTexto(plazo) {
-  if (!plazo) return 'Evento finalizado con saldo pendiente'
-  if (plazo.vencido) return `El plazo para retirar este saldo venció el ${formatDay(plazo.fechaLimite)}`
-  return `Puedes pedir la devolución de este saldo hasta el ${formatDay(plazo.fechaLimite)}`
-}
+import { MOMENTO_EVENTO, plazoTexto } from '../../utils/movimientos'
 
 /**
  * HU-020 (cliente): saldo en cada evento (Figma: Mi Manilla → Mis saldos). Cada saldo pertenece
@@ -45,7 +38,12 @@ export default function MiManillaPage() {
       </div>
 
       <section className="card-surface p-6">
-        <h2 className="font-display text-xl font-bold">Mis saldos</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-xl font-bold">Mis saldos</h2>
+          <Link to="/mi-manilla/movimientos" className="text-sm font-semibold text-teal-dark hover:underline">
+            Ver todos mis movimientos
+          </Link>
+        </div>
         <p className="mt-1 text-sm text-muted">
           Cada saldo pertenece exclusivamente a su evento y no se puede combinar, transferir ni usar en otros eventos.
           Recarga en los puntos de recarga del evento mostrando tu manilla o tu entrada digital.
@@ -83,7 +81,7 @@ export default function MiManillaPage() {
                     <span className="min-w-0">
                       {s.momento === 'FINALIZADO'
                         ? Number(s.saldo) > 0
-                          ? plazoTexto(s.plazoRetiro)
+                          ? plazoTexto(s.plazoRetiro, formatDay)
                           : 'Sin saldo pendiente'
                         : 'Saldo disponible solo dentro de este evento'}
                       {s.actualizado && ` · Actualizado ${formatDateTime(s.actualizado)}`}
