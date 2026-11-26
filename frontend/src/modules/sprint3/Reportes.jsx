@@ -75,6 +75,17 @@ function Incidencias({ ruta, admin }) {
   )
 }
 
+/** Tabla con posiciones; las filas ya llegan ordenadas de mayor a menor monto. */
+function Ranking({ titulo, quien, filas }) {
+  return (
+    <Tabla
+      titulo={titulo}
+      columnas={['#', quien, 'Operaciones', 'Total']}
+      filas={filas.map((f, i) => [i + 1, f.nombre, f.cantidad, formatBs(f.total)])}
+    />
+  )
+}
+
 export default function Reportes({ admin = false }) {
   const { id } = useParams(),
     ruta = id ? '/reportes/evento/' + id : '/reportes/global'
@@ -144,11 +155,20 @@ export default function Reportes({ admin = false }) {
             columnas={['Tipo', 'Cantidad', 'Total']}
             filas={data.movimientos.map((m) => [tipoMovimientoLabel(m.tipo), m.cantidad, formatBs(m.total)])}
           />
-          <Tabla
-            titulo="Actividad por operador"
-            columnas={['Operador', 'Tipo', 'Operaciones', 'Total']}
-            filas={data.operadores.map((o) => [o.nombre, tipoMovimientoLabel(o.tipo), o.cantidad, formatBs(o.total)])}
-          />
+          <div className="grid gap-5 lg:grid-cols-2">
+            {data.clientes && (
+              <>
+                <Ranking titulo="Clientes que más recargan" quien="Cliente" filas={data.clientes.recargas} />
+                <Ranking titulo="Clientes con más saldo devuelto" quien="Cliente" filas={data.clientes.devoluciones} />
+              </>
+            )}
+            {[
+              ['Recargadores', 'Recargador', 'RECARGA'],
+              ['Encargados de devoluciones', 'Encargado', 'DEVOLUCION'],
+            ].map(([titulo, quien, tipo]) => (
+              <Ranking key={tipo} titulo={titulo} quien={quien} filas={data.operadores.filter((o) => o.tipo === tipo)} />
+            ))}
+          </div>
           <Tabla
             titulo="Saldos pendientes"
             columnas={['Evento', 'Usuarios', 'Saldo', 'Fecha límite']}

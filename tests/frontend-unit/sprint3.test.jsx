@@ -43,6 +43,45 @@ it('conserva la clave cuando el organizador reintenta una incidencia del mismo e
   expect(api.post.mock.calls[0][0]).toBe('/reportes/evento/e1/incidencias')
 })
 
+it('muestra los rankings separados, con posiciones, y los de clientes solo si llegan', async () => {
+  const fila = (nombre, tipo) => ({ operadorId: nombre, nombre, tipo, cantidad: 1, total: 10 })
+  const datos = {
+    cantidadEventos: 1,
+    entradas: { bruto: 0, ingresoNeto: 0, reembolsos: 0, compras: 0 },
+    negocios: { total: 0, ventas: 0 },
+    accesos: {},
+    movimientos: [],
+    saldos: [],
+    operadores: [fila('Rosa', 'RECARGA'), fila('Dario', 'DEVOLUCION'), fila('Raul', 'RECARGA')],
+  }
+  const clientes = { recargas: [{ usuarioId: 'c1', nombre: 'Carla', cantidad: 2, total: 50 }], devoluciones: [] }
+  const filasDe = (titulo) =>
+    [...screen.getByRole('heading', { name: titulo }).parentElement.querySelectorAll('tbody tr')].map((tr) =>
+      [...tr.cells].slice(0, 2).map((td) => td.textContent),
+    )
+
+  api.get.mockResolvedValue({ data: { ...datos, clientes } })
+  const admin = render(
+    <MemoryRouter>
+      <Reportes admin />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('heading', { name: 'Clientes que más recargan' })
+  expect(filasDe('Clientes que más recargan')).toEqual([['1', 'Carla']])
+  expect(filasDe('Recargadores')).toEqual([['1', 'Rosa'], ['2', 'Raul']])
+  expect(filasDe('Encargados de devoluciones')).toEqual([['1', 'Dario']])
+  admin.unmount()
+
+  api.get.mockResolvedValue({ data: datos })
+  render(
+    <MemoryRouter>
+      <Reportes />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('heading', { name: 'Recargadores' })
+  expect(screen.queryByRole('heading', { name: /^Clientes/ })).toBeNull()
+})
+
 it('solicita devolución de la entrada elegida y vuelve al historial', async () => {
   api.get.mockResolvedValue({ data: [] })
   api.post.mockResolvedValue({})

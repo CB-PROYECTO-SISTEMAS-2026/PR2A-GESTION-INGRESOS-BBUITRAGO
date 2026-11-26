@@ -65,13 +65,14 @@ export class ReportesController {
   @Get('global')
   @Roles('ADMIN')
   global() {
-    return this.reportes.resumen();
+    return this.reportes.resumen(undefined, true);
   }
   @Get('evento/:id')
   @Roles('ADMIN', 'ORGANIZADOR')
   async resumen(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const evento = await this.reportes.evento(user, id);
-    return { evento, ...(await this.reportes.resumen(id)) };
+    const esAdmin = user.roles.includes('ADMIN');
+    return { evento, ...(await this.reportes.resumen(id, esAdmin)) };
   }
   @Get('evento/:id/ventas')
   @Roles('ADMIN', 'ORGANIZADOR')

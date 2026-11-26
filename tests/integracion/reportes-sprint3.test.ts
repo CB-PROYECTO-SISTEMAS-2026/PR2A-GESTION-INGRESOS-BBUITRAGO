@@ -63,6 +63,56 @@ test("reportes por rol, totales separados y acceso global", async () => {
     (await api.pedir("GET", "/api/reportes/global", { token: admin })).status,
   ).toBe(200);
 });
+test("HU-035: rankings de clientes ordenados, sin anuladas y solo para el admin", async () => {
+  const eventoId = esc.eventos.abierto;
+  const { cliente, cliente2 } = esc.usuarios;
+  const mover = async (
+    usuarioId: string,
+    tipo: "RECARGA" | "DEVOLUCION",
+    monto: number,
+    estado: "COMPLETADA" | "ANULADA" = "COMPLETADA",
+  ) => {
+    const { id } = await api.prisma.saldoEvento.upsert({
+      where: { usuarioId_eventoId: { usuarioId, eventoId } },
+      create: { usuarioId, eventoId, saldo: 0 },
+      update: {},
+    });
+    await api.prisma.transaccionSaldo.create({
+      data: {
+        saldoEventoId: id,
+        usuarioId,
+        eventoId,
+        tipo,
+        monto,
+        estado,
+        saldoResultante: 0,
+      },
+    });
+  };
+  await mover(cliente, "RECARGA", 30);
+  await mover(cliente, "RECARGA", 20);
+  await mover(cliente2, "RECARGA", 80);
+  await mover(cliente, "RECARGA", 500, "ANULADA");
+  await mover(cliente, "DEVOLUCION", 15);
+
+  const r = await api.pedir("GET", ruta, { token: admin });
+  expect(r.body.clientes.recargas).toMatchObject([
+    { usuarioId: cliente2, cantidad: 1, total: "80.00" },
+    { usuarioId: cliente, cantidad: 2, total: "50.00" },
+  ]);
+  expect(r.body.clientes.recargas[0].nombre).toContain("Prueba");
+  expect(r.body.clientes.devoluciones).toMatchObject([
+    { usuarioId: cliente, cantidad: 1, total: "15.00" },
+  ]);
+  const global = await api.pedir("GET", "/api/reportes/global", {
+    token: admin,
+  });
+  expect(global.body.clientes.recargas.length).toBeGreaterThan(0);
+  const propio = await api.pedir("GET", ruta, { token: org });
+  expect(propio.status).toBe(200);
+  expect(propio.body).not.toHaveProperty("clientes");
+});
+
 test("exporta ambos tipos de venta en CSV y XLSX legible", async () => {
   for (const formato of ["csv", "xlsx"]) {
     const res = await fetch(api.url + ruta + "/ventas?formato=" + formato, {
