@@ -122,15 +122,15 @@ export default function HomeExperiencia() {
         return probe?.getBoundingClientRect().width || 0
       }
 
-      const snapStepsToPath = (path) => {
+      const snapStepsToPath = (path, mobile) => {
         const fallback = iconWidth()
         if (fallback > 0) {
           body.style.setProperty('--ev-ex-icon-measure-px', `${fallback}px`)
         }
-        return alignLayersToFixedPath(path, root, layers, fallback)
+        return alignLayersToFixedPath(path, root, layers, fallback, { mobile })
       }
 
-      const play = (path, stepProgresses, reduce) => {
+      const play = (path, stepProgresses, reduce, mobile) => {
         const icons = gsap.utils.toArray('.ev-ex-icon', root)
         const pills = gsap.utils.toArray('.ev-ex-pill', root)
         const targetW = iconWidth()
@@ -155,7 +155,16 @@ export default function HomeExperiencia() {
 
         icons.forEach((icon) => {
           icon.style.transformOrigin = 'center center'
-          gsap.set(icon, { width: 0, scale: 0, autoAlpha: 0, overflow: 'hidden' })
+          if (mobile) {
+            gsap.set(icon, {
+              width: targetW || 'auto',
+              scale: 0,
+              autoAlpha: 0,
+              overflow: 'hidden',
+            })
+          } else {
+            gsap.set(icon, { width: 0, scale: 0, autoAlpha: 0, overflow: 'hidden' })
+          }
         })
         pills.forEach((pill) => {
           pill.style.transformOrigin = 'center center'
@@ -170,13 +179,20 @@ export default function HomeExperiencia() {
           const at = Math.max(0, point - 0.04)
           tl.to(
             icon,
-            {
-              width: targetW || 'auto',
-              scale: 1,
-              autoAlpha: 1,
-              duration: 0.14,
-              ease: 'back.out(3.5)',
-            },
+            mobile
+              ? {
+                  scale: 1,
+                  autoAlpha: 1,
+                  duration: 0.14,
+                  ease: 'back.out(3.5)',
+                }
+              : {
+                  width: targetW || 'auto',
+                  scale: 1,
+                  autoAlpha: 1,
+                  duration: 0.14,
+                  ease: 'back.out(3.5)',
+                },
             at,
           )
           tl.to(
@@ -221,8 +237,8 @@ export default function HomeExperiencia() {
             )
             if (!path) return
 
-            const stepProgresses = snapStepsToPath(path)
-            play(path, stepProgresses, Boolean(reduceMotion))
+            const stepProgresses = snapStepsToPath(path, isMobile)
+            play(path, stepProgresses, Boolean(reduceMotion), isMobile)
           },
         )
 
@@ -231,7 +247,7 @@ export default function HomeExperiencia() {
           const path = root.querySelector(
             isMobile ? '.ev-ex-draw--mobile path' : '.ev-ex-draw--desktop path',
           )
-          if (path) snapStepsToPath(path)
+          if (path) snapStepsToPath(path, isMobile)
         }
 
         ScrollTrigger.addEventListener('refreshInit', onRefreshInit)

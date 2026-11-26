@@ -3,6 +3,7 @@ import { exportarVentas, getResumenVentas, getVentasNegocio } from '../../api/po
 import { toast } from '../../components/Toast'
 import { IconDownload } from '../../components/ui/icons'
 import { formatBs, formatDateTime, getErrorMessage } from '../../utils/format'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { FiltrosVentas, KpiCard } from './components/VentasUI'
 import { useFiltrosVentas } from './components/ventasFiltros'
 
@@ -14,6 +15,7 @@ export default function VentasPage() {
   const [opciones, setOpciones] = useState({ negocios: [], eventos: [] })
   const [error, setError] = useState('')
   const [exportando, setExportando] = useState(false)
+  const [actualizando, setActualizando] = useState(false)
 
   useEffect(() => {
     getResumenVentas()
@@ -23,6 +25,7 @@ export default function VentasPage() {
 
   useEffect(() => {
     let cancel = false
+    setActualizando(true)
     getVentasNegocio({ ...filtros, page })
       .then(({ data }) => {
         if (!cancel) {
@@ -31,6 +34,9 @@ export default function VentasPage() {
         }
       })
       .catch((err) => !cancel && setError(getErrorMessage(err)))
+      .finally(() => {
+        if (!cancel) setActualizando(false)
+      })
     return () => {
       cancel = true
     }
@@ -80,11 +86,16 @@ export default function VentasPage() {
         </p>
       )}
 
-      {!data && !error && <p className="mt-8 text-muted">Cargando…</p>}
+      {!data && !error && (
+        <p className="mt-8 text-sm text-muted" role="status">
+          Cargando ventas…
+        </p>
+      )}
 
       {data && (
+        <PendingRegion pending={actualizando}  className="mt-6">
         <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3">
             <KpiCard label="Total recaudado" value={formatBs(data.totalRecaudado)} hint="En el periodo seleccionado" />
             <KpiCard label="Transacciones" value={data.totalItems} hint="Ventas completadas" />
             <KpiCard label="Ticket promedio" value={formatBs(promedio)} hint="Promedio por venta" />
@@ -138,6 +149,7 @@ export default function VentasPage() {
             </div>
           )}
         </>
+        </PendingRegion>
       )}
     </div>
   )

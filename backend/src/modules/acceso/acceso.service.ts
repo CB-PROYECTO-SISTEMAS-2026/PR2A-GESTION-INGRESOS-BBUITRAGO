@@ -40,11 +40,14 @@ type AuthUser = { id: string; roles: Role[] };
 type Db = Prisma.TransactionClient;
 type Medio = 'MANILLA' | 'QR_DIGITAL';
 export type EstadoEscaneo = 'VALIDO' | 'YA_USADO' | 'INVALIDO';
+export type SeveridadEscaneo = 'leve' | 'grave';
 
 const MAX_CANDIDATOS = 20;
 const MAX_REGISTROS = 200;
 const MAX_INTENTOS_SUFIJO = 5;
 const VENTANA_INTENTOS_MS = 15 * 60 * 1000;
+const VENTANA_RECHAZO_MS = 15_000;
+const MOTIVO_RECHAZO_DOCUMENTO = 'El documento no coincide con el titular.';
 const DENTRO: AccesoTipo[] = [AccesoTipo.INGRESO, AccesoTipo.REINGRESO];
 const ACCESO_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
 const MOTIVO_RECHAZO_FOTO =
@@ -276,7 +279,18 @@ export class AccesoService {
       throw err;
     }
     const ficha = await fichaEntrada(this.prisma, resuelto.entrada.id, hoy.id);
-    return this.dictamen(hoy, ficha, dto.sentido, resuelto.medio);
+    const dictamen = this.dictamen(hoy, ficha, dto.sentido, resuelto.medio);
+    if (dictamen.severidad === 'grave' && dictamen.entrada && dictamen.fecha) {
+      await this.registrarRechazoGrave({
+        eventoId: evento.id,
+        entradaId: dictamen.entrada.id,
+        fechaId: dictamen.fecha.id,
+        encargadoId: user.id,
+        sentido: dto.sentido,
+        motivo: dictamen.motivo || 'Acceso rechazado',
+      });
+    }
+    return dictamen;
   }
 
   /**
@@ -293,6 +307,7 @@ export class AccesoService {
       where: { id: entrada.id },
       select: {
         id: true,
+        estado: true,
         titularEstado: true,
         titular: {
           select: {
@@ -304,6 +319,11 @@ export class AccesoService {
       },
     });
 
+    if (ENTRADA_INVALIDA.includes(ficha.estado)) {
+      throw new BadRequestException(
+        `La entrada está ${ficha.estado.toLowerCase()} y ya no es válida.`,
+      );
+    }
     if (
       ficha.titularEstado !== TitularAsignacionEstado.ASIGNADA ||
       !ficha.titular?.identidad
@@ -333,6 +353,17 @@ export class AccesoService {
     });
 
     if (!coincidio) {
+      const hoy = this.fechaDeHoy(evento);
+      if (hoy) {
+        await this.registrarRechazoGrave({
+          eventoId: evento.id,
+          entradaId: ficha.id,
+          fechaId: hoy.id,
+          encargadoId: user.id,
+          sentido: dto.sentido,
+          motivo: MOTIVO_RECHAZO_DOCUMENTO,
+        });
+      }
       return {
         coincidio: false,
         titulo: 'DOCUMENTO NO COINCIDENTE',
@@ -734,10 +765,12 @@ export class AccesoService {
       estado: EstadoEscaneo,
       motivo: string | null,
       movimiento: AccesoTipo | null = null,
+      severidad: SeveridadEscaneo | null = null,
     ) => ({
       estado,
       motivo,
       movimiento,
+      severidad: estado === 'VALIDO' ? null : severidad,
       requiereFoto:
         movimiento !== null && movimiento !== AccesoTipo.SALIDA && !fotoIngreso,
       ...base,
@@ -747,6 +780,8 @@ export class AccesoService {
       return resultado(
         'INVALIDO',
         `La entrada ${entrada.codigo} está ${entrada.estado.toLowerCase()} y ya no es válida.`,
+        null,
+        'grave',
       );
     }
     if (
@@ -756,19 +791,25 @@ export class AccesoService {
       return resultado(
         'INVALIDO',
         'Esta entrada aún no tiene un titular definitivo. No permite el ingreso.',
+        null,
+        'leve',
       );
     }
     if (!entrada.titular.identidad) {
       return resultado(
         'INVALIDO',
         'El titular no tiene identidad registrada. No se puede verificar el acceso.',
+        null,
+        'leve',
       );
     }
     if (entrada.fechaId && entrada.fechaId !== hoy.id) {
       const dia = entrada.fecha ? formatDia(entrada.fecha.fecha) : 'otro día';
       return resultado(
         'INVALIDO',
-        `Esta entrada es para el ${dia}; hoy no permite el ingreso.`,
+        `Esta entrada es para el ${dia}, no para la función de hoy.`,
+        null,
+        'leve',
       );
     }
     if (
@@ -778,6 +819,8 @@ export class AccesoService {
       return resultado(
         'INVALIDO',
         `La categoría ${entrada.categoria.nombre} no tiene acceso hoy.`,
+        null,
+        'leve',
       );
     }
 
@@ -785,7 +828,9 @@ export class AccesoService {
       if (dentro) {
         return resultado(
           'YA_USADO',
-          `Ya ingresó hoy a las ${this.hora(ultimoHoy!.createdAt)} y no registró su salida. Verifica que la manilla o el QR no se esté prestando.`,
+          `Ya ingresó hoy a las ${this.hora(ultimoHoy!.createdAt)} y no registró su salida.`,
+          null,
+          'grave',
         );
       }
       return resultado(
@@ -800,14 +845,49 @@ export class AccesoService {
         ultimoHoy
           ? `Ya registró su salida a las ${this.hora(ultimoHoy.createdAt)}; no está dentro del evento.`
           : 'No tiene un ingreso registrado hoy: no se puede marcar su salida.',
+        null,
+        'leve',
       );
     }
     return resultado('VALIDO', null, AccesoTipo.SALIDA);
   }
 
+  /** Rojo de puerta. El mismo motivo de la misma entrada no se repite dentro de 15 segundos. */
+  private async registrarRechazoGrave(data: {
+    eventoId: string;
+    entradaId: string;
+    fechaId: string;
+    encargadoId: string;
+    sentido: Sentido;
+    motivo: string;
+  }) {
+    const motivo = data.motivo.slice(0, 300);
+    const desde = new Date(Date.now() - VENTANA_RECHAZO_MS);
+    const reciente = await this.prisma.accesoRechazo.findFirst({
+      where: {
+        entradaId: data.entradaId,
+        motivo,
+        createdAt: { gte: desde },
+      },
+      select: { id: true },
+    });
+    if (reciente) return;
+    await this.prisma.accesoRechazo.create({
+      data: {
+        eventoId: data.eventoId,
+        entradaId: data.entradaId,
+        fechaId: data.fechaId,
+        encargadoId: data.encargadoId,
+        sentido: data.sentido,
+        motivo,
+      },
+    });
+  }
+
   private invalido(sentido: Sentido, motivo: string) {
     return {
       estado: 'INVALIDO' as EstadoEscaneo,
+      severidad: 'leve' as SeveridadEscaneo,
       motivo,
       movimiento: null,
       requiereFoto: false,

@@ -3,6 +3,7 @@ import { cambiarEstadoRetiro, getRetirosAdmin } from '../../api/pos.api'
 import { toast } from '../../components/Toast'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import { IconExternal } from '../../components/ui/icons'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { formatBs, formatDateTime, getErrorMessage } from '../../utils/format'
 
 const ESTADOS = [
@@ -22,6 +23,7 @@ export default function RetirosPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState(null)
+  const [actualizando, setActualizando] = useState(false)
 
   // Número de la última petición: si el usuario cambia de pestaña antes de que llegue la
   // respuesta anterior, esa respuesta vieja se descarta (no pisa la tabla de la pestaña nueva).
@@ -29,6 +31,7 @@ export default function RetirosPage() {
 
   const cargar = useCallback(async () => {
     const peticion = ++ultimaPeticion.current
+    setActualizando(true)
     try {
       const { data } = await getRetirosAdmin({ estado })
       if (peticion !== ultimaPeticion.current) return
@@ -36,6 +39,8 @@ export default function RetirosPage() {
       setError('')
     } catch (err) {
       if (peticion === ultimaPeticion.current) setError(getErrorMessage(err))
+    } finally {
+      if (peticion === ultimaPeticion.current) setActualizando(false)
     }
   }, [estado])
 
@@ -108,10 +113,15 @@ export default function RetirosPage() {
           {error}
         </p>
       )}
-      {!data && !error && <p className="mt-8 text-muted">Cargando…</p>}
+      {!data && !error && (
+        <p className="mt-8 text-sm text-muted" role="status">
+          Cargando retiros…
+        </p>
+      )}
 
       {data && (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-border bg-white">
+        <PendingRegion pending={actualizando}  className="mt-6">
+        <div className="overflow-x-auto rounded-lg border border-border bg-white">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-page text-muted">
               <tr>
@@ -184,6 +194,7 @@ export default function RetirosPage() {
             </tbody>
           </table>
         </div>
+        </PendingRegion>
       )}
 
     </div>

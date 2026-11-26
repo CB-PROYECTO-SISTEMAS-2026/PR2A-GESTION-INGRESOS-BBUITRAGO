@@ -7,5 +7,12 @@ const TABS = [
 
 /** Terminal del recargador de saldo: pensada para su celular. */
 export default function RecargasLayout() {
-  return <StaffLayout tabs={TABS} label="Recargas" />
+  return (
+    <StaffLayout
+      tabs={TABS}
+      label="Recargas"
+      perfilPath="/recargas/perfil"
+      lectorPath="/recargas"
+    />
+  )
 }

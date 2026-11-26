@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import BrandLogo from '../BrandLogo'
 import { useAuth } from '../../context/AuthContext'
+import { homeFor } from '../../utils/roles'
+import { confirmLogout } from '../../utils/confirmLogout'
 import { IconX } from '../ui/icons'
 
 /**
@@ -10,8 +12,16 @@ import { IconX } from '../ui/icons'
  * En pantallas grandes (lg) es una columna fija. En celulares y tablets es un cajón que se
  * abre con el botón "Menú" de PanelLayout (`open`) y se cierra al elegir una opción.
  */
-export default function PanelSidebar({ items, roleLabel, open = false, onClose }) {
-  const { user } = useAuth()
+export default function PanelSidebar({
+  items,
+  roleLabel,
+  open = false,
+  onClose,
+  /** En jefe de negocio el perfil y el logout viven solo en el menú del navbar. */
+  showAccountLinks = true,
+}) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const nombre = [user?.nombre, user?.apellido].filter(Boolean).join(' ')
 
   useEffect(() => {
@@ -34,7 +44,7 @@ export default function PanelSidebar({ items, roleLabel, open = false, onClose }
         }`}
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-5">
-          <BrandLogo to="/" imgClassName="h-8 w-auto max-w-[140px] object-contain" />
+          <BrandLogo to={homeFor(user?.roles)} imgClassName="h-8 w-auto max-w-[140px] object-contain" />
           <button
             type="button"
             className="rounded-md p-1 text-slate-400 hover:text-white lg:hidden"
@@ -61,12 +71,37 @@ export default function PanelSidebar({ items, roleLabel, open = false, onClose }
             </NavLink>
           ))}
         </nav>
-        {nombre && (
-          <div className="border-t border-slate-800 px-5 py-4">
-            <p className="truncate text-sm font-semibold text-white">{nombre}</p>
-            <p className="text-xs text-slate-400">{roleLabel}</p>
-          </div>
-        )}
+        <div className="border-t border-slate-800 px-5 py-4">
+          {nombre ? (
+            <>
+              <p className="truncate text-sm font-semibold text-white">{nombre}</p>
+              <p className="text-xs text-slate-400">{roleLabel}</p>
+            </>
+          ) : null}
+          {showAccountLinks ? (
+            <div className={`flex flex-col gap-1 ${nombre ? 'mt-3' : ''}`}>
+              <NavLink
+                to="/perfil"
+                onClick={onClose}
+                className="rounded-md px-0 py-1.5 text-sm text-slate-300 transition hover:text-white"
+              >
+                Mi perfil
+              </NavLink>
+              <button
+                type="button"
+                className="rounded-md px-0 py-1.5 text-left text-sm text-danger transition hover:text-red-300"
+                onClick={async () => {
+                  onClose?.()
+                  if (!(await confirmLogout())) return
+                  navigate('/', { replace: true, state: { scrollToInicio: true } })
+                  logout()
+                }}
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          ) : null}
+        </div>
       </aside>
     </>
   )

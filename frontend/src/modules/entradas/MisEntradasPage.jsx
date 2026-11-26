@@ -17,6 +17,7 @@ import Field from '../../components/form/Field'
 import Modal from '../../components/ui/Modal'
 import TapReveal from '../../components/ui/TapReveal'
 import { SkeletonCard } from '../../components/ui/Skeleton'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import MisEntradasExplorerToolbar from '../../components/entradas/MisEntradasExplorerToolbar'
 import TitularesPendientesModal, { confirmAsignarme } from '../../components/entradas/TitularesPendientesModal'
@@ -611,7 +612,8 @@ export default function MisEntradasPage() {
         <p className="text-sm text-muted">Ninguna entrada coincide con esos filtros.</p>
       )}
 
-      <ul className="space-y-6" aria-busy={loading}>
+      <PendingRegion pending={Boolean(loading && entradas)} >
+      <ul className="space-y-6">
         {(entradas ?? []).map((e) => (
           <EntradaPass
             key={e.id}
@@ -623,6 +625,7 @@ export default function MisEntradasPage() {
           />
         ))}
       </ul>
+      </PendingRegion>
 
       {meta.totalPages > 1 ? (
         <nav aria-label="Páginas de entradas" className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">

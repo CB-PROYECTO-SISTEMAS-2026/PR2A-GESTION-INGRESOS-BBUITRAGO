@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getMisRecargas, reportarIncidenciaRecarga } from '../../api/recargas.api'
 import { toast } from '../../components/Toast'
 import RangoDiasFiltro from '../../components/staff/RangoDiasFiltro'
+import PendingRegion from '../../components/ui/PendingRegion'
 import Modal from '../../components/ui/Modal'
 import { formatBs, formatDay, formatDayRange, formatTime, getErrorMessage, localDay } from '../../utils/format'
 import { INCIDENCIA_TEXTO_MAX, TIPOS_INCIDENCIA, tipoIncidenciaLabel } from './incidencias'
@@ -60,6 +61,12 @@ export default function RecargasHistorialPage() {
         </p>
       )}
 
+      {loading && !data ? (
+        <p className="text-center text-sm text-muted" role="status">
+          Cargando…
+        </p>
+      ) : (
+        <PendingRegion pending={loading} >
       {data && (
         <div className="flex items-end justify-between rounded-xl bg-teal/10 p-4">
           <div>
@@ -82,10 +89,7 @@ export default function RecargasHistorialPage() {
         </div>
       )}
 
-      {loading && !data ? (
-        <p className="text-center text-sm text-muted">Cargando…</p>
-      ) : (
-        <ul className="grid gap-2">
+        <ul className="mt-4 grid gap-2">
           {data?.recargas.map((r) => {
             const anulada = r.estado === 'ANULADA'
             const incidencia = r.incidencia
@@ -148,6 +152,7 @@ export default function RecargasHistorialPage() {
             </li>
           )}
         </ul>
+        </PendingRegion>
       )}
 
       <ReportarIncidenciaModal

@@ -1,7 +1,10 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import BrandLogo from '../BrandLogo'
-import { useAuth } from '../../context/AuthContext'
-import { confirmLogout } from '../../utils/confirmLogout'
+import StaffTerminalDesktopBackdrop from './StaffTerminalDesktopBackdrop'
+import { StaffAccountDrawer, StaffAccountMenuButton } from '../terminal/StaffAccountMenu'
+import StaffConnectionFooter from '../terminal/StaffConnectionFooter'
+import { StaffShellContext } from './staffShellContext'
 
 const tabClass = ({ isActive }) =>
   `flex-1 rounded-md py-2 text-center text-sm font-semibold transition ${
@@ -12,48 +15,72 @@ const tabClass = ({ isActive }) =>
  * Terminal del personal del evento (punto de venta, recargas): pensada para el celular.
  * `tabs`: [{ to, label, end? }] — pestañas bajo la cabecera.
  */
-export default function StaffLayout({ tabs, label }) {
-  const { user, logout } = useAuth()
+export default function StaffLayout({
+  tabs,
+  label,
+  perfilPath,
+  lectorPath,
+  showLectorQr = true,
+  showAjustes = true,
+}) {
+  const location = useLocation()
   const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const enPerfil = perfilPath && location.pathname === perfilPath
+
+  const homeLector = lectorPath || tabs[0]?.to || '/'
+
+  const irLectorQr = useCallback(() => {
+    navigate(homeLector, { state: { openLector: true } })
+  }, [homeLector, navigate])
+
+  const shell = useMemo(
+    () => ({
+      openAjustes: () => {},
+      goLectorQr: irLectorQr,
+    }),
+    [irLectorQr],
+  )
 
   return (
-    <div className="min-h-screen bg-page">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-page">
-        <header className="sticky top-0 z-20 border-b border-border bg-white">
-          <div className="flex items-center justify-between bg-navy px-4 py-3">
-            <BrandLogo to={false} imgClassName="h-7 w-auto" />
-            <div className="flex items-center gap-3">
-              <span className="badge bg-teal/15 text-teal">STAFF</span>
-              <button
-                type="button"
-                className="text-xs font-semibold text-slate-300 hover:text-white"
-                onClick={async () => {
-                  if (!(await confirmLogout())) return
-                  logout()
-                  navigate('/login', { replace: true })
-                }}
-              >
-                Salir
-              </button>
+    <StaffShellContext.Provider value={shell}>
+      <div className="min-h-screen bg-page md:min-h-[100dvh] md:bg-transparent">
+        <StaffTerminalDesktopBackdrop />
+        <div
+          className={`relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-page md:min-h-[100dvh] md:shadow-[0_0_80px_rgba(15,23,42,0.35)] ${
+            menuOpen ? 'overflow-hidden' : ''
+          }`}
+        >
+          <header className="relative z-30 shrink-0 border-b border-border bg-white">
+            <div className="flex items-center justify-between bg-sidebar px-4 py-3">
+              <BrandLogo to={false} imgClassName="h-7 w-auto" />
+              <StaffAccountMenuButton open={menuOpen} onToggle={() => setMenuOpen((v) => !v)} />
             </div>
-          </div>
-          <nav className="mx-4 my-3 flex gap-1 rounded-lg bg-page p-1" aria-label={label}>
-            {tabs.map((tab) => (
-              <NavLink key={tab.to} to={tab.to} end={tab.end} className={tabClass}>
-                {tab.label}
-              </NavLink>
-            ))}
-          </nav>
-        </header>
-        <main className="flex flex-1 flex-col">
-          <Outlet />
-        </main>
-        {user?.nombre && (
-          <p className="px-4 pb-4 pt-2 text-center text-xs text-muted">
-            Sesión de {[user.nombre, user.apellido].filter(Boolean).join(' ')}
-          </p>
-        )}
+            {!enPerfil && tabs?.length > 0 && (
+              <nav className="mx-4 my-3 flex gap-1 rounded-lg bg-page p-1" aria-label={label}>
+                {tabs.map((tab) => (
+                  <NavLink key={tab.to} to={tab.to} end={tab.end} className={tabClass}>
+                    {tab.label}
+                  </NavLink>
+                ))}
+              </nav>
+            )}
+          </header>
+          <main className="flex flex-1 flex-col">
+            <Outlet />
+          </main>
+          <StaffConnectionFooter />
+
+          <StaffAccountDrawer
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            perfilPath={perfilPath}
+            onLectorQr={irLectorQr}
+            showLectorQr={showLectorQr}
+            showAjustes={showAjustes}
+          />
+        </div>
       </div>
-    </div>
+    </StaffShellContext.Provider>
   )
 }

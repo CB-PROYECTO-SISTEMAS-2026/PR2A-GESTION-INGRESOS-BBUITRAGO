@@ -25,11 +25,12 @@ export async function findAyudanteAsignacion(
   const ayudante = await prisma.ayudanteNegocio.findUnique({
     where: { usuarioId },
     select: {
+      activo: true,
       estado: true,
       negocio: { select: { id: true, nombre: true, activo: true } },
     },
   });
-  if (!ayudante) return null;
+  if (!ayudante?.activo) return null;
   return {
     negocioId: ayudante.negocio.id,
     negocioNombre: ayudante.negocio.nombre,
@@ -64,6 +65,7 @@ export function countAyudantesActivos(
   return prisma.ayudanteNegocio.count({
     where: {
       negocioId: { in: negocioIds },
+      activo: true,
       estado: AyudanteNegocio_estado.ACTIVO,
     },
   });

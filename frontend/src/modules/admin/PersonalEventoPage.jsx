@@ -5,6 +5,7 @@ import { asignarPersonal, getCandidatosPersonal, getPersonalEvento, quitarPerson
 import { toast } from '../../components/Toast'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import { IconPlus, IconSearch } from '../../components/ui/icons'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { formatDateTime, getErrorMessage } from '../../utils/format'
 import { roleLabel } from '../../utils/roles'
 import EventoHeader from './components/EventoHeader'
@@ -204,7 +205,8 @@ export default function PersonalEventoPage() {
                   aria-label="Buscar usuario"
                 />
               </div>
-              <ul className="mt-3 divide-y divide-border">
+              <PendingRegion pending={buscando}  className="mt-3">
+              <ul className="divide-y divide-border">
                 {candidatos.map((c) => (
                   <li key={c.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                     <div className="min-w-0">
@@ -227,6 +229,7 @@ export default function PersonalEventoPage() {
                   </li>
                 )}
               </ul>
+              </PendingRegion>
           </>
         </section>
       </div>

@@ -10,6 +10,7 @@ import {
   montoConSigno,
   tipoMovimientoLabel,
 } from '../../utils/movimientos'
+import PendingRegion from '../../components/ui/PendingRegion'
 import EventoHeader from './components/EventoHeader'
 
 /** HU-020 (administrador): movimientos de saldo de todos los clientes en un evento, con totales. */
@@ -20,6 +21,7 @@ export default function MovimientosEventoPage() {
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [actualizando, setActualizando] = useState(false)
   const ultimaPeticion = useRef(0)
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export default function MovimientosEventoPage() {
 
   const cargar = useCallback(async () => {
     const peticion = ++ultimaPeticion.current
+    setActualizando(true)
     try {
       const { data } = await getMovimientosEvento(id, { tipo: tipo || undefined, page })
       if (peticion !== ultimaPeticion.current) return
@@ -37,6 +40,8 @@ export default function MovimientosEventoPage() {
       setError('')
     } catch (err) {
       if (peticion === ultimaPeticion.current) setError(getErrorMessage(err))
+    } finally {
+      if (peticion === ultimaPeticion.current) setActualizando(false)
     }
   }, [id, tipo, page])
 
@@ -62,9 +67,14 @@ export default function MovimientosEventoPage() {
             {error}
           </p>
         )}
-        {!data && !error && <p className="text-muted">Cargando…</p>}
+        {!data && !error && (
+          <p className="text-sm text-muted" role="status">
+            Cargando movimientos…
+          </p>
+        )}
 
         {data && (
+          <PendingRegion pending={actualizando} >
           <>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <div className="card-surface bg-teal/10 p-4">
@@ -170,6 +180,7 @@ export default function MovimientosEventoPage() {
               </div>
             )}
           </>
+          </PendingRegion>
         )}
       </div>
     </>

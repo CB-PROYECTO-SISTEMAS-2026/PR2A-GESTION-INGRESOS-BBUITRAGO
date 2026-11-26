@@ -4,16 +4,17 @@ import Footer from './Footer'
 import Navbar from './Navbar'
 
 /**
- * Estructura común de los paneles (administrador, negocio): barra superior, menú lateral y
- * contenido. En celulares el menú lateral se abre desde el botón "Menú".
+ * Estructura común de los paneles (administrador, negocio): menú lateral y contenido.
+ * En celulares el menú lateral se abre desde el botón "Menú".
+ * El navbar público va cuando el rol puede recorrer la tienda (admin, jefe de negocio).
  */
-export default function PanelLayout({ sidebar: Sidebar }) {
+export default function PanelLayout({ sidebar: Sidebar, showFooter = true, showNavbar = true }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
   return (
     <div className="flex min-h-screen flex-col bg-page">
-      <Navbar />
+      {showNavbar ? <Navbar /> : null}
       <div className="flex flex-1">
         <Sidebar open={menuOpen} onClose={closeMenu} />
         <div className="min-w-0 flex-1 overflow-auto bg-white">
@@ -34,7 +35,7 @@ export default function PanelLayout({ sidebar: Sidebar }) {
           <Outlet />
         </div>
       </div>
-      <Footer variant="compact" />
+      {showFooter ? <Footer variant="compact" /> : null}
     </div>
   )
 }

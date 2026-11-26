@@ -25,6 +25,7 @@ import {
   ListSolicitudesNegocioQuery,
   RevisarSolicitudNegocioDto,
   SolicitarParticipacionDto,
+  UpdateAyudanteDto,
   UpdateNegocioDto,
   UpdateProductoDto,
 } from './dto/businesses.dto';
@@ -147,5 +148,24 @@ export class BusinessesController {
     @Body() dto: AsignarAyudanteDto,
   ) {
     return this.businessesService.asignarAyudante(id, userId, dto);
+  }
+
+  @Patch('ayudantes/:id')
+  @Roles(Role.JEFE_NEGOCIO, Role.ADMIN)
+  updateAyudante(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateAyudanteDto,
+  ) {
+    return this.businessesService.updateAyudante(id, userId, dto);
+  }
+
+  @Delete('ayudantes/:id')
+  @Roles(Role.JEFE_NEGOCIO, Role.ADMIN)
+  deleteAyudante(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.businessesService.deleteAyudante(id, userId);
   }
 }

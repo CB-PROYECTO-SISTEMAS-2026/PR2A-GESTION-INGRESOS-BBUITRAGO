@@ -165,15 +165,15 @@ export default function EventDetailPage() {
                 <IconTicket />
                 Comprar entrada
               </button>
-            ) : isAuthenticated ? (
-              <a href="#entradas" className="btn-primary">
-                Ver entradas
-              </a>
-            ) : (
+            ) : !isAuthenticated ? (
               <Link to={`/login?redirect=/eventos/${id}`} className="btn-primary">
                 Inicia sesión para comprar
               </Link>
-            )}
+            ) : hasRole('CLIENTE') ? (
+              <a href="#entradas" className="btn-primary">
+                Ver entradas
+              </a>
+            ) : null}
           </div>
         </div>
       </div>

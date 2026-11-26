@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getMisSaldos } from '../../api/recargas.api'
-import { IconWallet } from '../../components/ui/icons'
+import { IconChevronRight, IconWallet } from '../../components/ui/icons'
+import { Skeleton } from '../../components/ui/Skeleton'
 import { useAuth } from '../../context/AuthContext'
-import { formatBs, formatDateTime, formatDay, formatDayRange, getErrorMessage } from '../../utils/format'
+import { eventImage, formatBs, formatDateTime, formatDay, formatDayRange, getErrorMessage } from '../../utils/format'
 import { MOMENTO_EVENTO } from '../../utils/movimientos'
 
 /** Plazo para pedir la devolución del saldo que sobró (30 días desde el fin del evento). */
@@ -11,6 +12,98 @@ function plazoTexto(plazo) {
   if (!plazo) return 'Evento finalizado con saldo pendiente'
   if (plazo.vencido) return `El plazo para retirar este saldo venció el ${formatDay(plazo.fechaLimite)}`
   return `Puedes pedir la devolución de este saldo hasta el ${formatDay(plazo.fechaLimite)}`
+}
+
+function saldoNota(s) {
+  if (s.momento === 'FINALIZADO') {
+    return Number(s.saldo) > 0 ? plazoTexto(s.plazoRetiro) : 'Sin saldo pendiente'
+  }
+  return 'Saldo disponible solo dentro de este evento'
+}
+
+function SaldoSkeleton() {
+  return (
+    <div className="grid gap-4" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Cargando…</span>
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      {Array.from({ length: 3 }, (_, i) => (
+        <div key={i} className="overflow-hidden rounded-2xl border border-border bg-surface">
+          <div className="flex gap-0 sm:flex-row">
+            <Skeleton className="aspect-[16/10] w-full rounded-none sm:aspect-auto sm:h-auto sm:w-28" />
+            <div className="flex flex-1 flex-col gap-3 p-4">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+              <Skeleton className="h-8 w-28" />
+              <Skeleton className="h-3 w-4/5" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SaldoCard({ saldo: s }) {
+  const momento = MOMENTO_EVENTO[s.momento]
+  const monto = Number(s.saldo)
+  const sinSaldo = !Number.isFinite(monto) || monto <= 0
+
+  return (
+    <article className="ev-saldo-card">
+      <div className="ev-saldo-media" aria-hidden="true">
+        <img
+          src={eventImage(s)}
+          alt=""
+          className="ev-saldo-img"
+          width={320}
+          height={200}
+          loading="lazy"
+        />
+        <div className="ev-saldo-veil" />
+      </div>
+
+      <div className="ev-saldo-body">
+        <header className="min-w-0">
+          <h3 className="ev-saldo-title text-balance">{s.titulo}</h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+            <span className={`badge ${s.cancelado ? 'bg-danger-soft text-danger' : momento.badge}`}>
+              {s.cancelado ? 'Cancelado' : momento.label}
+            </span>
+            <span>{formatDayRange(s.fechaInicio, s.fechaFin)}</span>
+          </div>
+        </header>
+
+        <div className="ev-saldo-amount">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Saldo</p>
+          <p
+            className={`font-display text-3xl font-bold tabular-nums leading-none ${
+              sinSaldo ? 'text-muted' : 'text-success'
+            }`}
+          >
+            {formatBs(s.saldo)}
+          </p>
+        </div>
+
+        <p className="ev-saldo-note text-pretty">
+          {saldoNota(s)}
+          {s.actualizado ? ` · Actualizado ${formatDateTime(s.actualizado)}` : ''}
+        </p>
+
+        <footer className="ev-saldo-actions">
+          <Link
+            to={`/mi-manilla/movimientos?evento=${encodeURIComponent(s.eventoId)}`}
+            className="btn-secondary btn-sm inline-flex items-center gap-1"
+          >
+            Ver movimientos
+            <IconChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+          <Link to={`/eventos/${s.eventoId}`} className="text-sm font-semibold text-primary hover:underline">
+            Ver evento
+          </Link>
+        </footer>
+      </div>
+    </article>
+  )
 }
 
 /**
@@ -32,79 +125,104 @@ export default function MiManillaPage() {
     }
   }, [])
 
+  const resumen = useMemo(() => {
+    if (!saldos?.length) return null
+    const conSaldo = saldos.filter((s) => Number(s.saldo) > 0)
+    const activos = saldos.filter((s) => !s.cancelado && s.momento !== 'FINALIZADO' && Number(s.saldo) > 0)
+    const totalActivo = activos.reduce((acc, s) => acc + Number(s.saldo), 0)
+    const totalPendiente = conSaldo.reduce((acc, s) => acc + Number(s.saldo), 0)
+    return {
+      eventos: saldos.length,
+      conSaldo: conSaldo.length,
+      totalActivo,
+      totalPendiente,
+      tieneActivos: activos.length > 0,
+      tienePendiente: conSaldo.length > 0,
+    }
+  }, [saldos])
+
+  const nombre = [user?.nombre, user?.apellido].filter(Boolean).join(' ')
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-10">
-      <div>
-        <Link to="/" className="text-sm font-semibold text-teal-dark hover:text-teal">
-          ← Volver al inicio
-        </Link>
-        <h1 className="mt-2 font-display text-3xl font-bold text-ink">Mi Manilla</h1>
-        <p className="text-sm text-muted">
-          {[user?.nombre, user?.apellido].filter(Boolean).join(' ')} · {user?.email}
-        </p>
-      </div>
-
-      <section className="card-surface p-6">
-        <h2 className="font-display text-xl font-bold">Mis saldos</h2>
-        <p className="mt-1 text-sm text-muted">
-          Cada saldo pertenece exclusivamente a su evento y no se puede combinar, transferir ni usar en otros eventos.
-          Recarga en los puntos de recarga del evento mostrando tu manilla o tu entrada digital.
-        </p>
-
-        {error && (
-          <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
-            {error}
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:py-10">
+      <header className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Monedero</p>
+        <h1 className="mt-1 font-display text-3xl font-bold text-ink text-balance">Mi manilla</h1>
+        {(nombre || user?.email) && (
+          <p className="mt-1 truncate text-sm text-muted">
+            {nombre}
+            {nombre && user?.email ? ' · ' : ''}
+            {user?.email}
           </p>
         )}
-        {!saldos && !error && <p className="mt-6 text-sm text-muted">Cargando…</p>}
+      </header>
+
+      {error && (
+        <p className="mt-6 rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger" role="alert">
+          {error}
+        </p>
+      )}
+
+      <section className="mt-6" aria-labelledby="mis-saldos-titulo">
+        <h2 id="mis-saldos-titulo" className="sr-only">
+          Mis saldos
+        </h2>
+
+        {!saldos && !error && <SaldoSkeleton />}
 
         {saldos && (
-          <ul className="mt-5 grid gap-3">
-            {saldos.map((s) => {
-              const momento = MOMENTO_EVENTO[s.momento]
-              return (
-                <li key={s.eventoId} className="min-w-0 rounded-lg border border-border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{s.titulo}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                        <span className={`badge ${s.cancelado ? 'bg-red-50 text-red-700' : momento.badge}`}>
-                          {s.cancelado ? 'Cancelado' : momento.label}
-                        </span>
-                        <span>{formatDayRange(s.fechaInicio, s.fechaFin)}</span>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-xs text-muted">Saldo</p>
-                      <p className="font-display text-2xl font-bold text-teal-dark">{formatBs(s.saldo)}</p>
-                    </div>
+          <div className="grid gap-4">
+            {resumen && (
+              <div className="ev-saldo-resumen">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                    {resumen.tieneActivos
+                      ? 'Disponible en eventos activos'
+                      : resumen.tienePendiente
+                        ? 'Saldo pendiente de retiro'
+                        : 'Tus eventos'}
+                  </p>
+                  <p className="mt-1 font-display text-3xl font-bold tabular-nums text-white">
+                    {resumen.tieneActivos
+                      ? formatBs(resumen.totalActivo)
+                      : resumen.tienePendiente
+                        ? formatBs(resumen.totalPendiente)
+                        : `${resumen.eventos} eventos`}
+                  </p>
+                </div>
+                <dl className="ev-saldo-resumen-meta">
+                  <div>
+                    <dt>Eventos</dt>
+                    <dd className="tabular-nums">{resumen.eventos}</dd>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted">
-                    <span className="min-w-0">
-                      {s.momento === 'FINALIZADO'
-                        ? Number(s.saldo) > 0
-                          ? plazoTexto(s.plazoRetiro)
-                          : 'Sin saldo pendiente'
-                        : 'Saldo disponible solo dentro de este evento'}
-                      {s.actualizado && ` · Actualizado ${formatDateTime(s.actualizado)}`}
-                    </span>
-                    <Link
-                      to={`/mi-manilla/movimientos?evento=${encodeURIComponent(s.eventoId)}`}
-                      className="font-semibold text-teal-dark hover:underline"
-                    >
-                      Ver movimientos
-                    </Link>
+                  <div>
+                    <dt>Con saldo</dt>
+                    <dd className="tabular-nums">{resumen.conSaldo}</dd>
                   </div>
-                </li>
-              )
-            })}
-            {!saldos.length && (
-              <li className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted">
-                <IconWallet className="h-8 w-8" />
-                Todavía no tienes entradas ni saldo en ningún evento.
-              </li>
+                </dl>
+              </div>
             )}
-          </ul>
+
+            {saldos.map((s) => (
+              <SaldoCard key={s.eventoId} saldo={s} />
+            ))}
+
+            {!saldos.length && (
+              <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
+                  <IconWallet className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <p className="font-display text-lg font-semibold text-ink">Todavía no tienes saldo</p>
+                <p className="max-w-sm text-sm text-muted text-pretty">
+                  Cuando tengas una entrada, el saldo de ese evento aparece acá. Recarga en el recinto con tu manilla o
+                  tu entrada digital.
+                </p>
+                <Link to="/" className="btn-primary btn-sm mt-1">
+                  Ver eventos
+                </Link>
+              </div>
+            )}
+          </div>
         )}
       </section>
     </div>

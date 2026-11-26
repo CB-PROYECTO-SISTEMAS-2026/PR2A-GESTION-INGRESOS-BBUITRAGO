@@ -121,7 +121,6 @@ export class AdminUsersService {
         roles: { select: { role: true } },
         ayudanteDe: {
           select: {
-            rolFuncion: true,
             activo: true,
             negocio: {
               select: { nombre: true, evento: { select: { titulo: true } } },

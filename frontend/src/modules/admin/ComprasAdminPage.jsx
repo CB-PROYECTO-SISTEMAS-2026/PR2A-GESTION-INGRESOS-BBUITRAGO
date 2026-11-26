@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { getComprasAdmin } from '../../api/compras.api'
 import { getAllEventsAdmin } from '../../api/events.api'
 import { IconSearch, IconTicket } from '../../components/ui/icons'
+import PendingRegion from '../../components/ui/PendingRegion'
 import CompraRevisionModal from './components/CompraRevisionModal'
 import { formatBs, formatDateTime, getErrorMessage } from '../../utils/format'
 import { formatNumber } from '../../utils/validation'
@@ -137,7 +138,8 @@ export default function ComprasAdminPage() {
 
       {error && <p className="text-red-600">{error}</p>}
 
-      <div className={`overflow-x-auto rounded-lg border border-border bg-white ${loading ? 'opacity-60' : ''}`}>
+      <PendingRegion pending={loading} >
+      <div className="overflow-x-auto rounded-lg border border-border bg-white">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-page text-xs uppercase tracking-wide text-muted">
             <tr>
@@ -187,6 +189,7 @@ export default function ComprasAdminPage() {
           </tbody>
         </table>
       </div>
+      </PendingRegion>
       {res && res.total > res.compras.length && (
         <p className="text-sm text-muted">
           Se muestran {formatNumber(res.compras.length)} de {formatNumber(res.total)} compras. Filtra por evento o comprador para

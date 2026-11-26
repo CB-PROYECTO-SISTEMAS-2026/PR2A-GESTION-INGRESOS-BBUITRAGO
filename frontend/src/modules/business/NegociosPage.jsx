@@ -27,21 +27,35 @@ export default function NegociosPage() {
   const [solError, setSolError] = useState('')
   const [busySol, setBusySol] = useState(false)
 
+  const fillForm = (n) => {
+    if (!n) {
+      setForm(empty)
+      return
+    }
+    setForm({
+      nombre: n.nombre || '',
+      descripcion: n.descripcion || '',
+    })
+  }
+
   const load = async () => {
     const [{ data }, { data: sols }, { data: evs }] = await Promise.all([
       getMisNegocios(),
       getMisSolicitudesNegocio().catch(() => ({ data: [] })),
       getEventosDisponiblesNegocio().catch(() => ({ data: [] })),
     ])
-    setItems(Array.isArray(data) ? data : data?.data ?? [])
+    const list = Array.isArray(data) ? data : data?.data ?? []
+    setItems(list)
     setSolicitudes(Array.isArray(sols) ? sols : [])
     setEventos(Array.isArray(evs) ? evs : [])
+    return list
   }
 
   useEffect(() => {
     ;(async () => {
       try {
-        await load()
+        const list = await load()
+        fillForm(list[0])
       } catch (err) {
         toast(getErrorMessage(err), 'error')
       } finally {
@@ -50,18 +64,15 @@ export default function NegociosPage() {
     })()
   }, [])
 
-  const resetForm = () => {
-    setForm(empty)
+  const resetForm = (negocioActual) => {
     setEditingId(null)
     setFormError('')
+    fillForm(negocioActual ?? items[0])
   }
 
   const startEdit = (n) => {
     setEditingId(n.id)
-    setForm({
-      nombre: n.nombre || '',
-      descripcion: n.descripcion || '',
-    })
+    fillForm(n)
     setFormError('')
   }
 
@@ -84,8 +95,8 @@ export default function NegociosPage() {
         await createNegocio(payload)
         toast('Negocio creado', 'success')
       }
-      resetForm()
-      await load()
+      const list = await load()
+      resetForm(list[0])
     } catch (err) {
       toast(getErrorMessage(err), 'error')
     }
@@ -146,7 +157,7 @@ export default function NegociosPage() {
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">{editingId ? 'Editar negocio' : negocio ? 'Datos del negocio' : 'Nuevo negocio'}</h2>
           {editingId && (
-            <button type="button" className="text-sm font-semibold text-muted" onClick={resetForm}>
+            <button type="button" className="text-sm font-semibold text-muted" onClick={() => resetForm()}>
               Cancelar
             </button>
           )}
@@ -157,7 +168,7 @@ export default function NegociosPage() {
             className="input"
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            placeholder="Ej. Puesto de Empanadas"
+            placeholder={negocio ? undefined : 'Ej. Puesto de Empanadas'}
             required
             minLength={2}
             disabled={!editingId && Boolean(negocio)}
@@ -169,7 +180,7 @@ export default function NegociosPage() {
             className="input min-h-20"
             value={form.descripcion}
             onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-            placeholder="Qué ofreces: comidas, merchandising, bebidas…"
+            placeholder={negocio ? undefined : 'Qué ofreces: comidas, merchandising, bebidas…'}
             disabled={!editingId && Boolean(negocio)}
           />
         </div>

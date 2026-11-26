@@ -24,6 +24,7 @@ import {
   CreateAyudanteDto,
   CreateNegocioDto,
   CreateProductoDto,
+  UpdateAyudanteDto,
   UpdateNegocioDto,
   UpdateProductoDto,
 } from './dto/businesses.dto';
@@ -58,9 +59,11 @@ export class BusinessesService {
     return this.prisma.negocio.findMany({
       where: { duenoId },
       include: {
-        // Los productos con ventas no se borran, se desactivan (ver deleteProducto).
+        // Solo activos: deleteProducto hace baja lógica (activo = false).
         productos: { where: { activo: true }, orderBy: { nombre: 'asc' } },
         ayudantes: {
+          where: { activo: true },
+          orderBy: { createdAt: 'desc' },
           include: {
             usuario: {
               select: { id: true, email: true, nombre: true, apellido: true },
@@ -147,18 +150,11 @@ export class BusinessesService {
     });
     if (!producto) throw new NotFoundException('Producto no encontrado');
     if (producto.negocio.duenoId !== duenoId) throw new ForbiddenException();
-    // Un producto ya vendido sigue referenciado por el detalle de las ventas: se desactiva.
-    const vendido = await this.prisma.detalleVenta.count({
-      where: { productoId: id },
+    // Baja lógica: el catálogo deja de mostrarlo; el historial de ventas conserva la referencia.
+    await this.prisma.producto.update({
+      where: { id },
+      data: { activo: false },
     });
-    if (vendido) {
-      await this.prisma.producto.update({
-        where: { id },
-        data: { activo: false },
-      });
-    } else {
-      await this.prisma.producto.delete({ where: { id } });
-    }
     return { message: 'Producto eliminado' };
   }
 
@@ -202,7 +198,6 @@ export class BusinessesService {
             negocioId,
             usuarioId: usuario.id,
             jefeId,
-            rolFuncion: dto.rolFuncion?.trim() || 'cajero',
             // El jefe crea la cuenta con contraseña: no hay invitación pendiente.
             estado: AyudanteNegocio_estado.ACTIVO,
           },
@@ -248,20 +243,73 @@ export class BusinessesService {
     jefeId: string,
     dto: AsignarAyudanteDto,
   ) {
-    const ayudante = await this.prisma.ayudanteNegocio.findUnique({
-      where: { id: ayudanteId },
-    });
-    if (!ayudante) throw new NotFoundException('Ayudante no encontrado');
-    if (ayudante.jefeId !== jefeId) throw new ForbiddenException();
+    const ayudante = await this.requireAyudanteDelJefe(ayudanteId, jefeId);
     await this.ensureOwner(dto.negocioId, jefeId);
     return this.prisma.ayudanteNegocio.update({
-      where: { id: ayudanteId },
+      where: { id: ayudante.id },
       data: { negocioId: dto.negocioId },
       include: {
-        usuario: { select: { id: true, email: true, nombre: true } },
+        usuario: {
+          select: { id: true, email: true, nombre: true, apellido: true },
+        },
         negocio: true,
       },
     });
+  }
+
+  async updateAyudante(
+    ayudanteId: string,
+    jefeId: string,
+    dto: UpdateAyudanteDto,
+  ) {
+    const ayudante = await this.requireAyudanteDelJefe(ayudanteId, jefeId);
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.nombre !== undefined || dto.apellido !== undefined) {
+        await tx.usuario.update({
+          where: { id: ayudante.usuarioId },
+          data: {
+            ...(dto.nombre !== undefined
+              ? { nombre: dto.nombre.trim() }
+              : {}),
+            ...(dto.apellido !== undefined
+              ? { apellido: dto.apellido.trim() || null }
+              : {}),
+          },
+        });
+      }
+      return tx.ayudanteNegocio.update({
+        where: { id: ayudante.id },
+        data: {
+          ...(dto.estado !== undefined ? { estado: dto.estado } : {}),
+        },
+        include: {
+          usuario: {
+            select: { id: true, email: true, nombre: true, apellido: true },
+          },
+        },
+      });
+    });
+  }
+
+  async deleteAyudante(ayudanteId: string, jefeId: string) {
+    const ayudante = await this.requireAyudanteDelJefe(ayudanteId, jefeId);
+    // Baja lógica: deja de aparecer en el panel y no puede cobrar en el POS.
+    await this.prisma.ayudanteNegocio.update({
+      where: { id: ayudante.id },
+      data: { activo: false, estado: AyudanteNegocio_estado.INACTIVO },
+    });
+    return { message: 'Ayudante eliminado' };
+  }
+
+  private async requireAyudanteDelJefe(ayudanteId: string, jefeId: string) {
+    const ayudante = await this.prisma.ayudanteNegocio.findUnique({
+      where: { id: ayudanteId },
+    });
+    if (!ayudante || !ayudante.activo) {
+      throw new NotFoundException('Ayudante no encontrado');
+    }
+    if (ayudante.jefeId !== jefeId) throw new ForbiddenException();
+    return ayudante;
   }
 
   private async ensureOwner(negocioId: string, duenoId: string) {

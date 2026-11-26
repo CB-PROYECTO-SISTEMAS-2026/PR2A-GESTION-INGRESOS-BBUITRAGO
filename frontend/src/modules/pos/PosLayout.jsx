@@ -7,5 +7,12 @@ const TABS = [
 
 /** Terminal de punto de venta: pensada para el celular del ayudante. */
 export default function PosLayout() {
-  return <StaffLayout tabs={TABS} label="Punto de venta" />
+  return (
+    <StaffLayout
+      tabs={TABS}
+      label="Punto de venta"
+      perfilPath="/pos/perfil"
+      lectorPath="/pos"
+    />
+  )
 }

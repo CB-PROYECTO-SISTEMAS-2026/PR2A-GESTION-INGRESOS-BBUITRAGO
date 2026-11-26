@@ -3,6 +3,7 @@ import { getAllEventsAdmin } from '../../api/events.api'
 import { anularRecarga, getRecargasAdmin, resolverIncidenciaRecarga } from '../../api/recargas.api'
 import { toast } from '../../components/Toast'
 import Modal from '../../components/ui/Modal'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { formatBs, formatDateTime, getErrorMessage } from '../../utils/format'
 import { estadoMovimientoBadge, estadoMovimientoLabel } from '../../utils/movimientos'
 import { INCIDENCIA_TEXTO_MAX, tipoIncidenciaLabel } from '../recargas/incidencias'
@@ -26,6 +27,7 @@ export default function RecargasAdminPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [anulando, setAnulando] = useState(null)
+  const [actualizando, setActualizando] = useState(false)
   const [resolviendo, setResolviendo] = useState(null)
   const ultimaPeticion = useRef(0)
 
@@ -37,6 +39,7 @@ export default function RecargasAdminPage() {
 
   const cargar = useCallback(async () => {
     const peticion = ++ultimaPeticion.current
+    setActualizando(true)
     try {
       const params = Object.fromEntries(Object.entries({ ...filtro, page }).filter(([, v]) => v))
       const { data } = await getRecargasAdmin(params)
@@ -45,6 +48,8 @@ export default function RecargasAdminPage() {
       setError('')
     } catch (err) {
       if (peticion === ultimaPeticion.current) setError(getErrorMessage(err))
+    } finally {
+      if (peticion === ultimaPeticion.current) setActualizando(false)
     }
   }, [filtro, page])
 
@@ -150,11 +155,16 @@ export default function RecargasAdminPage() {
           {error}
         </p>
       )}
-      {!data && !error && <p className="mt-8 text-muted">Cargando…</p>}
+      {!data && !error && (
+        <p className="mt-8 text-sm text-muted" role="status">
+          Cargando recargas…
+        </p>
+      )}
 
       {data && (
+        <PendingRegion pending={actualizando}  className="mt-4">
         <>
-          <p className="mt-4 text-sm text-muted">
+          <p className="text-sm text-muted">
             {data.totalItems} {data.totalItems === 1 ? 'recarga' : 'recargas'} · Total vigente{' '}
             <strong className="text-ink">{formatBs(data.totalRecargado)}</strong>
           </p>
@@ -247,6 +257,7 @@ export default function RecargasAdminPage() {
             </div>
           )}
         </>
+        </PendingRegion>
       )}
 
       <AnularRecargaModal

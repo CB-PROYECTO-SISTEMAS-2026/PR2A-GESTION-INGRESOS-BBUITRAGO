@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { asignarSupervisorAcceso, getAccesoEvento, quitarSupervisorAcceso } from '../../api/acceso.api'
 import { toast } from '../../components/Toast'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import { IconUsers, IconX } from '../../components/ui/icons'
 import AforoResumen from '../../components/acceso/AforoResumen'
+import PendingRegion from '../../components/ui/PendingRegion'
 import EventoHeader from './components/EventoHeader'
 import EncargadoAccesoPicker from './components/EncargadoAccesoPicker'
 import { formatDay, getErrorMessage, toDay } from '../../utils/format'
@@ -22,21 +23,32 @@ export default function AccesoEventoPage() {
   const [fechaId, setFechaId] = useState('')
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [actualizando, setActualizando] = useState(false)
+  const peticion = useRef(0)
 
-  const load = useCallback(async () => {
-    const { data: res } = await getAccesoEvento(id, fechaId || undefined)
-    setData(res)
-    setLoadError('')
+  const load = useCallback(async ({ visible = true } = {}) => {
+    const n = ++peticion.current
+    if (visible) setActualizando(true)
+    try {
+      const { data: res } = await getAccesoEvento(id, fechaId || undefined)
+      if (n !== peticion.current) return
+      setData(res)
+      setLoadError('')
+    } catch (err) {
+      if (n === peticion.current && visible) setLoadError(getErrorMessage(err))
+    } finally {
+      if (n === peticion.current) setActualizando(false)
+    }
   }, [id, fechaId])
 
   useEffect(() => {
-    load().catch((err) => setLoadError(getErrorMessage(err)))
+    load()
   }, [load])
 
   const esHoy = data?.aforo?.fecha && toDay(data.aforo.fecha.fecha) === data.hoy
   useEffect(() => {
     if (!esHoy) return undefined
-    const timer = setInterval(() => load().catch(() => {}), REFRESH_MS)
+    const timer = setInterval(() => load({ visible: false }), REFRESH_MS)
     return () => clearInterval(timer)
   }, [esHoy, load])
 
@@ -153,12 +165,13 @@ export default function AccesoEventoPage() {
                 </select>
               )}
             </div>
-            <div className="mt-4">
+            <PendingRegion pending={actualizando} className="mt-4">
               <AforoResumen aforo={aforo} />
-            </div>
+            </PendingRegion>
           </section>
         </div>
 
+        <PendingRegion pending={actualizando}>
         <section className="card-surface p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-display text-lg font-bold text-ink">
@@ -218,7 +231,8 @@ export default function AccesoEventoPage() {
               </tbody>
             </table>
           </div>
-        </section>
+          </section>
+        </PendingRegion>
 
         {rechazos?.length > 0 && (
           <section className="card-surface p-6">

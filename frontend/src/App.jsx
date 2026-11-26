@@ -7,6 +7,7 @@ import AdminLayout from './components/layout/AdminLayout'
 import BusinessLayout from './components/layout/BusinessLayout'
 import SupervisorLayout from './components/layout/SupervisorLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
+import CatalogGate from './components/layout/CatalogGate'
 
 import Reportes from './modules/sprint3/Reportes'
 import Reembolsos from './modules/sprint3/Reembolsos'
@@ -94,9 +95,14 @@ const router = createBrowserRouter([
       {
         element: <PublicLayout />,
         children: [
-          { index: true, element: <HomePage /> },
-          { path: 'eventos', element: <EventsPage /> },
-          { path: 'eventos/:id', element: <EventDetailPage /> },
+          {
+            element: <CatalogGate />,
+            children: [
+              { index: true, element: <HomePage /> },
+              { path: 'eventos', element: <EventsPage /> },
+              { path: 'eventos/:id', element: <EventDetailPage /> },
+            ],
+          },
           { path: 'login', element: <LoginPage /> },
           { path: 'register', element: <RegisterPage /> },
           { path: 'forgot-password', element: <ForgotPasswordPage /> },
@@ -195,6 +201,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <PosPage /> },
               { path: 'historial', element: <PosHistorialPage /> },
+              { path: 'perfil', element: <ProfilePage terminal /> },
             ],
           },
         ],
@@ -208,6 +215,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <RecargaPage /> },
               { path: 'historial', element: <RecargasHistorialPage /> },
+              { path: 'perfil', element: <ProfilePage terminal /> },
             ],
           },
         ],
@@ -218,7 +226,12 @@ const router = createBrowserRouter([
         children: [
           {
             element: <DevolucionesLayout />,
-            children: [{ index: true, element: <DevolucionPage /> }, { path: 'retiros', element: <RetirosCaja /> }, { path: 'historial', element: <HistorialDevoluciones /> }],
+            children: [
+              { index: true, element: <DevolucionPage /> },
+              { path: 'retiros', element: <RetirosCaja /> },
+              { path: 'historial', element: <HistorialDevoluciones /> },
+              { path: 'perfil', element: <ProfilePage terminal /> },
+            ],
           },
         ],
       },
@@ -229,10 +242,12 @@ const router = createBrowserRouter([
           {
             element: <SupervisorLayout />,
             children: [
-              { index: true, element: <EntregaManillasPage /> },
+              { index: true, element: <ControlAccesoPage /> },
+              { path: 'manillas', element: <EntregaManillasPage /> },
               { path: 'historial-accesos', element: <HistorialAccesos /> },
               { path: 'entregas', element: <MisEntregasPage /> },
-              { path: 'acceso', element: <ControlAccesoPage /> },
+              { path: 'perfil', element: <ProfilePage terminal /> },
+              { path: 'acceso', element: <Navigate to="/supervisor" replace /> },
             ],
           },
         ],

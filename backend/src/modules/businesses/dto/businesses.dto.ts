@@ -1,5 +1,9 @@
 import { Transform } from 'class-transformer';
-import { Producto_categoria, SolicitudNegocio_estado } from '@prisma/client';
+import {
+  AyudanteNegocio_estado,
+  Producto_categoria,
+  SolicitudNegocio_estado,
+} from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
@@ -152,16 +156,31 @@ export class CreateAyudanteDto {
   @IsString()
   @MaxLength(100)
   apellido?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  rolFuncion?: string;
 }
 
 export class AsignarAyudanteDto {
   @IsString()
   negocioId: string;
+}
+
+export class UpdateAyudanteDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  apellido?: string;
+
+  /** Solo ACTIVO puede cobrar en el POS de los eventos aceptados del negocio. */
+  @IsOptional()
+  @IsIn([AyudanteNegocio_estado.ACTIVO, AyudanteNegocio_estado.INACTIVO], {
+    message: 'El estado debe ser ACTIVO o INACTIVO.',
+  })
+  estado?: 'ACTIVO' | 'INACTIVO';
 }
 
 export class SolicitarParticipacionDto {

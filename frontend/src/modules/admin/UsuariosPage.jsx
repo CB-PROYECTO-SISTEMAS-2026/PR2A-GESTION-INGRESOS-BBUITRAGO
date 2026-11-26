@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { toast } from '../../components/Toast'
 import Modal from '../../components/ui/Modal'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { confirmDialog } from '../../components/ui/ConfirmDialog'
 import {
   IconCheck,
@@ -364,7 +365,8 @@ export default function UsuariosPage() {
             />
           </div>
 
-          <div className={`mt-4 overflow-x-auto rounded-md border border-border transition ${loadingUsers ? 'opacity-60' : ''}`}>
+          <PendingRegion pending={loadingUsers} className="mt-4">
+          <div className="overflow-x-auto rounded-md border border-border">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-page text-xs uppercase tracking-wide text-muted">
                 <tr>
@@ -430,6 +432,7 @@ export default function UsuariosPage() {
               </tbody>
             </table>
           </div>
+          </PendingRegion>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
             <span className="text-muted">
