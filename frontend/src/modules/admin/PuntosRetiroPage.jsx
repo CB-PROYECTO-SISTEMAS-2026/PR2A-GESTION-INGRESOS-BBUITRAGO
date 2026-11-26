@@ -19,7 +19,30 @@ import { formatDateTime, formatDay, getErrorMessage } from '../../utils/format'
 import { tipoAccesoLabel } from '../../utils/labels'
 import { formatNumber } from '../../utils/validation'
 
-const emptyForm = { nombre: '', ubicacion: '', horario: '' }
+const emptyForm = { nombre: '', ubicacion: '', horaDesde: '', horaHasta: '' }
+
+/** Acepta "09:00 - 18:00", guiones tipográficos o un solo "HH:mm". */
+function parseHorario(value) {
+  if (!value || typeof value !== 'string') return { horaDesde: '', horaHasta: '' }
+  const match = value.trim().match(/^(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})$/)
+  if (match) {
+    return { horaDesde: normalizarHora(match[1]), horaHasta: normalizarHora(match[2]) }
+  }
+  const solo = value.trim().match(/^(\d{1,2}:\d{2})$/)
+  if (solo) return { horaDesde: normalizarHora(solo[1]), horaHasta: '' }
+  return { horaDesde: '', horaHasta: '' }
+}
+
+function normalizarHora(hhmm) {
+  const [h, m] = hhmm.split(':')
+  return `${String(Number(h)).padStart(2, '0')}:${m}`
+}
+
+function formatHorario(horaDesde, horaHasta) {
+  if (!horaDesde && !horaHasta) return ''
+  if (horaDesde && horaHasta) return `${horaDesde} - ${horaHasta}`
+  return horaDesde || horaHasta
+}
 
 /** HU-053: puntos de entrega de manillas del evento, sus supervisores y el registro de entregas. */
 export default function PuntosRetiroPage() {
@@ -62,7 +85,13 @@ export default function PuntosRetiroPage() {
 
   const setField = (name, value) => {
     setForm((f) => ({ ...f, [name]: value }))
-    setErrors((e) => (e[name] ? { ...e, [name]: '' } : e))
+    setErrors((e) => {
+      if (!e[name] && !e.horario) return e
+      const next = { ...e }
+      if (next[name]) next[name] = ''
+      if ((name === 'horaDesde' || name === 'horaHasta') && next.horario) next.horario = ''
+      return next
+    })
   }
 
   const resetForm = () => {
@@ -73,18 +102,37 @@ export default function PuntosRetiroPage() {
 
   const startEdit = (p) => {
     setEditingId(p.id)
-    setForm({ nombre: p.nombre, ubicacion: p.ubicacion || '', horario: p.horario || '' })
+    setForm({
+      nombre: p.nombre,
+      ubicacion: p.ubicacion || '',
+      ...parseHorario(p.horario),
+    })
     setErrors({})
     document.getElementById('punto-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const onSubmit = async (e) => {
     e.preventDefault()
+    const nextErrors = {}
     if (form.nombre.trim().length < 2) {
-      setErrors({ nombre: 'El nombre debe tener al menos 2 caracteres.' })
+      nextErrors.nombre = 'El nombre debe tener al menos 2 caracteres.'
+    }
+    const tieneDesde = Boolean(form.horaDesde)
+    const tieneHasta = Boolean(form.horaHasta)
+    if (tieneDesde !== tieneHasta) {
+      nextErrors.horario = 'Indica la hora de inicio y la hora de fin.'
+    } else if (tieneDesde && tieneHasta && form.horaHasta <= form.horaDesde) {
+      nextErrors.horario = 'La hora de fin debe ser posterior a la de inicio.'
+    }
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors)
       return
     }
-    const payload = { nombre: form.nombre.trim(), ubicacion: form.ubicacion.trim(), horario: form.horario.trim() }
+    const payload = {
+      nombre: form.nombre.trim(),
+      ubicacion: form.ubicacion.trim(),
+      horario: formatHorario(form.horaDesde, form.horaHasta),
+    }
     setSaving(true)
     try {
       const { data } = editingId ? await updatePuntoRetiro(editingId, payload) : await createPuntoRetiro(id, payload)
@@ -211,15 +259,30 @@ export default function PuntosRetiroPage() {
                   onChange={(e) => setField('ubicacion', e.target.value)}
                 />
               </Field>
-              <Field label="Horario de entrega" htmlFor="punto-horario">
-                <input
-                  id="punto-horario"
-                  className="input"
-                  value={form.horario}
-                  maxLength={100}
-                  placeholder="Ej. 09:00 - 18:00"
-                  onChange={(e) => setField('horario', e.target.value)}
-                />
+              <Field label="Horario de entrega" htmlFor="punto-hora-desde" error={errors.horario}>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="punto-hora-desde"
+                    className="input tabular-nums"
+                    type="time"
+                    value={form.horaDesde}
+                    onChange={(e) => setField('horaDesde', e.target.value)}
+                    aria-invalid={Boolean(errors.horario)}
+                    aria-label="Hora de inicio de entrega"
+                  />
+                  <span className="shrink-0 text-sm font-semibold text-muted" aria-hidden>
+                    –
+                  </span>
+                  <input
+                    id="punto-hora-hasta"
+                    className="input tabular-nums"
+                    type="time"
+                    value={form.horaHasta}
+                    onChange={(e) => setField('horaHasta', e.target.value)}
+                    aria-invalid={Boolean(errors.horario)}
+                    aria-label="Hora de fin de entrega"
+                  />
+                </div>
               </Field>
               <div className="flex flex-wrap gap-3 pt-1">
                 <button type="submit" className="btn-primary" disabled={saving}>

@@ -26,6 +26,9 @@ export class CreatePuntoRetiroDto {
   @Transform(emptyToUndefined)
   @IsString()
   @Transform(trimString)
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d\s-\s([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'El horario debe ser un rango de horas (ej. 09:00 - 18:00).',
+  })
   @MaxLength(100, { message: 'El horario puede tener hasta 100 caracteres.' })
   horario?: string;
 }
@@ -45,9 +48,13 @@ export class UpdatePuntoRetiroDto {
   @MaxLength(191, { message: 'La ubicación puede tener hasta 191 caracteres.' })
   ubicacion?: string;
 
+  /** Cadena vacía borra el horario. */
   @IsOptional()
   @IsString()
   @Transform(trimString)
+  @Matches(/^$|^([01]\d|2[0-3]):[0-5]\d\s-\s([01]\d|2[0-3]):[0-5]\d$/, {
+    message: 'El horario debe ser un rango de horas (ej. 09:00 - 18:00).',
+  })
   @MaxLength(100, { message: 'El horario puede tener hasta 100 caracteres.' })
   horario?: string;
 
