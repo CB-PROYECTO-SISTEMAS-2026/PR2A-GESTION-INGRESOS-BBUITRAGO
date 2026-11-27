@@ -25,7 +25,7 @@ import {
 } from '../../../common/validation/validators';
 import { IDEMPOTENCY_KEY_RE } from '../../pos/dto/pos.dto';
 
-export const MAX_ENTRADAS_POR_COMPRA = 20;
+export const MAX_ENTRADAS_POR_COMPRA = 6;
 const CANTIDAD_MESSAGE = `La cantidad debe ser un número entero entre 1 y ${MAX_ENTRADAS_POR_COMPRA}.`;
 export const TELEFONO_RE = /^[\d+\s()-]{7,20}$/;
 

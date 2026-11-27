@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { crearCompra, getCheckout } from '../../api/compras.api'
-import QR_PAGOS from '../../assets/qr_pagos.jpeg'
 import { toast } from '../../components/Toast'
 import ImageCaptureField from '../../components/form/ImageCaptureField'
 import Modal from '../../components/ui/Modal'
@@ -56,7 +55,7 @@ function Stepper({ value, onChange, max, disabled, label }) {
 }
 
 /**
- * Modal de compra: categorías + contadores, asignación por correo, QR fijo, comprobante con cámara.
+ * Modal de compra: categorías + contadores, asignación por correo, QR del evento, comprobante con cámara.
  * No muestra cupos. El n.º de operación no se pide.
  */
 export default function CompraEntradasModal({ open, onClose, eventoId }) {
@@ -100,8 +99,10 @@ export default function CompraEntradasModal({ open, onClose, eventoId }) {
   const fechas = useMemo(() => evento?.fechas ?? [], [evento])
   const fechaById = useMemo(() => new Map(fechas.map((f) => [f.id, f])), [fechas])
   const unicaFechaId = !multiDia ? fechas[0]?.id ?? '' : ''
-  const maxEntradas = data?.maxEntradas ?? 20
+  const maxEntradas = data?.maxEntradas ?? 6
   const habilitado = Boolean(data?.pago?.habilitado)
+  const qrPagoUrl = data?.pago?.qrPagoUrl || ''
+  const instruccionesPago = data?.pago?.instruccionesPago || ''
   const hayDiasALaVenta = fechas.some((f) => f.aLaVenta)
   const bloqueado = !habilitado || !hayDiasALaVenta
 
@@ -483,7 +484,7 @@ export default function CompraEntradasModal({ open, onClose, eventoId }) {
               </div>
             </div>
 
-            {habilitado && (
+            {habilitado && qrPagoUrl && (
               <div>
                 <h3 className="font-display text-lg font-bold text-ink">Pago QR</h3>
                 <button
@@ -493,13 +494,16 @@ export default function CompraEntradasModal({ open, onClose, eventoId }) {
                   aria-label="Ver QR de pago en pantalla completa"
                 >
                   <img
-                    src={QR_PAGOS}
-                    alt="QR de pagos Eventix"
+                    src={qrPagoUrl}
+                    alt="QR de pago del evento"
                     className="aspect-square w-full object-contain"
                     width={220}
                     height={220}
                   />
                 </button>
+                {instruccionesPago && (
+                  <p className="mt-3 whitespace-pre-wrap text-sm text-muted">{instruccionesPago}</p>
+                )}
                 <div className="mt-4">
                   <p className="mb-2 text-sm font-medium text-ink">Comprobante</p>
                   <ImageCaptureField
@@ -528,6 +532,7 @@ export default function CompraEntradasModal({ open, onClose, eventoId }) {
     </Modal>
 
     {qrOpen &&
+      qrPagoUrl &&
       createPortal(
         <div
           className="fixed inset-0 z-[100] flex flex-col bg-sidebar/95"
@@ -547,13 +552,15 @@ export default function CompraEntradasModal({ open, onClose, eventoId }) {
           </div>
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-4 pb-10">
             <img
-              src={QR_PAGOS}
-              alt="QR de pagos Eventix"
+              src={qrPagoUrl}
+              alt="QR de pago del evento"
               className="max-h-[min(70vh,28rem)] w-full max-w-md object-contain"
             />
             <a
-              href={QR_PAGOS}
-              download="eventix-qr-pago.jpeg"
+              href={qrPagoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download="qr-pago-evento.jpeg"
               className="btn-primary inline-flex items-center gap-2"
             >
               <IconDownload className="h-4 w-4" />
