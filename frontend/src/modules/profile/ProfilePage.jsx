@@ -36,7 +36,7 @@ function toForm(data) {
 }
 
 /** Perfil: datos básicos + identidad; organizadores editan también la productora. */
-export default function ProfilePage() {
+export default function ProfilePage({ terminal = false }) {
   const { user, refreshUser, hasRole } = useAuth()
   const isOrganizador = hasRole('ORGANIZADOR')
   const [form, setForm] = useState(emptyForm)
@@ -146,7 +146,10 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 px-4 py-12" aria-busy="true">
+      <div
+        className={terminal ? 'flex flex-1 flex-col gap-4 p-4' : 'mx-auto max-w-3xl space-y-4 px-4 py-12'}
+        aria-busy="true"
+      >
         <span className="sr-only">Cargando…</span>
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-24 w-full" />
@@ -158,8 +161,10 @@ export default function ProfilePage() {
   const iniciales = `${(form.nombre[0] || '?').toUpperCase()}${(form.apellido[0] || '').toUpperCase()}`
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-10">
-      <h1 className="font-display text-3xl font-bold text-ink text-balance">Mi perfil</h1>
+    <div className={terminal ? 'flex flex-1 flex-col gap-5 p-4 pb-6' : 'mx-auto max-w-3xl space-y-6 px-4 py-10'}>
+      <h1 className={`font-display font-bold text-ink text-balance ${terminal ? 'text-xl' : 'text-3xl'}`}>
+        Mi perfil
+      </h1>
 
       <Section title="Foto">
         <div className="flex flex-wrap items-center gap-5">

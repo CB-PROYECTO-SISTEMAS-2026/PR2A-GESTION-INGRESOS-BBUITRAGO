@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getResumenVentas } from '../../api/pos.api'
 import { formatBs, formatTime, getErrorMessage } from '../../utils/format'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { FiltrosVentas, KpiCard, VentasPorDiaChart } from './components/VentasUI'
 import { useFiltrosVentas } from './components/ventasFiltros'
 
@@ -11,13 +12,15 @@ export default function DashboardPage() {
   const [filtros, setFiltros] = useFiltrosVentas()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [actualizando, setActualizando] = useState(false)
 
   // Número de la última petición: al cambiar los filtros (o con el refresco periódico), una
   // respuesta vieja que llega tarde se descarta y no pisa los datos de los filtros nuevos.
   const ultimaPeticion = useRef(0)
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async ({ visible = true } = {}) => {
     const peticion = ++ultimaPeticion.current
+    if (visible) setActualizando(true)
     try {
       const { data } = await getResumenVentas(filtros)
       if (peticion !== ultimaPeticion.current) return
@@ -25,14 +28,16 @@ export default function DashboardPage() {
       setError('')
     } catch (err) {
       if (peticion === ultimaPeticion.current) setError(getErrorMessage(err))
+    } finally {
+      if (peticion === ultimaPeticion.current) setActualizando(false)
     }
   }, [filtros])
 
-  // Actualización periódica mientras la pestaña está visible.
+  // Actualización periódica mientras la pestaña está visible. El poll no muestra el aviso.
   useEffect(() => {
-    cargar()
+    cargar({ visible: true })
     const id = setInterval(() => {
-      if (document.visibilityState === 'visible') cargar()
+      if (document.visibilityState === 'visible') cargar({ visible: false })
     }, POLL_MS)
     return () => clearInterval(id)
   }, [cargar])
@@ -58,9 +63,14 @@ export default function DashboardPage() {
         </p>
       )}
 
-      {!data && !error && <p className="mt-8 text-muted">Cargando…</p>}
+      {!data && !error && (
+        <div className="mt-16 flex justify-center">
+          <span className="ev-spinner" role="progressbar" aria-label="Cargando" />
+        </div>
+      )}
 
       {data && (
+        <PendingRegion pending={actualizando}>
         <>
           {!data.negocios.length && (
             <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -199,6 +209,7 @@ export default function DashboardPage() {
             </div>
           </section>
         </>
+        </PendingRegion>
       )}
     </div>
   )

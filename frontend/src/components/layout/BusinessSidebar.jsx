@@ -2,7 +2,7 @@ import PanelSidebar from './PanelSidebar'
 
 const items = [
   { to: '/negocio/dashboard', label: 'Resumen' },
-  { to: '/negocio', label: 'Mis Negocios', end: true },
+  { to: '/negocio', label: 'Mi Negocio', end: true },
   { to: '/negocio/productos', label: 'Productos' },
   { to: '/negocio/ventas', label: 'Ventas' },
   { to: '/negocio/ayudantes', label: 'Ayudantes' },
@@ -10,5 +10,5 @@ const items = [
 ]
 
 export default function BusinessSidebar(props) {
-  return <PanelSidebar items={items} roleLabel="Jefe de negocio" {...props} />
+  return <PanelSidebar items={items} roleLabel="Jefe de negocio" {...props} showAccountLinks={false} />
 }

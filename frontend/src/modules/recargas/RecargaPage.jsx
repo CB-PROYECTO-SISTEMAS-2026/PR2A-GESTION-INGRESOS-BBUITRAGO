@@ -1,7 +1,8 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { consultarClienteRecarga, getRecargasContexto, recargar } from '../../api/recargas.api'
 import { toast } from '../../components/Toast'
+import TarjetaLectura from '../../components/terminal/TarjetaLectura'
 import { IconCheck, IconQr, IconWallet, IconWarning } from '../../components/ui/icons'
 import { useAuth } from '../../context/AuthContext'
 import { feedbackError, feedbackOk } from '../../utils/feedback'
@@ -43,6 +44,8 @@ function usePendientes(userId) {
 /** HU-019 / HU-047: el recargador escanea la manilla o el QR del cliente y acredita saldo en efectivo. */
 export default function RecargaPage() {
   const { user } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const eventoKey = `eventix_recargas_evento:${user?.id ?? ''}`
   const [ctx, setCtx] = useState(null)
   const [loadError, setLoadError] = useState('')
@@ -115,6 +118,12 @@ export default function RecargaPage() {
     window.addEventListener('online', reintentarPendientes)
     return () => window.removeEventListener('online', reintentarPendientes)
   }, [reintentarPendientes])
+
+  useEffect(() => {
+    if (!location.state?.openLector) return
+    setPaso('escanear')
+    navigate('.', { replace: true, state: {} })
+  }, [location.state?.openLector, navigate])
 
   const eventosHoy = ctx?.eventos.filter((e) => e.enCurso) ?? []
   const evento = eventosHoy.find((e) => e.id === eventoId)
@@ -306,11 +315,7 @@ export default function RecargaPage() {
             <CodigoScanner onCodigo={onCodigo} disabled={buscando} />
           </Suspense>
           {buscando && <p className="text-center text-sm text-muted">Buscando cliente…</p>}
-          {scanError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
-              {scanError}
-            </p>
-          )}
+          {scanError && <TarjetaLectura tono="danger" titulo="No se pudo leer" motivo={scanError} />}
           <button type="button" className="py-2 text-sm font-semibold text-muted" onClick={volverAlInicio}>
             Volver
           </button>
@@ -596,18 +601,17 @@ function ConfirmarRecarga({ cliente, monto, rechazo, enviando, pendiente, onConf
 function RecargaExitosa({ resultado, onNueva, onInicio }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-4 p-4">
-      <div className="mt-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
-        <IconCheck className="h-8 w-8" strokeWidth={2.5} />
-      </div>
-      <div className="text-center">
-        <p className="font-display text-2xl font-bold">Recarga Exitosa</p>
-        <p className="text-sm text-muted">El saldo ha sido actualizado</p>
-        {resultado.repetido && (
-          <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Esta recarga ya se había registrado: se muestra el comprobante original y no se acreditó otra vez.
-          </p>
-        )}
-      </div>
+      <TarjetaLectura
+        tono="success"
+        titulo="Recarga exitosa"
+        nombre={resultado.cliente.nombre}
+        codigo={resultado.codigo}
+        motivo={
+          resultado.repetido
+            ? 'Esta recarga ya se había registrado: se muestra el comprobante original y no se acreditó otra vez.'
+            : null
+        }
+      />
       <div className="w-full rounded-xl border border-border bg-white p-4 text-center">
         <p className="font-semibold">{resultado.cliente.nombre}</p>
         {resultado.cliente.identificador && (

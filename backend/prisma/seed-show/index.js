@@ -426,7 +426,6 @@ async function crearNegocios(jefes, eventosPublicados, admin) {
           jefeId: jefe.id,
           estado,
           rolId: rolCajero.id,
-          rolFuncion: 'cajero',
           activo: estado === 'ACTIVO',
         },
       });

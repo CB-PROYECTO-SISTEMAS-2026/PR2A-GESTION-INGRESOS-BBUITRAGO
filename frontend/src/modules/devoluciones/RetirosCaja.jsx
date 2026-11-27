@@ -1,28 +1,111 @@
 import { useState } from 'react'
 import api from '../../api/axios'
 import { pagarRetiro } from '../../api/pos.api'
+import { toast } from '../../components/Toast'
 import Modal from '../../components/ui/Modal'
 import { formatBs, getErrorMessage } from '../../utils/format'
 
+const ESTADO = {
+  APROBADO: 'Aprobado',
+  PAGADO: 'Pagado',
+  RECHAZADO: 'Rechazado',
+  PENDIENTE: 'Pendiente',
+}
+
 export default function RetirosCaja() {
-  const [retiro, elegir] = useState(null)
-  const [mensaje, avisar] = useState('')
+  const [codigo, setCodigo] = useState('')
+  const [retiro, setRetiro] = useState(null)
+  const [error, setError] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [pagar, setPagar] = useState(false)
+
   async function buscar(e) {
     e.preventDefault()
-    const codigo = e.currentTarget.elements.codigo.value.trim()
-    avisar('')
+    const value = codigo.trim()
+    if (!value) return
+    setError('')
+    setRetiro(null)
+    setPagar(false)
+    setBuscando(true)
     try {
-      const { data } = await api.get('/devoluciones/retiros/' + encodeURIComponent(codigo))
-      if (data.estado === 'PAGADO') avisar('Este retiro ya fue pagado.')
-      else elegir(data)
-    } catch (err) { avisar(getErrorMessage(err)) }
+      const { data } = await api.get('/devoluciones/retiros/' + encodeURIComponent(value))
+      setRetiro({ ...data, codigo: value })
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setBuscando(false)
+    }
   }
-  return <main className="space-y-4 p-5"><h1 className="text-2xl font-bold">Retiro en efectivo</h1>
-    <form onSubmit={buscar}><label className="label">Código de retiro<input className="input" name="codigo" required /></label>
-    <button className="btn-primary mt-3">Consultar retiro</button></form><p role="status">{mensaje}</p>
-    {retiro && <RegistrarPagoModal retiro={retiro} onClose={() => elegir(null)} onPagado={repetido => {
-      elegir(null); avisar(repetido ? 'Este retiro ya fue registrado. Verificá el comprobante antes de entregar efectivo.' : 'Pago registrado. Entregá el efectivo al titular.')
-    }} />}</main>
+
+  return (
+    <main className="flex flex-1 flex-col gap-4 p-4">
+      <h1 className="font-display text-xl font-bold text-ink">Retiro en efectivo</h1>
+      <form onSubmit={buscar} className="grid gap-2">
+        <label className="label" htmlFor="codigo-retiro">
+          Código de retiro
+        </label>
+        <input
+          id="codigo-retiro"
+          className="input font-mono"
+          name="codigo"
+          value={codigo}
+          required
+          autoComplete="off"
+          onChange={(e) => setCodigo(e.target.value)}
+          aria-invalid={Boolean(error)}
+        />
+        {error && (
+          <p className="field-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button className="btn-primary w-full" disabled={buscando}>
+          {buscando ? 'Consultando…' : 'Consultar retiro'}
+        </button>
+      </form>
+
+      {retiro && (
+        <article className="rounded-xl border border-border bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-xs text-muted">{retiro.codigo}</p>
+              <p className="font-display text-2xl font-bold text-ink">{formatBs(retiro.monto)}</p>
+              <p className="text-sm font-semibold text-ink">{retiro.negocio}</p>
+              <p className="text-xs text-muted">{retiro.dueno}</p>
+            </div>
+            <span className={`badge ${retiro.estado === 'PAGADO' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`}>
+              {ESTADO[retiro.estado] || retiro.estado}
+            </span>
+          </div>
+          {retiro.estado !== 'PAGADO' && (
+            <button type="button" className="btn-primary mt-4 w-full" onClick={() => setPagar(true)}>
+              Registrar pago
+            </button>
+          )}
+        </article>
+      )}
+
+      {retiro && pagar && (
+        <RegistrarPagoModal
+          retiro={retiro}
+          onClose={() => setPagar(false)}
+          onPagado={(repetido) => {
+            setPagar(false)
+            setRetiro((prev) => (prev ? { ...prev, estado: 'PAGADO' } : prev))
+            toast(
+              repetido
+                ? {
+                    title: 'Este retiro ya fue registrado',
+                    body: 'Verificá el comprobante antes de entregar efectivo.',
+                    variant: 'warning',
+                  }
+                : { title: 'Pago registrado', body: 'Entregá el efectivo al titular.', variant: 'success' },
+            )
+          }}
+        />
+      )}
+    </main>
+  )
 }
 
 function RegistrarPagoModal({ retiro, onClose, onPagado }) {
@@ -61,7 +144,7 @@ function RegistrarPagoModal({ retiro, onClose, onPagado }) {
 
   return (
     <Modal
-      open={Boolean(retiro)}
+      open
       onClose={cerrar}
       title="Registrar pago del retiro"
       size="sm"
@@ -77,33 +160,34 @@ function RegistrarPagoModal({ retiro, onClose, onPagado }) {
         </>
       }
     >
-      {retiro && (
-        <form id="form-pago-retiro" onSubmit={enviar} className="grid gap-4 px-6 py-5">
-          <p className="text-sm text-muted">
-            Retiro de <strong className="text-ink">{formatBs(retiro.monto)}</strong> para{' '}
-            <strong className="text-ink">{retiro.negocio}</strong> ({retiro.dueno}).
+      <form id="form-pago-retiro" onSubmit={enviar} className="grid gap-4 px-6 py-5">
+        <p className="text-sm text-muted">
+          Retiro de <strong className="text-ink">{formatBs(retiro.monto)}</strong> para{' '}
+          <strong className="text-ink">{retiro.negocio}</strong> ({retiro.dueno}).
+        </p>
+        <label className="label">
+          Documento del titular presente
+          <input className="input" name="documento" required />
+        </label>
+        <div>
+          <label className="label" htmlFor="evidencia-retiro">
+            Comprobante del retiro en efectivo
+          </label>
+          <input
+            id="evidencia-retiro"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            className="input"
+            onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+          />
+          <p className="mt-1 text-xs text-muted">Imagen o PDF de hasta 10 MB.</p>
+        </div>
+        {error && (
+          <p className="field-error" role="alert">
+            {error}
           </p>
-          <label className="label">Documento del titular presente<input className="input" name="documento" required /></label>
-          <div>
-            <label className="label" htmlFor="evidencia-retiro">
-              Comprobante del retiro en efectivo *
-            </label>
-            <input
-              id="evidencia-retiro"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,application/pdf"
-              className="input"
-              onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-            />
-            <p className="mt-1 text-xs text-muted">Imagen o PDF de hasta 10 MB.</p>
-          </div>
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-      )}
+        )}
+      </form>
     </Modal>
   )
 }

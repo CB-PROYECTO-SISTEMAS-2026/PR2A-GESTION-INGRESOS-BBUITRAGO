@@ -1,8 +1,9 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { homeFor } from '../../utils/roles'
 
 export default function ProtectedRoute({ roles }) {
-  const { isAuthenticated, loading, hasRole } = useAuth()
+  const { user, isAuthenticated, loading, hasRole } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -18,7 +19,7 @@ export default function ProtectedRoute({ roles }) {
   }
 
   if (roles?.length && !hasRole(...roles)) {
-    return <Navigate to="/" replace />
+    return <Navigate to={homeFor(user?.roles)} replace />
   }
 
   return <Outlet />

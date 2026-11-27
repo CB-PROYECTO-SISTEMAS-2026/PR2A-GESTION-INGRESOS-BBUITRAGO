@@ -147,7 +147,6 @@ function ActividadAyudante({ u }) {
         <>
           <Dato label="Negocio">{a.negocio.nombre}</Dato>
           <Dato label="Evento">{a.negocio.evento?.titulo}</Dato>
-          <Dato label="Función">{a.rolFuncion}</Dato>
           <Dato label="Jefe de negocio">{[a.jefe.nombre, a.jefe.apellido].filter(Boolean).join(' ')}</Dato>
         </>
       ) : (

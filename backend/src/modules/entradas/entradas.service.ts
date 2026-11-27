@@ -144,9 +144,7 @@ export class EntradasService {
       },
     });
     if (!e) throw new NotFoundException('El código no corresponde a ninguna entrada de este evento.');
-    if (ENTRADA_INVALIDA.includes(e.estado)) {
-      throw new BadRequestException(`La entrada ${e.codigo} está ${e.estado.toLowerCase()} y ya no es válida.`);
-    }
+    // Anulada o reembolsada la resuelve el dictamen de la puerta, para poder dejar el rechazo en el log.
     return { medio, entrada: e };
   }
 

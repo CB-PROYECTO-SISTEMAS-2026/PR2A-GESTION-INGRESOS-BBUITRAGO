@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import jsQR from 'jsqr'
+import { leerQrDesdeArchivo } from '../../utils/leerQrDesdeArchivo'
 
 const SCAN_INTERVAL_MS = 150
 const MAX_SIDE = 640
@@ -13,14 +14,19 @@ function mensajeCamara(err) {
 /** Lee códigos QR con la cámara trasera mientras `active` sea true y avisa cada lectura con `onDetect`. */
 export default function QrScanner({ active, onDetect }) {
   const videoRef = useRef(null)
+  const inputFotoRef = useRef(null)
   const onDetectRef = useRef(onDetect)
   const [error, setError] = useState('')
+  const [fotoError, setFotoError] = useState('')
+  const [leyendoFoto, setLeyendoFoto] = useState(false)
+  const puedeCamaraEnVivo = typeof window !== 'undefined' && window.isSecureContext
+
   useLayoutEffect(() => {
     onDetectRef.current = onDetect
   })
 
   useEffect(() => {
-    if (!active) return undefined
+    if (!active || !puedeCamaraEnVivo) return undefined
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Este navegador no permite usar la cámara. Escribe el código manualmente.')
       return undefined
@@ -71,7 +77,50 @@ export default function QrScanner({ active, onDetect }) {
       cancelAnimationFrame(frame)
       stream?.getTracks().forEach((t) => t.stop())
     }
-  }, [active])
+  }, [active, puedeCamaraEnVivo])
+
+  const onFoto = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !active) return
+    setFotoError('')
+    setLeyendoFoto(true)
+    try {
+      const codigo = await leerQrDesdeArchivo(file)
+      if (codigo) onDetectRef.current(codigo)
+      else setFotoError('No se leyó un QR en la foto. Encuadralo de nuevo o escribí el código.')
+    } catch {
+      setFotoError('No se pudo leer la foto. Probá de nuevo o escribí el código.')
+    } finally {
+      setLeyendoFoto(false)
+    }
+  }
+
+  if (!puedeCamaraEnVivo) {
+    return (
+      <div className="grid gap-3 rounded-md border border-border bg-surface p-4">
+        <p className="text-sm text-ink">Fotografiá el QR con la cámara del celular.</p>
+        <input
+          ref={inputFotoRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={onFoto}
+          disabled={!active || leyendoFoto}
+        />
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={!active || leyendoFoto}
+          onClick={() => inputFotoRef.current?.click()}
+        >
+          {leyendoFoto ? 'Leyendo QR…' : 'Abrir cámara'}
+        </button>
+        {fotoError && <p className="text-sm text-danger">{fotoError}</p>}
+      </div>
+    )
+  }
 
   if (error) {
     return <div className="flex aspect-video items-center justify-center rounded-md bg-slate-900 p-6 text-center text-sm text-slate-200">{error}</div>

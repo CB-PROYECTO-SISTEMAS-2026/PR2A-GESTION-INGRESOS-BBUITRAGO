@@ -30,6 +30,9 @@ const ESTADO_LABELS = {
   USADA: 'Usada',
   REEMBOLSADA: 'Reembolsada',
   ANULADA: 'Anulada',
+  ACTIVO: 'Activo',
+  INACTIVO: 'Inactivo',
+  PENDIENTE_INVITACION: 'Invitación pendiente',
 }
 
 const ESTADO_BADGES = {
@@ -49,6 +52,9 @@ const ESTADO_BADGES = {
   USADA: 'bg-indigo-100 text-indigo-800',
   REEMBOLSADA: 'bg-slate-200 text-slate-600',
   ANULADA: 'bg-red-100 text-red-700',
+  ACTIVO: 'bg-emerald-100 text-emerald-800',
+  INACTIVO: 'bg-slate-200 text-slate-600',
+  PENDIENTE_INVITACION: 'bg-amber-100 text-amber-800',
 }
 
 const MAPA_CAMBIO_LABELS = {

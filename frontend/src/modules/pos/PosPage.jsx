@@ -1,7 +1,8 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { cobrar, consultarCliente, getPosContexto } from '../../api/pos.api'
-import { IconCheck, IconQr, IconWarning } from '../../components/ui/icons'
+import TarjetaLectura from '../../components/terminal/TarjetaLectura'
+import { IconCheck, IconQr } from '../../components/ui/icons'
 import { formatBs, formatDayRange, formatTime, getErrorMessage } from '../../utils/format'
 import { feedbackError, feedbackOk } from '../../utils/feedback'
 import { useAuth } from '../../context/AuthContext'
@@ -23,6 +24,8 @@ function maxCantidad(producto) {
 
 export default function PosPage() {
   const { user } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   // El evento elegido se recuerda por usuario: varios ayudantes pueden compartir un celular.
   const eventoKey = `eventix_pos_evento:${user?.id ?? ''}`
   const [ctx, setCtx] = useState(null)
@@ -83,6 +86,12 @@ export default function PosPage() {
   const totalCents = lineas.reduce((acc, l) => acc + l.subtotalCents, 0)
   const total = totalCents / 100
   const articulos = lineas.reduce((acc, l) => acc + l.cantidad, 0)
+
+  useEffect(() => {
+    if (!location.state?.openLector) return
+    if (lineas.length) setPaso('escanear')
+    navigate('.', { replace: true, state: {} })
+  }, [location.state?.openLector, lineas.length, navigate])
 
   const cambiarCantidad = (producto, delta) =>
     setCarrito((prev) => {
@@ -341,11 +350,7 @@ export default function PosPage() {
             <CodigoScanner onCodigo={onCodigo} disabled={buscando} />
           </Suspense>
           {buscando && <p className="text-center text-sm text-muted">Buscando cliente…</p>}
-          {scanError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
-              {scanError}
-            </p>
-          )}
+          {scanError && <TarjetaLectura tono="danger" titulo="No se pudo leer" motivo={scanError} />}
           <button type="button" className="py-2 text-sm font-semibold text-muted" onClick={() => setPaso('carrito')}>
             Volver al carrito
           </button>
@@ -409,16 +414,15 @@ function ConfirmarCobro({ cliente, lineas, totalCents, rechazo, cobrando, onConf
       </div>
 
       {(insuficiente || rechazo) && (
-        <div className="flex gap-3 rounded-xl border-2 border-red-500 bg-red-50 p-4 text-red-800" role="alert">
-          <IconWarning className="mt-0.5 h-6 w-6 shrink-0" />
-          <div>
-            <p className="font-bold">Cobro rechazado</p>
-            <p className="text-sm">
-              {rechazo ||
-                `Saldo insuficiente: faltan ${formatBs((totalCents - saldoCents) / 100)}. El cliente debe recargar saldo antes de pagar.`}
-            </p>
-          </div>
-        </div>
+        <TarjetaLectura
+          tono="danger"
+          titulo="Cobro rechazado"
+          nombre={cliente.cliente.nombre}
+          motivo={
+            rechazo ||
+            `Saldo insuficiente: faltan ${formatBs((totalCents - saldoCents) / 100)}. El cliente debe recargar saldo antes de pagar.`
+          }
+        />
       )}
 
       <div className="rounded-xl border border-border bg-white p-4 text-sm">
@@ -473,18 +477,17 @@ function ConfirmarCobro({ cliente, lineas, totalCents, rechazo, cobrando, onConf
 function CobroExitoso({ resultado, onNuevaVenta }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-4 p-4">
-      <div className="mt-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
-        <IconCheck className="h-8 w-8" strokeWidth={2.5} />
-      </div>
-      <div className="text-center">
-        <p className="font-display text-2xl font-bold">Pago exitoso</p>
-        <p className="text-sm text-muted">Transacción {resultado.codigo}</p>
-        {resultado.repetido && (
-          <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Este cobro ya se había registrado: se muestra el comprobante original y no se cobró otra vez.
-          </p>
-        )}
-      </div>
+      <TarjetaLectura
+        tono="success"
+        titulo="Pago exitoso"
+        nombre={resultado.cliente.nombre}
+        codigo={resultado.codigo}
+        motivo={
+          resultado.repetido
+            ? 'Este cobro ya se había registrado: se muestra el comprobante original y no se cobró otra vez.'
+            : null
+        }
+      />
       <dl className="grid w-full gap-2 rounded-xl border border-border bg-white p-4 text-sm">
         {[
           ['Cliente', resultado.cliente.nombre],

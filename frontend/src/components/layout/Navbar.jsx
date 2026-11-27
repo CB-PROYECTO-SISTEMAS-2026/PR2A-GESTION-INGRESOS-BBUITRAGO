@@ -38,8 +38,8 @@ function panelLinks(hasRole) {
   if (hasRole('RECARGADOR')) links.push({ to: '/recargas', label: 'Recargas' })
   if (hasRole('DEVOLUCIONES')) links.push({ to: '/devoluciones', label: 'Devoluciones' })
   if (hasRole('ENCARGADO_ACCESO')) {
-    links.push({ to: '/supervisor', label: 'Entrega de manillas' })
-    links.push({ to: '/supervisor/acceso', label: 'Control de acceso' })
+    links.push({ to: '/supervisor', label: 'Puerta' })
+    links.push({ to: '/supervisor/manillas', label: 'Manillas' })
   }
   return links
 }
@@ -156,53 +156,6 @@ function UserMenu({ user, logout, panels }) {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function MobileNav({ links, onNavigate }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return undefined
-    const onDoc = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [open])
-
-  return (
-    <div className="relative md:hidden" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-label="Abrir menú de navegación"
-        className="flex h-10 w-10 items-center justify-center rounded-md border border-sidebar-border text-white hover:border-primary-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-focus"
-      >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-      {open && (
-        <nav className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-md border border-border bg-surface py-1 text-ink shadow-lg" aria-label="Secciones">
-          {links.map((l) => (
-            <Link
-              key={l.label}
-              to={l.to}
-              onClick={(e) => {
-                setOpen(false)
-                onNavigate?.(e, l)
-              }}
-              className="block px-3 py-2.5 text-sm hover:bg-page"
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-      )}
     </div>
   )
 }
@@ -326,7 +279,16 @@ export default function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
-          <MobileNav links={HOME_SECTIONS} onNavigate={onSectionNav} />
+          <NavLink
+            to="/eventos"
+            className={({ isActive }) =>
+              `hidden max-md:inline text-sm font-medium transition ${
+                isActive ? 'text-primary-focus' : 'text-slate-300 hover:text-white'
+              }`
+            }
+          >
+            Explorar
+          </NavLink>
           {isAuthenticated ? (
             <>
               {hasRole('CLIENTE') && <SaldoEvento />}

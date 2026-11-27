@@ -1,6 +1,18 @@
-import SupervisorSidebar from './SupervisorSidebar'
-import PanelLayout from './PanelLayout'
+import StaffLayout from './StaffLayout'
 
+const TABS = [
+  { to: '/supervisor', label: 'Puerta', end: true },
+  { to: '/supervisor/manillas', label: 'Manillas' },
+]
+
+/** Terminal del encargado de acceso: puerta y entrega de manillas, en el celular. */
 export default function SupervisorLayout() {
-  return <PanelLayout sidebar={SupervisorSidebar} />
+  return (
+    <StaffLayout
+      tabs={TABS}
+      label="Acceso"
+      perfilPath="/supervisor/perfil"
+      lectorPath="/supervisor"
+    />
+  )
 }

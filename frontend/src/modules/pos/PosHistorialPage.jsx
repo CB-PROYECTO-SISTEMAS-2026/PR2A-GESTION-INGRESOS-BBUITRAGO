@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getMisVentas } from '../../api/pos.api'
 import RangoDiasFiltro from '../../components/staff/RangoDiasFiltro'
+import PendingRegion from '../../components/ui/PendingRegion'
 import { formatBs, formatDay, formatDayRange, formatTime, getErrorMessage, localDay } from '../../utils/format'
 
 /** HU-024: ventas cobradas por el ayudante, por día o rango de fechas. */
@@ -53,6 +54,12 @@ export default function PosHistorialPage() {
         </p>
       )}
 
+      {loading && !data ? (
+        <p className="text-center text-sm text-muted" role="status">
+          Cargando…
+        </p>
+      ) : (
+        <PendingRegion pending={loading} >
       {data && (
         <div className="flex items-end justify-between rounded-xl bg-teal/10 p-4">
           <div>
@@ -70,10 +77,7 @@ export default function PosHistorialPage() {
         </div>
       )}
 
-      {loading && !data ? (
-        <p className="text-center text-sm text-muted">Cargando…</p>
-      ) : (
-        <ul className="grid gap-2">
+        <ul className="mt-4 grid gap-2">
           {data?.ventas.map((v) => (
             <li key={v.id} className="flex items-center gap-3 rounded-xl border border-border bg-white p-3">
               <div className="w-14 shrink-0 text-center">
@@ -93,6 +97,7 @@ export default function PosHistorialPage() {
             </li>
           )}
         </ul>
+        </PendingRegion>
       )}
     </div>
   )

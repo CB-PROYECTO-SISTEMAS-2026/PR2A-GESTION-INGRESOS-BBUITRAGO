@@ -1,7 +1,8 @@
 import { Comprobante } from '../sprint3/Devoluciones'
-import { Tabla } from '../sprint3/comun'
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { consultarClienteDevolucion, devolverSaldo, getDevolucionesContexto } from '../../api/recargas.api'
+import TarjetaLectura from '../../components/terminal/TarjetaLectura'
 import { IconCheck, IconQr, IconWallet, IconWarning } from '../../components/ui/icons'
 import { useAuth } from '../../context/AuthContext'
 import { feedbackError, feedbackOk } from '../../utils/feedback'
@@ -29,6 +30,8 @@ function textoPlazo(plazo) {
  */
 export default function DevolucionPage() {
   const { user } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const eventoKey = `eventix_devoluciones_evento:${user?.id ?? ''}`
   const [ctx, setCtx] = useState(null)
   const [loadError, setLoadError] = useState('')
@@ -62,6 +65,12 @@ export default function DevolucionPage() {
   useEffect(() => {
     if (eventoId) writeStorage(eventoKey, eventoId)
   }, [eventoKey, eventoId])
+
+  useEffect(() => {
+    if (!location.state?.openLector) return
+    setPaso('escanear')
+    navigate('.', { replace: true, state: {} })
+  }, [location.state?.openLector, navigate])
 
   const disponibles = ctx?.eventos.filter((e) => e.disponible) ?? []
   const evento = disponibles.find((e) => e.id === eventoId)
@@ -245,11 +254,7 @@ export default function DevolucionPage() {
             <CodigoScanner onCodigo={onCodigo} disabled={buscando} />
           </Suspense>
           {buscando && <p className="text-center text-sm text-muted">Buscando cliente…</p>}
-          {scanError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
-              {scanError}
-            </p>
-          )}
+          {scanError && <TarjetaLectura tono="danger" titulo="No se pudo leer" motivo={scanError} />}
           <button type="button" className="py-2 text-sm font-semibold text-muted" onClick={volverAlInicio}>
             Volver
           </button>
@@ -287,18 +292,11 @@ export default function DevolucionPage() {
 function Rechazo({ rechazo }) {
   if (!rechazo) return null
   return (
-    <div
-      className={`flex gap-3 rounded-xl border-2 p-4 ${
-        rechazo.pendiente ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-red-500 bg-red-50 text-red-800'
-      }`}
-      role="alert"
-    >
-      <IconWarning className="mt-0.5 h-6 w-6 shrink-0" />
-      <div>
-        <p className="font-bold">{rechazo.pendiente ? 'Devolución sin confirmar' : 'Devolución rechazada'}</p>
-        <p className="text-sm">{rechazo.mensaje}</p>
-      </div>
-    </div>
+    <TarjetaLectura
+      tono={rechazo.pendiente ? 'warning' : 'danger'}
+      titulo={rechazo.pendiente ? 'Devolución sin confirmar' : 'Devolución rechazada'}
+      motivo={rechazo.mensaje}
+    />
   )
 }
 
@@ -350,7 +348,27 @@ function DetalleCliente({ cliente, verificado, onVerificado, rechazo, onContinua
 
       <Rechazo rechazo={rechazo} />
 
-      <Tabla titulo="Últimos movimientos del evento" columnas={['Fecha','Operación','Monto','Estado']} filas={(cliente.movimientos||[]).map(m=>[formatDateTime(m.createdAt),m.tipo,formatBs(m.monto),m.estado])}/>
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-ink">Últimos movimientos</h2>
+        {(cliente.movimientos || []).length ? (
+          <ul className="grid gap-2">
+            {cliente.movimientos.map((m, i) => (
+              <li key={m.id || i} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-white p-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-ink">{m.tipo}</p>
+                  <p className="text-xs text-muted">{formatDateTime(m.createdAt)}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-semibold text-ink">{formatBs(m.monto)}</p>
+                  <p className="text-xs text-muted">{m.estado}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">Sin movimientos en este evento.</p>
+        )}
+      </section>
       {cliente.puedeDevolver && fotoIngreso ? (
         <>
           <p className="rounded-xl bg-teal/10 p-4 text-sm text-teal-dark">
@@ -448,18 +466,17 @@ function ConfirmarDevolucion({ cliente, rechazo, enviando, onConfirmar, onCancel
 function DevolucionExitosa({ resultado, onNueva, onInicio }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-4 p-4">
-      <div className="mt-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
-        <IconCheck className="h-8 w-8" strokeWidth={2.5} />
-      </div>
-      <div className="text-center">
-        <p className="font-display text-2xl font-bold">Devolución Exitosa</p>
-        <p className="text-sm text-muted">Transacción completada con éxito</p>
-        {resultado.repetido && (
-          <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Esta devolución ya se había registrado: se muestra el comprobante original y no se descontó otra vez.
-          </p>
-        )}
-      </div>
+      <TarjetaLectura
+        tono="success"
+        titulo="Devolución exitosa"
+        nombre={resultado.cliente.nombre}
+        codigo={resultado.codigo}
+        motivo={
+          resultado.repetido
+            ? 'Esta devolución ya se había registrado: se muestra el comprobante original y no se descontó otra vez.'
+            : null
+        }
+      />
       <div className="w-full rounded-xl border border-border bg-white p-4 text-center">
         <p className="font-semibold">{resultado.cliente.nombre}</p>
         {resultado.cliente.identificador && (

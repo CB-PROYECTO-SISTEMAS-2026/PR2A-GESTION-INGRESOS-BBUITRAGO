@@ -12,6 +12,9 @@ export const deleteProducto = (productoId) => api.delete(`/productos/${productoI
 
 export const createAyudante = (negocioId, data) =>
   api.post(`/negocios/${negocioId}/ayudantes`, data)
+export const updateAyudante = (ayudanteId, data) =>
+  api.patch(`/ayudantes/${ayudanteId}`, data)
+export const deleteAyudante = (ayudanteId) => api.delete(`/ayudantes/${ayudanteId}`)
 export const asignarAyudante = (ayudanteId, data) =>
   api.patch(`/ayudantes/${ayudanteId}/asignar`, data)
 
